@@ -37,6 +37,7 @@ public class MovementController extends Node {
   private double speed = 0.0;
   private double camRotation = 0.0;
   private double playerInitRotation = 0.0;
+  private StrafingState.StrafingStateType strafingStateType = StrafingState.StrafingStateType.NOT_STRAFING;
 
   @RegisterFunction
   @Override
@@ -70,7 +71,18 @@ public class MovementController extends Node {
     player.moveAndSlide();
 
     // Handle Mesh Rotation
-    double targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
+    double targetRotation;
+    if (strafingStateType ==  StrafingState.StrafingStateType.STRAFING) {
+      // Face camera direction regardless of movement
+      targetRotation = camRotation - playerInitRotation;
+    } else {
+      // Face movement direction (only when actually moving)
+      if (direction.lengthSquared() > 0.001) {
+        targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
+      } else {
+        targetRotation = meshRoot.getRotation().getY(); // hold current facing
+      }
+    }
 
     Vector3 currentRot = meshRoot.getRotation();
     double newY = GD.lerpAngle(currentRot.getY(), targetRotation, rotationSpeed * delta);
@@ -87,11 +99,13 @@ public class MovementController extends Node {
 
   @RegisterFunction
   public void onSetMovementState(MovementState movementState) {
-
-    GD.print("onSetMovementState" + movementState.toString() + ", accel" + movementState.getAcceleration());
-
     speed = movementState.getMovementSpeed();
     acceleration = movementState.getAcceleration();
+  }
+
+  @RegisterFunction
+  public void onSetStrafingState(StrafingState strafingState) {
+    this.strafingStateType = strafingState.getStrafingStateType();
   }
 
   @RegisterFunction

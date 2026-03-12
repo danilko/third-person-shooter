@@ -25,6 +25,8 @@ public class Player extends CharacterBody3D {
   @RegisterSignal
   public final Signal1<Vector3> changedMovementDirection = Signal1.create(this, "changedMovementDirection");
 
+  @RegisterSignal
+  public final Signal1<StrafingState> changedStrafingState= Signal1.create(this, "changedStrafingState");
   // Exports
   @RegisterProperty
   public int maxAirJump = 1;
@@ -43,6 +45,7 @@ public class Player extends CharacterBody3D {
   private String currentStanceName = "Upright";
   private String currentMovementStateName = "";
   private SceneTreeTimer stanceAntispamTimer;
+  private StrafingState strafingState = new StrafingState();
 
   @RegisterFunction
   @Override
@@ -55,15 +58,18 @@ public class Player extends CharacterBody3D {
     changedMovementDirection.emit(Vector3.Companion.getBACK());
     setMovementState("Idle");
     setStance(currentStanceName);
+    setStrafingState();
   }
 
   @RegisterFunction
   @Override
   public void _input(InputEvent event) {
     if (event == null) return;
-
+    Input input = Input.INSTANCE;
     if (event.isActionPressed("movement", false) || event.isActionReleased("movement", false)) {
-      Input input = Input.INSTANCE;
+
+
+
       movementDirection.setX(input.getActionStrength("left") - input.getActionStrength("right"));
       movementDirection.setZ(input.getActionStrength("forward") - input.getActionStrength("back"));
       String movementState = "Idle";
@@ -81,7 +87,19 @@ public class Player extends CharacterBody3D {
       setMovementState(movementState);
     }
 
-    if (event.isActionPressed("jump", false)) {
+    // Update staring
+    boolean isAiming = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
+    StrafingState.StrafingStateType desired = isAiming
+                                                ? StrafingState.StrafingStateType.STRAFING
+                                                : StrafingState.StrafingStateType.NOT_STRAFING;
+
+    if (strafingState.getStrafingStateType() != desired) {
+      strafingState.setStrafingStateType(desired);
+
+      setStrafingState();
+    }
+
+    if (input.isActionPressed("jump", false)) {
       if (airJumpCounter <= maxAirJump) {
         if (isStanceBlocked("Upright")) return;
 
@@ -106,6 +124,10 @@ public class Player extends CharacterBody3D {
         }
       }
     }
+  }
+
+  private void setStrafingState() {
+    changedStrafingState.emit(strafingState);
   }
 
   @RegisterFunction
@@ -136,7 +158,6 @@ public class Player extends CharacterBody3D {
     Stance stanceNode = (Stance) getNode(path);
     if (stanceNode == null) return;
     currentMovementStateName = state;
-
     changedMovementState.emit(stanceNode.getMovementState(state));
   }
 
@@ -270,5 +291,9 @@ public class Player extends CharacterBody3D {
 
   public void setStanceAntispamTimer(SceneTreeTimer stanceAntispamTimer) {
     this.stanceAntispamTimer = stanceAntispamTimer;
+  }
+
+  public StrafingState getStrafingState() {
+    return strafingState;
   }
 }

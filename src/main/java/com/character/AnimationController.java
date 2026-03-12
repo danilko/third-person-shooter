@@ -10,6 +10,8 @@ import godot.api.Tween;
 import godot.annotation.Export;
 import godot.annotation.RegisterProperty;
 import godot.core.NodePath;
+import godot.core.Vector2;
+import godot.core.Vector3;
 import godot.global.GD;
 
 @RegisterClass(className = "AnimationController")
@@ -27,6 +29,10 @@ public class AnimationController extends Node {
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
   private String currentStanceName = "Upright";
+  private StrafingState.StrafingStateType strafingStateType = StrafingState.StrafingStateType.NOT_STRAFING;
+  private Vector2 movementDirection = new Vector2();
+  private Vector2 animationDirection = new Vector2();
+  private MovementState currentMovementState = null;
 
   @RegisterFunction
   @Override
@@ -54,22 +60,8 @@ public class AnimationController extends Node {
 
   @RegisterFunction
   public void onSetMovementState(MovementState movementState) {
-    if (animationTree == null) return;
-
-    // Clean up previous tween
-    if (tween != null && tween.isValid()) {
-      tween.kill();
-    }
-
-    tween = createTween();
-
-    // Tween the blend position (id)
-    String blendPath = "parameters/" + currentStanceName + "MovementBlend/blend_position";
-    tween.tweenProperty(animationTree, new NodePath(blendPath), movementState.id, 0.25);
-
-    // Tween the animation speed scale in parallel
-    String speedPath = "parameters/MovementAnimSpeed/scale";
-    tween.parallel().tweenProperty(animationTree, new NodePath(speedPath), movementState.animationSpeed, 0.7);
+    currentMovementState = movementState;
+    updateAnimationBlend(movementState);
   }
 
   @RegisterFunction
@@ -79,5 +71,44 @@ public class AnimationController extends Node {
     // Update the transition and keep track of the current stance name
     animationTree.set("parameters/StanceTransition/transition_request", stance.getName().toString());
     this.currentStanceName = stance.getName().toString();
+  }
+
+
+  @RegisterFunction
+  public void onSetStrafingState(StrafingState strafingState) {
+    this.strafingStateType = strafingState.getStrafingStateType();
+    updateAnimationBlend(currentMovementState);
+  }
+
+  @RegisterFunction
+  public void onSetMovementDirection(Vector3 movementDirection) {
+    this.movementDirection.setX(movementDirection.getX() == 0 ? 0 : movementDirection.getX() > 0 ? 1 : -1);
+    this.movementDirection.setY(movementDirection.getZ() == 0 ? 0 : movementDirection.getZ() > 0 ? 1 : -1);
+  }
+
+  private void updateAnimationBlend(MovementState movementState) {
+    if (animationTree == null || currentMovementState == null) return;
+
+    if (tween != null && tween.isValid()) {
+      tween.kill();
+    }
+
+    tween = createTween();
+
+    if (strafingStateType == StrafingState.StrafingStateType.STRAFING) {
+      animationDirection.setX(movementDirection.getX());
+      animationDirection.setY(movementDirection.getY());
+    } else {
+      animationDirection.setX(0.0f);
+      animationDirection.setY(movementState.getId());
+    }
+
+    GD.print("starf:" + (strafingStateType == StrafingState.StrafingStateType.STRAFING) + "," + animationDirection);
+
+    String blendPath = "parameters/" + currentStanceName + "MovementBlend/blend_position";
+    tween.tweenProperty(animationTree, new NodePath(blendPath), animationDirection, 0.25);
+
+    String speedPath = "parameters/MovementAnimSpeed/scale";
+    tween.parallel().tweenProperty(animationTree, new NodePath(speedPath), movementState.animationSpeed, 0.7);
   }
 }

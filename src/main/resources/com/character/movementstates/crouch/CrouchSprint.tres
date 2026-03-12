@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_8e1n1")
-id = 1
+id = 2
 movement_speed = 2.25
 acceleration = 7.0
 camera_fov = 70.0

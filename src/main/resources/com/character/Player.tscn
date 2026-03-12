@@ -1,4 +1,4 @@
-[gd_scene load_steps=43 format=3 uid="uid://bwxj3ecw2ta4k"]
+[gd_scene load_steps=63 format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="1_i0ahk"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
@@ -28,6 +28,33 @@ animation = &"air_jump"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jn40o"]
 animation = &"jump"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_u0wnu"]
+animation = &"crawl"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_v8d07"]
+animation = &"crawl-idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ufc68"]
+animation = &"crawl"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_4t16q"]
+animation = &"crawl"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_rgjax"]
+animation = &"crawl"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_d6yvc"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_u0wnu")
+blend_point_0/pos = Vector2(0, 1)
+blend_point_1/node = SubResource("AnimationNodeAnimation_v8d07")
+blend_point_1/pos = Vector2(0, 0)
+blend_point_2/node = SubResource("AnimationNodeAnimation_ufc68")
+blend_point_2/pos = Vector2(0, -1)
+blend_point_3/node = SubResource("AnimationNodeAnimation_4t16q")
+blend_point_3/pos = Vector2(-1, 0)
+blend_point_4/node = SubResource("AnimationNodeAnimation_rgjax")
+blend_point_4/pos = Vector2(1, 0)
+
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_dnye5"]
 animation = &"crawl-idle"
 
@@ -53,6 +80,33 @@ blend_point_0/pos = 0.0
 blend_point_1/node = SubResource("AnimationNodeAnimation_j83q5")
 blend_point_1/pos = 1.0
 min_space = 0.0
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_cet18"]
+animation = &"crouch"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_sy336"]
+animation = &"crouch_walk_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jxrhs"]
+animation = &"crouch_walk_right"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_8ulcr"]
+animation = &"crouch_walk_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_pk7bh"]
+animation = &"crouch_walk_back"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_v5nep"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_cet18")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_1/node = SubResource("AnimationNodeAnimation_sy336")
+blend_point_1/pos = Vector2(-1, 0)
+blend_point_2/node = SubResource("AnimationNodeAnimation_jxrhs")
+blend_point_2/pos = Vector2(1, 0)
+blend_point_3/node = SubResource("AnimationNodeAnimation_8ulcr")
+blend_point_3/pos = Vector2(0, 1)
+blend_point_4/node = SubResource("AnimationNodeAnimation_pk7bh")
+blend_point_4/pos = Vector2(0, -1)
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_ige6o"]
 animation = &"falling-loop-Godot_Chan_Stealth"
@@ -84,6 +138,46 @@ input_2/auto_advance = false
 input_2/break_loop_at_end = false
 input_2/reset = true
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_k4e70"]
+animation = &"idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_5qqj5"]
+animation = &"run_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_8mmyv"]
+animation = &"run_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1qhsf"]
+animation = &"walk_left"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_psjdo"]
+animation = &"walk_right"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wev4p"]
+animation = &"walk_forward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_4afhp"]
+animation = &"walk_backward"
+
+[sub_resource type="AnimationNodeBlendSpace2D" id="AnimationNodeBlendSpace2D_u0wnu"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_k4e70")
+blend_point_0/pos = Vector2(0, 0)
+blend_point_1/node = SubResource("AnimationNodeAnimation_5qqj5")
+blend_point_1/pos = Vector2(0, 2)
+blend_point_2/node = SubResource("AnimationNodeAnimation_8mmyv")
+blend_point_2/pos = Vector2(0, -2)
+blend_point_3/node = SubResource("AnimationNodeAnimation_1qhsf")
+blend_point_3/pos = Vector2(-1, 0)
+blend_point_4/node = SubResource("AnimationNodeAnimation_psjdo")
+blend_point_4/pos = Vector2(1, 0)
+blend_point_5/node = SubResource("AnimationNodeAnimation_wev4p")
+blend_point_5/pos = Vector2(0, 1)
+blend_point_6/node = SubResource("AnimationNodeAnimation_4afhp")
+blend_point_6/pos = Vector2(0, -1)
+min_space = Vector2(-1, -2)
+max_space = Vector2(1, 2)
+snap = Vector2(1, 1)
+
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_6f0xc"]
 animation = &"idle"
 
@@ -104,14 +198,14 @@ min_space = 0.0
 max_space = 2.0
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
-graph_offset = Vector2(-792.0469, 96.138)
+graph_offset = Vector2(-1355.2292, 2.0208435)
 nodes/output/position = Vector2(1180, 160)
-nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace1D_ige6o")
-nodes/UprightMovementBlend/position = Vector2(-260, -120)
-nodes/CrouchMovementBlend/node = SubResource("AnimationNodeBlendSpace1D_2iqcg")
-nodes/CrouchMovementBlend/position = Vector2(-260, 120)
-nodes/CrawlMovementBlend/node = SubResource("AnimationNodeBlendSpace1D_jn40o")
-nodes/CrawlMovementBlend/position = Vector2(-260, 360)
+nodes/UprightMovementBlendBack/node = SubResource("AnimationNodeBlendSpace1D_ige6o")
+nodes/UprightMovementBlendBack/position = Vector2(-980, -100)
+"nodes/CrouchMovementBlend Back/node" = SubResource("AnimationNodeBlendSpace1D_2iqcg")
+"nodes/CrouchMovementBlend Back/position" = Vector2(-1140, 160)
+"nodes/CrawlMovementBlendBack 1/node" = SubResource("AnimationNodeBlendSpace1D_jn40o")
+"nodes/CrawlMovementBlendBack 1/position" = Vector2(-1060, 380)
 "nodes/Animation 2/node" = SubResource("AnimationNodeAnimation_2iqcg")
 "nodes/Animation 2/position" = Vector2(960, 380)
 nodes/StanceTransition/node = SubResource("AnimationNodeTransition_jn40o")
@@ -128,6 +222,12 @@ nodes/AirJump/node = SubResource("AnimationNodeOneShot_ige6o")
 nodes/AirJump/position = Vector2(960, 80)
 nodes/Animation/node = SubResource("AnimationNodeAnimation_jn40o")
 nodes/Animation/position = Vector2(540, 400)
+nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_u0wnu")
+nodes/UprightMovementBlend/position = Vector2(-260, -120)
+nodes/CrouchMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_v5nep")
+nodes/CrouchMovementBlend/position = Vector2(-260, 100)
+nodes/CrawlMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_d6yvc")
+nodes/CrawlMovementBlend/position = Vector2(-300, 360)
 node_connections = [&"output", 0, &"AirJump", &"StanceTransition", 0, &"UprightMovementBlend", &"StanceTransition", 1, &"CrouchMovementBlend", &"StanceTransition", 2, &"CrawlMovementBlend", &"MovementAnimSpeed", 0, &"StanceTransition", &"OnFloorBlend", 0, &"Falling", &"OnFloorBlend", 1, &"MovementAnimSpeed", &"GroundJump", 0, &"OnFloorBlend", &"GroundJump", 1, &"Animation", &"AirJump", 0, &"GroundJump", &"AirJump", 1, &"Animation 2"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_yfjlo"]
@@ -165,15 +265,15 @@ bones/0/position = Vector3(9.801669e-17, -0.0081920745, -0.080805)
 bones/0/rotation = Quaternion(0.49999997, 0.5000001, 0.5, 0.49999994)
 bones/1/rotation = Quaternion(0.59183085, 0.35592884, 0.64538103, -0.3263959)
 bones/2/position = Vector3(2.463313e-08, 0.08255872, 2.0098608e-07)
-bones/2/rotation = Quaternion(0.43516025, -0.0041313698, 0.036794867, 0.89959145)
+bones/2/rotation = Quaternion(0.43706575, -0.0040271473, 0.03680657, 0.8986671)
 bones/3/position = Vector3(5.736744e-10, 0.062254008, -1.2457261e-07)
-bones/3/rotation = Quaternion(-0.10683759, 0.0025515535, 0.0106963515, 0.9942157)
+bones/3/rotation = Quaternion(-0.11734594, 0.0025363686, 0.01069858, 0.99303025)
 bones/4/position = Vector3(-2.8325545e-10, 0.08556752, 6.214298e-07)
-bones/4/rotation = Quaternion(-0.050547786, -7.7625155e-05, 5.8839582e-06, 0.9987217)
+bones/4/rotation = Quaternion(-0.037124276, -0.00020558306, 1.5584685e-05, 0.99931073)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(-0.00047398827, -0.018184187, -0.6750532, 0.73754483)
 bones/6/position = Vector3(8.023931e-07, 0.127426, -1.2913566e-07)
-bones/6/rotation = Quaternion(-0.10483943, 0.06539307, -0.6552925, 0.7452009)
+bones/6/rotation = Quaternion(-0.10173876, 0.061056696, -0.6557717, 0.7455768)
 bones/7/position = Vector3(-8.8424995e-06, 0.21891475, 4.756102e-07)
 bones/7/rotation = Quaternion(0.30276728, -0.06968067, 0.017427504, 0.95035416)
 bones/8/position = Vector3(3.8872545e-06, 0.1973007, -1.0646324e-06)
@@ -211,7 +311,7 @@ bones/23/rotation = Quaternion(0.2134944, 0.14238712, 0.26183495, 0.9303701)
 bones/24/position = Vector3(-0.021079943, 0.21339336, 0.0025152338)
 bones/24/rotation = Quaternion(-0.00047399482, 0.018184135, 0.67505383, 0.73754424)
 bones/25/position = Vector3(-7.3546835e-07, 0.12742592, -1.3498003e-07)
-bones/25/rotation = Quaternion(-0.12343642, -0.071279034, 0.6557265, 0.74142134)
+bones/25/rotation = Quaternion(-0.12023755, -0.06700329, 0.65630543, 0.7418333)
 bones/26/position = Vector3(9.0478825e-06, 0.21891458, 5.191955e-07)
 bones/26/rotation = Quaternion(0.30276728, 0.06968069, -0.017427512, 0.9503541)
 bones/27/position = Vector3(-3.8339786e-06, 0.19730073, -9.966508e-07)
@@ -247,7 +347,7 @@ bones/41/rotation = Quaternion(0.29147688, -0.39089304, 0.25898, 0.83377045)
 bones/42/position = Vector3(-3.4885336e-06, 0.030804897, 6.338854e-06)
 bones/42/rotation = Quaternion(0.21353126, -0.14241993, -0.2618033, 0.93036556)
 bones/43/position = Vector3(1.301939e-09, 0.2767149, -0.01678027)
-bones/43/rotation = Quaternion(0.1917351, 3.250717e-05, -7.0225997e-06, 0.9814468)
+bones/43/rotation = Quaternion(0.18613149, 8.577448e-05, -1.8562603e-05, 0.9825249)
 bones/44/position = Vector3(1.119872e-09, 0.10856666, -1.921447e-06)
 bones/44/rotation = Quaternion(-0.21635222, -3.5772466e-08, -1.40684415e-08, 0.97631544)
 bones/45/position = Vector3(0.08844693, -0.004813221, -0.01024066)
@@ -267,9 +367,9 @@ bones/52/rotation = Quaternion(-0.33835617, -0.020245912, -0.033779427, 0.940193
 root_node = NodePath("../Model")
 tree_root = SubResource("AnimationNodeBlendTree_jn40o")
 anim_player = NodePath("../Model/AnimationPlayer")
-parameters/UprightMovementBlend/blend_position = 0.0
-parameters/CrouchMovementBlend/blend_position = 0.0
-parameters/CrawlMovementBlend/blend_position = 0.0
+parameters/UprightMovementBlendBack/blend_position = 0.0
+"parameters/CrouchMovementBlend Back/blend_position" = 0.0
+"parameters/CrawlMovementBlendBack 1/blend_position" = 0.0
 parameters/StanceTransition/current_state = "Upright"
 parameters/StanceTransition/transition_request = ""
 parameters/StanceTransition/current_index = 0
@@ -281,6 +381,9 @@ parameters/GroundJump/request = 0
 parameters/AirJump/active = false
 parameters/AirJump/internal_active = false
 parameters/AirJump/request = 0
+parameters/UprightMovementBlend/blend_position = Vector2(0, 0)
+parameters/CrouchMovementBlend/blend_position = Vector2(0, 0)
+parameters/CrawlMovementBlend/blend_position = Vector2(0, 0)
 
 [node name="UprightCollision" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
@@ -364,11 +467,14 @@ shape = SubResource("CylinderShape3D_gguhd")
 disabled = true
 
 [connection signal="changed_movement_direction" from="." to="MovementController" method="on_set_movement_direction"]
+[connection signal="changed_movement_direction" from="." to="AnimationController" method="on_set_movement_direction"]
 [connection signal="changed_movement_state" from="." to="CameraRoot" method="on_set_movement_state"]
 [connection signal="changed_movement_state" from="." to="MovementController" method="on_set_movement_state"]
 [connection signal="changed_movement_state" from="." to="AnimationController" method="on_set_movement_state"]
 [connection signal="changed_stance" from="." to="CameraRoot" method="on_set_stance"]
 [connection signal="changed_stance" from="." to="AnimationController" method="on_set_stance"]
+[connection signal="changed_strafing_state" from="." to="MovementController" method="on_set_strafing_state"]
+[connection signal="changed_strafing_state" from="." to="AnimationController" method="on_set_strafing_state"]
 [connection signal="pressed_jump" from="." to="MovementController" method="jump"]
 [connection signal="pressed_jump" from="." to="AnimationController" method="jump"]
 [connection signal="set_cam_rotation" from="CameraRoot" to="MovementController" method="on_set_cam_rotation"]
