@@ -65,7 +65,21 @@ public class Player extends CharacterBody3D {
   @Override
   public void _input(InputEvent event) {
     if (event == null) return;
+
     Input input = Input.INSTANCE;
+
+    // Update staring
+    boolean isAiming = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
+    StrafingState.StrafingStateType desired = isAiming
+                                                ? StrafingState.StrafingStateType.STRAFING
+                                                : StrafingState.StrafingStateType.NOT_STRAFING;
+
+    if (strafingState.getStrafingStateType() != desired) {
+      strafingState.setStrafingStateType(desired);
+
+      setStrafingState();
+    }
+
     if (event.isActionPressed("movement", false) || event.isActionReleased("movement", false)) {
 
 
@@ -83,21 +97,10 @@ public class Player extends CharacterBody3D {
           movementState = "Sprint";
         }
       }
-
       setMovementState(movementState);
     }
 
-    // Update staring
-    boolean isAiming = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
-    StrafingState.StrafingStateType desired = isAiming
-                                                ? StrafingState.StrafingStateType.STRAFING
-                                                : StrafingState.StrafingStateType.NOT_STRAFING;
 
-    if (strafingState.getStrafingStateType() != desired) {
-      strafingState.setStrafingStateType(desired);
-
-      setStrafingState();
-    }
 
     if (input.isActionPressed("jump", false)) {
       if (airJumpCounter <= maxAirJump) {

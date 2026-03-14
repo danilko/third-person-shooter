@@ -77,13 +77,14 @@ public class AnimationController extends Node {
   @RegisterFunction
   public void onSetStrafingState(StrafingState strafingState) {
     this.strafingStateType = strafingState.getStrafingStateType();
-    updateAnimationBlend(currentMovementState);
   }
 
   @RegisterFunction
   public void onSetMovementDirection(Vector3 movementDirection) {
     this.movementDirection.setX(movementDirection.getX() == 0 ? 0 : movementDirection.getX() > 0 ? 1 : -1);
     this.movementDirection.setY(movementDirection.getZ() == 0 ? 0 : movementDirection.getZ() > 0 ? 1 : -1);
+
+    updateAnimationBlend(currentMovementState);
   }
 
   private void updateAnimationBlend(MovementState movementState) {
@@ -96,8 +97,9 @@ public class AnimationController extends Node {
     tween = createTween();
 
     if (strafingStateType == StrafingState.StrafingStateType.STRAFING) {
-      animationDirection.setX(movementDirection.getX());
-      animationDirection.setY(movementDirection.getY());
+      int id = Math.min(movementState.getId(), 1);
+      animationDirection.setX(id * movementDirection.getX());
+      animationDirection.setY(id * movementDirection.getY());
     } else {
       animationDirection.setX(0.0f);
       animationDirection.setY(movementState.getId());
