@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CombatState" load_steps=2 format=3 uid="uid://hfsbhmhtpqq8"]
+
+[ext_resource type="Script" path="res://gdj/com/character/CombatState.gdj" id="1_lp2gr"]
+
+[resource]
+script = ExtResource("1_lp2gr")
+combat = true
+movement_speed_factor = 0.9
+strafing_movement_acceleration_factor = 0.8
+metadata/_custom_type_script = "uid://mtsj57twt27p"
