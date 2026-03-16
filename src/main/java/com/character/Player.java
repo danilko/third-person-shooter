@@ -62,6 +62,9 @@ public class Player extends CharacterBody3D {
   private SceneTreeTimer rollCooldownTimer;
   private boolean combat = false;
 
+  private RayCast3D rayCast3D;
+  private Marker3D  marker3D;
+
   @RegisterFunction
   @Override
   public void _ready() {
@@ -71,6 +74,10 @@ public class Player extends CharacterBody3D {
       rollCooldownTimer = tree.createTimer(0.0f);
     }
 
+    rayCast3D = (RayCast3D) getNode("CameraRoot/CamYaw/CamPitch/SpringArm/Camera/RayCast3D");
+
+    rayCast3D.addException(this);
+    marker3D = (Marker3D)getNode("CameraRoot/CamYaw/CamPitch/SpringArm/Camera/SpineIKTarget");
     changedMovementDirection.emit(Vector3.Companion.getBACK());
     setMovementState("Idle");
     setStance(currentStanceName);
@@ -208,6 +215,15 @@ public class Player extends CharacterBody3D {
       airJumpCounter = 0;
     } else if (airJumpCounter == 0) {
       airJumpCounter = 1;
+    }
+
+    if (combat) {
+      if(rayCast3D.isColliding()) {
+        marker3D.setGlobalPosition(rayCast3D.getCollisionPoint());
+      }
+      else {
+        marker3D.setGlobalPosition(rayCast3D.toGlobal(rayCast3D.getTargetPosition()));
+      }
     }
   }
 

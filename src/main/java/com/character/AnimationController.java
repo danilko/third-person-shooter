@@ -2,11 +2,7 @@ package com.character;
 
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
-import godot.api.AnimationNodeOneShot;
-import godot.api.AnimationTree;
-import godot.api.CharacterBody3D;
-import godot.api.Node;
-import godot.api.Tween;
+import godot.api.*;
 import godot.annotation.Export;
 import godot.annotation.RegisterProperty;
 import godot.core.NodePath;
@@ -25,6 +21,10 @@ public class AnimationController extends Node {
   @Export
   public CharacterBody3D player;
 
+  @RegisterProperty
+  @Export
+  public LookAtModifier3D aimLookAtModifier;
+
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
@@ -37,7 +37,7 @@ public class AnimationController extends Node {
   @RegisterFunction
   @Override
   public void _physicsProcess(double delta) {
-    if (player == null || animationTree == null) return;
+    if (player == null || animationTree == null || aimLookAtModifier == null) return;
 
     // Calculate floor blend target
     onFloorBlendTarget = player.isOnFloor() ? 1.0 : 0.0;
@@ -94,6 +94,10 @@ public class AnimationController extends Node {
   @RegisterFunction
   public void onSetCombatState(CombatState combatState) {
       combat = combatState.isCombat();
+
+      animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
+
+      aimLookAtModifier.setActive(combat);
   }
 
   @RegisterFunction

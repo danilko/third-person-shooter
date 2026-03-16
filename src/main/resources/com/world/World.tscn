@@ -74,3 +74,5 @@ sky_mode = 1
 [node name="DirectionalLight3D2" type="DirectionalLight3D" parent="WorldEnvironment"]
 transform = Transform3D(0.9658932, -0.07774715, -0.24699299, 0.078457184, 0.996893, -0.00698126, 0.24676836, -0.012635224, 0.9689921, 0, 4.677, 0)
 light_energy = 0.03
+
+[connection signal="completed_roll" from="Player" to="Player/MovementController" method="completed_roll"]
