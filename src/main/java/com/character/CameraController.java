@@ -20,7 +20,6 @@ public class CameraController extends Node3D {
 
   private Node3D yawNode;
   private Node3D pitchNode;
-  private SpringArm3D springArm;
   private Camera3D camera;
 
   private double yaw = 0.0;
@@ -33,8 +32,8 @@ public class CameraController extends Node3D {
   private double pitchMin = -55.0;
 
   private Tween tween;
-  private Vector3 positionOffset = new Vector3(0, 1.3, 0);
-  private Vector3 positionOffsetTarget = new Vector3(0, 1.3, 0);
+  private Vector3 positionOffset = new Vector3(0, 0.8, 0);
+  private Vector3 positionOffsetTarget = new Vector3(0, 0.8, 0);
 
   @RegisterFunction
   @Override
@@ -44,8 +43,8 @@ public class CameraController extends Node3D {
     // Handling @onready assignments
     yawNode = (Node3D) getNode(new NodePath("CamYaw"));
     pitchNode = (Node3D) getNode(new NodePath("CamYaw/CamPitch"));
-    springArm = (SpringArm3D) getNode(new NodePath("CamYaw/CamPitch/SpringArm3D"));
-    camera = (Camera3D) getNode(new NodePath("CamYaw/CamPitch/SpringArm3D/Camera3D"));
+    SpringArm3D springArm = (SpringArm3D) getNode(new NodePath("CamYaw/CamPitch/SpringArm"));
+    camera = (Camera3D) getNode(new NodePath("CamYaw/CamPitch/SpringArm/Camera"));
 
     if (player != null) {
       springArm.addExcludedObject(player.getRid());

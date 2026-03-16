@@ -204,7 +204,7 @@ blend_point_1/node = SubResource("AnimationNodeAnimation_d6yvc")
 blend_point_1/pos = 1.0
 
 [sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jn40o"]
-graph_offset = Vector2(-144.73291, 130.54898)
+graph_offset = Vector2(-682.977, -76.36954)
 nodes/output/position = Vector2(1820, 140)
 nodes/UprightMovementBlend/node = SubResource("AnimationNodeBlendSpace2D_u0wnu")
 nodes/UprightMovementBlend/position = Vector2(-260, -120)
@@ -247,6 +247,7 @@ radius = 0.35
 height = 1.5
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_3mnk3"]
+radius = 0.1
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_gguhd"]
 radius = 0.35
@@ -277,19 +278,19 @@ combat_states = Dictionary[String, ExtResource("5_3qk6j")]({
 [node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(1.2786603e-09, -0.025128441, -0.080805)
+bones/0/position = Vector3(1.3198351e-09, -0.025673818, -0.080805)
 bones/0/rotation = Quaternion(0.49999997, 0.5000001, 0.5, 0.49999994)
-bones/1/rotation = Quaternion(0.5691066, 0.36702776, 0.6655059, -0.3138634)
+bones/1/rotation = Quaternion(0.56689507, 0.3680673, 0.6673907, -0.3126438)
 bones/2/position = Vector3(1.6179703e-08, 0.08255858, 1.6332916e-07)
-bones/2/rotation = Quaternion(0.43316585, -0.008070389, 0.070748985, 0.898497)
+bones/2/rotation = Quaternion(0.4330686, -0.008418412, 0.07379995, 0.89829516)
 bones/3/position = Vector3(-1.1143332e-09, 0.06225353, -1.1384274e-07)
-bones/3/rotation = Quaternion(-0.100449555, 0.0034911402, 0.014580616, 0.9948292)
+bones/3/rotation = Quaternion(-0.1004486, 0.0036382985, 0.01519521, 0.9948196)
 bones/4/position = Vector3(-7.9983126e-10, 0.085567415, 5.909288e-07)
 bones/4/rotation = Quaternion(-0.058687627, 1.652926e-08, -1.2197263e-09, 0.9982764)
 bones/5/position = Vector3(0.021079993, 0.2133932, 0.0025152443)
 bones/5/rotation = Quaternion(-0.00047398856, -0.018184187, -0.6750532, 0.73754483)
 bones/6/position = Vector3(5.669175e-07, 0.12742606, -1.5087662e-07)
-bones/6/rotation = Quaternion(-0.04336448, 0.04476952, -0.65208125, 0.7555828)
+bones/6/rotation = Quaternion(-0.046084374, 0.045772187, -0.6522683, 0.7552002)
 bones/7/position = Vector3(-8.844765e-06, 0.2189151, 4.8355594e-07)
 bones/7/rotation = Quaternion(0.30276728, -0.06968064, 0.017427512, 0.95035416)
 bones/8/position = Vector3(3.9159127e-06, 0.19730066, -1.0956303e-06)
@@ -327,7 +328,7 @@ bones/23/rotation = Quaternion(0.21349443, 0.14238714, 0.26183495, 0.9303701)
 bones/24/position = Vector3(-0.021079987, 0.21339312, 0.0025152534)
 bones/24/rotation = Quaternion(-0.00047399575, 0.018184133, 0.67505383, 0.73754424)
 bones/25/position = Vector3(-1.0230851e-06, 0.12742594, -1.441495e-07)
-bones/25/rotation = Quaternion(-0.18653236, -0.083846614, 0.655916, 0.7266016)
+bones/25/rotation = Quaternion(-0.18392773, -0.08342707, 0.65594673, 0.7272857)
 bones/26/position = Vector3(9.0469775e-06, 0.2189145, 3.7174473e-07)
 bones/26/rotation = Quaternion(0.30276728, 0.06968074, -0.017427487, 0.9503541)
 bones/27/position = Vector3(-3.7588259e-06, 0.1973006, -1.0633076e-06)
@@ -367,17 +368,17 @@ bones/43/rotation = Quaternion(0.1951483, 3.0960468e-08, 1.291161e-08, 0.9807737
 bones/44/position = Vector3(3.890395e-09, 0.10856683, -1.9013617e-06)
 bones/44/rotation = Quaternion(-0.21635221, -3.5972967e-08, -1.4342651e-08, 0.97631544)
 bones/45/position = Vector3(0.088446975, -0.0048133396, -0.010240662)
-bones/45/rotation = Quaternion(0.9073346, 0.16915236, -0.20211098, -0.3275404)
+bones/45/rotation = Quaternion(0.908443, 0.17131913, -0.2016359, -0.32361105)
 bones/46/position = Vector3(2.2732804e-06, 0.34780735, -1.4711743e-06)
-bones/46/rotation = Quaternion(0.29561287, 0.21912602, -0.062297747, 0.9277477)
-bones/47/rotation = Quaternion(-0.6101449, 0.017979136, -0.024473138, 0.7917077)
-bones/48/rotation = Quaternion(-0.47478783, 0.021221021, 0.020334387, 0.87960935)
+bones/46/rotation = Quaternion(0.31000298, 0.2182503, -0.06610765, 0.9229815)
+bones/47/rotation = Quaternion(-0.6103166, 0.0180276, -0.024484511, 0.79157394)
+bones/48/rotation = Quaternion(-0.4716305, 0.021203166, 0.020663252, 0.88129914)
 bones/49/position = Vector3(-0.08844692, -0.004813282, -0.010240703)
-bones/49/rotation = Quaternion(0.956463, 0.031151712, 0.27123865, -0.103139296)
+bones/49/rotation = Quaternion(0.95578784, 0.033788122, 0.27257457, -0.1050293)
 bones/50/position = Vector3(-2.274486e-06, 0.3478073, -1.5150933e-06)
-bones/50/rotation = Quaternion(0.1514317, -0.22523138, 0.024276964, 0.96215904)
-bones/51/rotation = Quaternion(-0.4792725, -0.02400237, 0.024701992, 0.8769901)
-bones/52/rotation = Quaternion(-0.27556258, -0.019669542, -0.039487, 0.96027035)
+bones/50/rotation = Quaternion(0.15343438, -0.22519806, 0.024809115, 0.9618359)
+bones/51/rotation = Quaternion(-0.48289654, -0.02382159, 0.024703555, 0.87500477)
+bones/52/rotation = Quaternion(-0.27827623, -0.01969599, -0.03924613, 0.95949686)
 
 [node name="AnimationTree" type="AnimationTree" parent="MeshRoot"]
 root_node = NodePath("../Model")
@@ -385,7 +386,7 @@ tree_root = SubResource("AnimationNodeBlendTree_jn40o")
 anim_player = NodePath("../Model/AnimationPlayer")
 parameters/UprightMovementBlend/blend_position = Vector2(0, 1)
 parameters/CrawlMovementBlend/blend_position = Vector2(0, 0)
-parameters/CrouchMovementBlend/blend_position = Vector2(0, 1)
+parameters/CrouchMovementBlend/blend_position = Vector2(0, 0)
 parameters/StanceTransition/current_state = "Upright"
 parameters/StanceTransition/transition_request = ""
 parameters/StanceTransition/current_index = 0
@@ -416,22 +417,23 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.27, 0)
 target_position = Vector3(0, 1.02, 0)
 
 [node name="CameraRoot" type="Node3D" parent="." node_paths=PackedStringArray("player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 script = ExtResource("5_u0j3k")
 player = NodePath("..")
 
 [node name="CamYaw" type="Node3D" parent="CameraRoot"]
 
 [node name="CamPitch" type="Node3D" parent="CameraRoot/CamYaw"]
-transform = Transform3D(1, 0, 0, 0, 0.94942546, -0.31399244, 0, 0.31399244, 0.94942546, 0, 1.598, 0)
+transform = Transform3D(1, 0, 0, 0, 0.94942546, -0.31399244, 0, 0.31399244, 0.94942546, 0, 0.8, 0)
 
-[node name="SpringArm3D" type="SpringArm3D" parent="CameraRoot/CamYaw/CamPitch"]
-transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -0.4, 0, 0)
+[node name="SpringArm" type="SpringArm3D" parent="CameraRoot/CamYaw/CamPitch"]
+transform = Transform3D(-1, 0, 1.509958e-07, 0, 1, 0, -1.509958e-07, 0, -1, 0, 0, 0)
 shape = SubResource("SphereShape3D_3mnk3")
 spring_length = 3.0
 
-[node name="Camera3D" type="Camera3D" parent="CameraRoot/CamYaw/CamPitch/SpringArm3D"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -2.2)
+[node name="Camera" type="Camera3D" parent="CameraRoot/CamYaw/CamPitch/SpringArm"]
+transform = Transform3D(1, 0, -1.4210855e-14, 0, 1, 2.9802322e-08, 2.842171e-14, -2.9802322e-08, 1, 0, 0, -2.2)
+doppler_tracking = 1
 fov = 65.0
 far = 8192.0
 

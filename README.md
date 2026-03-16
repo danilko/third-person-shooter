@@ -14,7 +14,6 @@ Before open the project in editor (the editor must use 4.5.1 from  https://githu
 
 Current test with Amazon Corretto JDK 25.0
 
-
 ## Control
 
 KEYBOARD 
@@ -25,3 +24,9 @@ C CROUCH
 V CRAWL
 
 MOUSE RIGHT/LEFT FIRE/AIM
+
+## Models/Codes
+Base codes reference following:
+https://github.com/JohnnyRouddro/Godot_Third_Person_Controller
+https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter
+https://johnnyrouddro.itch.io/godot-4-third-person-controller
