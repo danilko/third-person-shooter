@@ -5,9 +5,7 @@ import godot.annotation.RegisterFunction;
 import godot.api.*;
 import godot.annotation.Export;
 import godot.annotation.RegisterProperty;
-import godot.core.NodePath;
-import godot.core.Vector2;
-import godot.core.Vector3;
+import godot.core.*;
 import godot.global.GD;
 
 @RegisterClass(className = "AnimationController")
@@ -25,6 +23,10 @@ public class AnimationController extends Node {
   @Export
   public LookAtModifier3D aimLookAtModifier;
 
+  private int weapon = 0;
+  private int pendingWeapon = -1;
+  private static final double WEAPON_SWAP_DELAY = 0.3;
+
   private double onFloorBlend = 1.0;
   private double onFloorBlendTarget = 1.0;
   private Tween tween;
@@ -33,6 +35,7 @@ public class AnimationController extends Node {
   private Vector2 movementDirection = new Vector2();
   private Vector2 animationDirection = new Vector2();
   private MovementState currentMovementState = null;
+
 
   @RegisterFunction
   @Override
@@ -81,6 +84,33 @@ public class AnimationController extends Node {
     updateAnimationBlend(movementState);
   }
 
+  public void onWeaponTransition(int animationWeaponIndex, boolean isEquipping) {
+    // If unequipping, we stay on the current weapon's pose.
+    if (!isEquipping) {
+      animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
+      animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
+    }
+    // 2. CONFIGURE: Tell the transition which weapon's specific animation to play
+    animationTree.set("parameters/WeaponChangeAnimation/blend_position", animationWeaponIndex);
+    // 3. DIRECTION: 1 for Equip (In), 0 or -1 for Unequip (Out)
+    int state = isEquipping ? 1 : -1;
+    animationTree.set("parameters/WeaponChangeScale/transition_request", state);
+
+    // 4. EXECUTE: Fire the actual movement
+    animationTree.set("parameters/WeaponChange/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
+
+    // If equipping, change to correct weapon pose
+    if (isEquipping) {
+      animationTree.set("parameters/WeaponAim/blend_position", animationWeaponIndex);
+      animationTree.set("parameters/WeaponHold/blend_position", animationWeaponIndex);
+    }
+  }
+
+  @RegisterFunction
+  public void onWeaponReload() {
+    animationTree.set("parameters/Reload/request", AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
+  }
+
   @RegisterFunction
   public void onSetStance(Stance stance) {
     if (animationTree == null) return;
@@ -96,6 +126,8 @@ public class AnimationController extends Node {
       combat = combatState.isCombat();
 
       animationTree.set("parameters/CombatTransition/transition_request", combat ? "Combat" : "NoCombat");
+      // Update neck to T pose so crawl and other will not have issue
+      animationTree.set("parameters/NeckFront/blend_amount", combat ? 1 : 0);
 
       aimLookAtModifier.setActive(combat);
   }
@@ -107,6 +139,7 @@ public class AnimationController extends Node {
 
     updateAnimationBlend(currentMovementState);
   }
+
 
   private void updateAnimationBlend(MovementState movementState) {
     if (animationTree == null || currentMovementState == null) return;

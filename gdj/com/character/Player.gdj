@@ -1,0 +1,45 @@
+// THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
+// Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
+
+registeredName = Player
+fqName = com.character.Player
+relativeSourcePath = src/main/java/com/character/Player.java
+baseType = CharacterBody3D
+supertypes = [
+    godot.api.CharacterBody3D,
+	godot.api.PhysicsBody3D,
+	godot.api.CollisionObject3D,
+	godot.api.Node3D,
+	godot.api.Node,
+	godot.api.Object,
+	godot.core.KtObject,
+	godot.common.interop.NativeWrapper,
+	godot.common.interop.NativePointer,
+	kotlin.Any
+]
+signals = [
+    pressed_jump,
+	pressed_roll,
+	changed_stance,
+	fire_weapon,
+	not_fire_weapon,
+	changed_movement_state,
+	changed_movement_direction,
+	changed_combat_state,
+	changed_weapon,
+	reload_weapon
+]
+properties = [
+    max_air_jump,
+	jump_states,
+	stances,
+	combat_states,
+	roll_state,
+	weapon_controller
+]
+functions = [
+    _physics_process,
+	_ready,
+	_input,
+	completed_roll
+]

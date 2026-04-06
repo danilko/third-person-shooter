@@ -1,0 +1,16 @@
+[remap]
+
+importer="bitmap"
+type="BitMap"
+uid="uid://di830knvfek2x"
+path="res://.godot/imported/radial_menu_click_mask.bmp-33175dca80c8c51b6a5cf3d1ac631a64.res"
+
+[deps]
+
+source_file="res://assets/ui/radial_menu_click_mask.bmp"
+dest_files=["res://.godot/imported/radial_menu_click_mask.bmp-33175dca80c8c51b6a5cf3d1ac631a64.res"]
+
+[params]
+
+create_from=0
+threshold=0.5

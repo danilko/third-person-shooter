@@ -1,0 +1,39 @@
+[gd_scene load_steps=5 format=3 uid="uid://ch2k70cs37qt6"]
+
+[ext_resource type="Texture2D" uid="uid://c0fhq8v7smdwl" path="res://assets/ui/radial_menu.png" id="1_55vp6"]
+[ext_resource type="Script" uid="uid://dbfmf4egkcccj" path="res://gdj/com/ui/RadialMenuItem.gdj" id="1_qv767"]
+[ext_resource type="Texture2D" uid="uid://dowvrkhhp42bs" path="res://assets/ui/radial_menu_hover.png" id="2_qv767"]
+[ext_resource type="BitMap" uid="uid://di830knvfek2x" path="res://assets/ui/radial_menu_click_mask.bmp" id="3_f7opg"]
+
+[node name="RaidalMenuItem" type="Control"]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+script = ExtResource("1_qv767")
+
+[node name="Button" type="TextureButton" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -120.5
+offset_top = -252.0
+offset_right = 120.5
+offset_bottom = -74.0
+grow_horizontal = 2
+grow_vertical = 0
+texture_normal = ExtResource("1_55vp6")
+texture_hover = ExtResource("2_qv767")
+texture_click_mask = ExtResource("3_f7opg")
+
+[connection signal="mouse_entered" from="Button" to="." method="on_hover"]
+[connection signal="pressed" from="Button" to="." method="on_clicked"]

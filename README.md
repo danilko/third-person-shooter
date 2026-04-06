@@ -1,35 +1,73 @@
-Experiment with https://github.com/utopia-rise/godot-kotlin-jvm with Godot + Java
+# Godot Kotlin/JVM Third Person Experiment
 
-Third Person Base codes are coming from Johnny Rouddro youtube and itch.io: https://www.youtube.com/watch?v=3AD2z2mx3sY (current models are also modified from the code base)
+A technical exploration of 3D game mechanics in **Godot 4.x** using the **Kotlin/JVM** binding. This project adapts and refactors traditional GDScript-based third-person controllers into a Java/Kotlin-compatible architecture.
 
-## Build
+## 🛠 Tech Stack
+* **Engine:** Godot 4.5.1 (Custom [Utopia-Rise](https://github.com/utopia-rise/godot-kotlin-jvm) build required)
+* **Language:** Java / Kotlin
+* **JDK:** Amazon Corretto 25
 
-Please ensure to perform 
+## ✨ Features & Modifications
+This project is based on Johnny Rouddro's Third Person Controller tutorial ([YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY)) but introduces several architectural changes and gameplay tweaks:
 
-```
-gradle build
-```
+* **Decoupled Architecture:** Refactored the monolithic player class into a modular **Controller** system.
+* **Movement Mechanics:** * Added **Double Jump** capability.
+    * **Crawl-to-Shoot** mechanics (Experimental/Beta animation).
+    * Dynamic **Physics Body transformation** during dodge rolls.
+* **Combat Updates:**
+    * Simplified weapon system (Always equipped, no holster state).
+    * Customized weapon models and swap logic.
+    * Toggleable over-the-shoulder camera (Left/Right swap).
 
-Before open the project in editor (the editor must use 4.5.1 from  https://github.com/utopia-rise/godot-kotlin-jvm , standard Godot Editor will not work)
+> **Note:** This is an experimental codebase. You may encounter "crunch-time" bugs or unstable animations. It is provided as-is for educational purposes.
 
-Current test with Amazon Corretto JDK 25.0
+---
 
-## Control
+## 🚀 Getting Started
 
-KEYBOARD 
-W/S/A/D FORWARD/BACKWARD/LEFT/RIGHT
-CTRL + ABOVE ROLLING
-SPACE JUMP
-C CROUCH
-V CRAWL
+### Prerequisites
+You **cannot** use the standard Godot editor. You must download the specific Kotlin-JVM enabled editor from [Utopia-Rise Releases](https://github.com/utopia-rise/godot-kotlin-jvm).
 
-MOUSE RIGHT/LEFT FIRE/AIM
+### Build Instructions
+1. Clone the repository.
+2. Run the Gradle build task to generate the necessary JVM wrappers:
+   ```bash
+   ./gradlew build
+   ```
+3. Open the `project.godot` file using the **Godot Kotlin/JVM Editor**.
 
-## Models/Codes
-Base codes and models reference following:
-https://github.com/JohnnyRouddro/Godot_Third_Person_Controller
-https://github.com/JohnnyRouddro/Godot_Third_Person_Shooter
-https://johnnyrouddro.itch.io/godot-4-third-person-controller
+---
 
-Additional Model references:
-https://quaternius.itch.io/50-lowpoly-guns 
+## 🎮 Controls
+
+| Action | Input |
+| :--- | :--- |
+| **Move** | `W` `A` `S` `D` |
+| **Jump / Double Jump** | `Space` |
+| **Roll** | `Ctrl` + Direction |
+| **Crouch / Crawl** | `C` / `V` |
+| **Aim / Fire** | `Mouse Right` / `Mouse Left` |
+| **Reload** | `R` |
+| **Switch Weapon** | `G` |
+| **Swap Camera Shoulder** | `Q` |
+
+---
+
+## 📚 Credits & Assets
+
+### Code & Logic
+* Base Third Person Controller by **Johnny Rouddro**: [YouTube](https://www.youtube.com/watch?v=3AD2z2mx3sY) | [GitHub](https://github.com/JohnnyRouddro/Godot_Third_Person_Controller) | [Itch.io](https://johnnyrouddro.itch.io/godot-4-third-person-controller)
+
+### Models & External Assets
+* **Weapon Models:** [50 Low-poly Guns](https://quaternius.itch.io/50-lowpoly-guns) by Quaternius.
+* **Additional Assets:** [Godot Asset Library](https://godotengine.org/asset-library/asset/781).
+
+
+Note:
+Did use Gemini/Claude AI during debugging/documentation.
+
+---
+
+## 🎮 Screenshots
+![screenshot1.png](images/screenshot1.png)
+![screenshot2.png](images/screenshot2.png)

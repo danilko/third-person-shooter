@@ -1,0 +1,31 @@
+// THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
+// Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
+
+registeredName = Stance
+fqName = com.character.Stance
+relativeSourcePath = src/main/java/com/character/Stance.java
+baseType = Node
+supertypes = [
+    godot.api.Node,
+	godot.api.Object,
+	godot.core.KtObject,
+	godot.common.interop.NativeWrapper,
+	godot.common.interop.NativePointer,
+	kotlin.Any
+]
+signals = [
+    
+]
+properties = [
+    idle_state,
+	walk_state,
+	sprint_state,
+	camera_height,
+	collider,
+	col_raycast,
+	higher_stances
+]
+functions = [
+    is_blocked,
+	get_movement_state
+]

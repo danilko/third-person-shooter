@@ -14,11 +14,23 @@ public class CombatState extends Resource {
 
   @Export
   @RegisterProperty
-  public double combatSpeedFactor = 1.0f;
+  public double speedFactor = 1.0f;
 
   @Export
   @RegisterProperty
-  public double combatAccelerationFactor = 1.0f;
+  public double accelerationFactor = 1.0f;
+
+  @Export
+  @RegisterProperty
+  public double cameraDistance = 2.0f;
+
+  @Export
+  @RegisterProperty
+  public double cameraShoulderOffset = 0.1f;
+
+  @Export
+  @RegisterProperty
+  public double cameraFov = 70.0f;
 
 
   // Default constructor is required for Godot to instantiate the Resource
@@ -30,11 +42,11 @@ public class CombatState extends Resource {
     return combat;
   }
 
-  public double getCombatSpeedFactor() {
-    return combatSpeedFactor;
+  public double getSpeedFactor() {
+    return speedFactor;
   }
 
-  public double getCombatAccelerationFactor() {
-    return combatAccelerationFactor;
+  public double getAccelerationFactor() {
+    return accelerationFactor;
   }
 }
