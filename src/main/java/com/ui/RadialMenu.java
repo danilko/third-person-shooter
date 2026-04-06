@@ -1,6 +1,7 @@
 package com.ui;
 
 import com.character.Player;
+import com.character.WeaponController;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -21,17 +22,20 @@ public class RadialMenu extends Control {
 
   private AnimationPlayer animationPlayer;
   private String previousMovementState;
+  private WeaponController weaponController;
+
   @RegisterFunction
   @Override
   public void _ready() {
     animationPlayer = (AnimationPlayer) getNode("AnimationPlayer");
+    weaponController = (WeaponController) getOwner().getNode("WeaponController");
     hide();
   }
 
   @RegisterFunction
   @Override
   public void _input(InputEvent event) {
-    if(event.isActionPressed("radialmenu")) {
+    if(event.isActionPressed("radialmenu") && !weaponController.isWeaponReloading()) {
       showRadialMenu();
     }
     else if(event.isActionReleased("radialmenu")) {

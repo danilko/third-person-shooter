@@ -1,8 +1,10 @@
-[gd_scene load_steps=9 format=3 uid="uid://jvsaup8qx28"]
+[gd_scene load_steps=14 format=3 uid="uid://jvsaup8qx28"]
 
 [ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
 [ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="2_hbo2n"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
+[ext_resource type="Script" uid="uid://b722ufsi6a0p5" path="res://gdj/com/environment/AmmoRefil.gdj" id="4_kj2pm"]
+[ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lj72b"]
 albedo_texture = ExtResource("1_umubf")
@@ -26,10 +28,19 @@ glow_enabled = true
 glow_normalized = true
 glow_strength = 0.75
 
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hbo2n"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_kj2pm"]
+material = SubResource("StandardMaterial3D_hbo2n")
+size = Vector3(2, 0.1, 2)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hbo2n"]
+size = Vector3(2, 0.1, 2)
+
 [node name="World" type="Node3D"]
 
 [node name="Player" parent="." instance=ExtResource("2_lj72b")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7612269, 4.1552534)
+transform = Transform3D(0.2888312, 0, 0.9573802, 0, 1, 0, -0.9573802, 0, 0.2888312, 0, 0.7612269, 4.1552534)
 roll_state = ExtResource("2_hbo2n")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
@@ -74,3 +85,22 @@ sky_mode = 1
 [node name="DirectionalLight3D2" type="DirectionalLight3D" parent="WorldEnvironment"]
 transform = Transform3D(0.9658932, -0.07774715, -0.24699299, 0.078457184, 0.996893, -0.00698126, 0.24676836, -0.012635224, 0.9689921, 0, 4.677, 0)
 light_energy = 0.03
+
+[node name="AmmoRefill" type="Area3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75007653, 0)
+script = ExtResource("4_kj2pm")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="AmmoRefill"]
+mesh = SubResource("BoxMesh_kj2pm")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AmmoRefill"]
+shape = SubResource("BoxShape3D_hbo2n")
+
+[node name="Label3D" type="Label3D" parent="AmmoRefill"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63201284, 0)
+outline_modulate = Color(0, 0.40344608, 0.7485906, 1)
+text = "AMMO REFILL"
+font = ExtResource("5_uecv0")
+font_size = 60
+
+[connection signal="body_entered" from="AmmoRefill" to="AmmoRefill" method="on_body_entered"]

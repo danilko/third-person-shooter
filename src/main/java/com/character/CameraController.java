@@ -84,7 +84,7 @@ public class CameraController extends Node3D {
 
     positionOffsetTarget.setX(positionOffsetTarget.getX() * shoulderDirection);
 
-    setCamearFov();
+    setCameraFov();
   }
 
   @RegisterFunction
@@ -130,16 +130,16 @@ public class CameraController extends Node3D {
     positionOffsetTarget.setX(combatState.cameraShoulderOffset * shoulderDirection);
     springArmLengthTarget = (float) combatState.cameraDistance;
 
-    setCamearFov();
+    setCameraFov();
   }
 
   @RegisterFunction
   public void onSetMovementState(MovementState movementState) {
     movementFov = movementState.getCameraFov();
-    setCamearFov();
+    setCameraFov();
   }
 
-  private void setCamearFov() {
+  private void setCameraFov() {
     if (tween != null && tween.isValid()) {
       tween.kill();
     }

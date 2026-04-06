@@ -1,5 +1,6 @@
 package com.character;
 
+import com.ui.Crosshair;
 import godot.api.CharacterBody3D;
 import godot.api.Node;
 import godot.api.Node3D;
@@ -11,7 +12,7 @@ import godot.core.Vector3;
 import godot.global.GD;
 import static java.lang.Math.atan2;
 
-@RegisterClass
+@RegisterClass(className = "MovementController")
 public class MovementController extends Node {
 
   @Export
@@ -43,6 +44,15 @@ public class MovementController extends Node {
   private boolean rolling = false;
   private double rollTimer = 0.0;
   private double rollSpeed = 0.0;
+  private Stance stance;
+
+  @RegisterProperty
+  @Export
+  public WeaponController weaponController;
+
+  @RegisterProperty
+  @Export
+  public Crosshair crosshair;
 
   @RegisterFunction
   @Override
@@ -59,6 +69,7 @@ public class MovementController extends Node {
 
     // Calculate horizontal velocity
     Vector3 normDir = direction.normalized();
+
     if (rolling) {
       velocity.setX(rollSpeed * normDir.getX());
       velocity.setZ(rollSpeed * normDir.getZ());
@@ -102,6 +113,16 @@ public class MovementController extends Node {
 
     // Update only the Y axis
     meshRoot.setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()));
+
+    WeaponStats weaponStats = weaponController.getCurrentWeaponStats();
+    crosshair.setPositionX((float) (weaponStats.getSpread() + weaponStats.getMovementSpread() + velocity.length() + (weaponStats.jumpSpread * (player.isOnFloor() ? 1 : 0))));
+    crosshair.setPositionX(crosshair.getPositionX() + ((weaponStats.getAimSpread() * (combat ? 2: 0)) + (weaponStats.crouchSpread * ("Idle".equalsIgnoreCase(stance.getName().toString()) ? 2 : 0))));
+  }
+
+
+  @RegisterFunction
+  public void onSetStance(Stance stance) {
+    this.stance = stance;
   }
 
   @RegisterFunction
@@ -125,7 +146,7 @@ public class MovementController extends Node {
   @RegisterFunction
   public void onSetMovementState(MovementState movementState) {
     speed = movementState.getMovementSpeed() * combatSpeedFactor;
-    acceleration = movementState.getAcceleration() * combatSpeedFactor;
+    acceleration = movementState.getAcceleration() * combatAccelerationFactor;
   }
 
   @RegisterFunction
