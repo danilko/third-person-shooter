@@ -34,13 +34,13 @@ public class Player extends CharacterBody3D {
   public final Signal1<Vector3> changedMovementDirection = Signal1.create(this, "changedMovementDirection");
 
   @RegisterSignal
-  public final Signal1<CombatState> changedCombatState= Signal1.create(this, "changedCombatState");
+  public final Signal1<CombatState> changedCombatState = Signal1.create(this, "changedCombatState");
 
   @RegisterSignal
-  public final Signal1<Integer> changedWeapon =  Signal1.create(this, "changedWeapon");
+  public final Signal1<Integer> changedWeapon = Signal1.create(this, "changedWeapon");
 
   @RegisterSignal
-  public final Signal0 reloadWeapon =  Signal0.create(this, "reloadWeapon");
+  public final Signal0 reloadWeapon = Signal0.create(this, "reloadWeapon");
 
   // Exports
   @RegisterProperty
@@ -73,13 +73,22 @@ public class Player extends CharacterBody3D {
   private Timer aimStayTimer;
 
   private boolean combat = false;
+  private boolean wantCombat = false;
 
   private RayCast3D rayCast3D;
-  private Marker3D  marker3D;
+  private Marker3D marker3D;
 
   @RegisterProperty
   @Export
   public WeaponController weaponController;
+
+  @RegisterProperty
+  @Export
+  public NodePath rayCastNodePath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+
+  @RegisterProperty
+  @Export
+  public NodePath spineIKTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
 
   @RegisterFunction
   @Override
@@ -91,10 +100,10 @@ public class Player extends CharacterBody3D {
 
     aimStayTimer = (Timer) getNode("AimStayTimer");
 
-    rayCast3D = (RayCast3D) getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+    rayCast3D = (RayCast3D) getNode(rayCastNodePath);
 
     rayCast3D.addException(this);
-    marker3D = (Marker3D)getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
+    marker3D = (Marker3D) getNode(spineIKTargetPath);
 
     changedMovementDirection.emit(Vector3.Companion.getBACK());
     setMovementState("Idle");
@@ -120,8 +129,7 @@ public class Player extends CharacterBody3D {
 
         if (input.isActionPressed("walk", false)) {
           movementState = "Walk";
-        }
-        else {
+        } else {
 
           movementState = "Sprint";
         }
@@ -136,33 +144,29 @@ public class Player extends CharacterBody3D {
 
     if (!isRolling) {
       // Update combat
-      boolean currentCombat = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
 
       Vector3 currentRotationDegree = rayCast3D.getRotationDegrees();
-      rayCast3D.setRotationDegrees(new Vector3( currentRotationDegree.getX(), 0.0f, 0.0f));
-      if (combat != currentCombat) {
+      rayCast3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.0f, 0.0f));
 
-        // only if combat is true, or aimStayTimer is completed
-        if(combat || aimStayTimer.getTimeLeft() <= 0) {
-          if(combat) {
-            aimStayTimer.start();
-          }
+      wantCombat = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
 
-          combat = currentCombat;
+      if (wantCombat) {
+        // Cancel any pending exit — player re-engaged aim/fire
+        aimStayTimer.stop();
+        if (!combat) {
+          combat = true;
           setCombatState();
         }
-
-
+      } else if (combat && aimStayTimer.isStopped()) {
+        // Released aim/fire and timer not yet running — begin the hold window
+        aimStayTimer.start();
       }
 
-      if (input.isActionPressed("fire", false))
-      {
+      if (input.isActionPressed("fire", false)) {
         fireWeapon.emit();
-      }
-      else{
+      } else {
         notFireWeapon.emit();
       }
-
 
 
       if (input.isActionPressed("jump", false)) {
@@ -190,8 +194,7 @@ public class Player extends CharacterBody3D {
           }
         }
       }
-    }
-    else {
+    } else {
       notFireWeapon.emit();
     }
 
@@ -204,7 +207,6 @@ public class Player extends CharacterBody3D {
     }
   }
 
-
   private void setCombatState() {
 
     changedCombatState.emit(combatStates.get(combat ? "Combat" : "NoCombat"));
@@ -215,12 +217,12 @@ public class Player extends CharacterBody3D {
     isRolling = isRoll;
 
     // If not crouch, then disable collider to enable crouch
-    if (! currentStanceName.equals("Crouch")) {
+    if (!currentStanceName.equals("Crouch")) {
 
       String disabledStanceColliderName = currentStanceName;
       String enabledStanceColliderName = "Crouch";
 
-      if(!isRoll) {
+      if (!isRoll) {
         disabledStanceColliderName = enabledStanceColliderName;
         enabledStanceColliderName = currentStanceName;
       }
@@ -266,10 +268,15 @@ public class Player extends CharacterBody3D {
     }
 
     if (combat) {
-      if(rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
-        marker3D.setGlobalPosition(rayCast3D.getCollisionPoint());
+      // Exit combat once the aim-stay timer has finished and player is no longer engaging
+      if (aimStayTimer.isStopped() && !wantCombat) {
+        combat = false;
+        setCombatState();
       }
-      else {
+
+      if (rayCast3D.isColliding() && (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+        marker3D.setGlobalPosition(rayCast3D.getCollisionPoint());
+      } else {
         marker3D.setGlobalPosition(rayCast3D.toGlobal(rayCast3D.getTargetPosition()));
       }
     }

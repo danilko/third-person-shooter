@@ -1,7 +1,9 @@
 package com.ui;
 
+import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
+import godot.annotation.RegisterProperty;
 import godot.api.*;
 import godot.core.VariantArray;
 import godot.core.Vector2;
@@ -9,6 +11,10 @@ import godot.global.GD;
 
 @RegisterClass(className = "Crosshair")
 public class Crosshair extends Control {
+
+  @Export
+  @RegisterProperty
+  public double crosshairLerpSpeed = 12.0;
 
   private VariantArray<Node> lines;
 
@@ -48,7 +54,7 @@ public class Crosshair extends Control {
       Vector2 currentPos = currentLine.getPosition();
 
       // Calculate the new X using Mathf.lerp
-      float newX = (float) GD.lerp(currentPos.getX(), positionX, delta * 12.0);
+      float newX = (float) GD.lerp(currentPos.getX(), positionX, delta * crosshairLerpSpeed);
 
       // Apply the new position (creating a new Vector3 with the updated X)
       currentLine.setPosition(new Vector2(newX, currentPos.getY()));

@@ -115,8 +115,11 @@ public class MovementController extends Node {
     meshRoot.setRotation(new Vector3(currentRot.getX(), newY, currentRot.getZ()));
 
     WeaponStats weaponStats = weaponController.getCurrentWeaponStats();
-    crosshair.setPositionX((float) (weaponStats.getSpread() + weaponStats.getMovementSpread() + velocity.length() + (weaponStats.jumpSpread * (player.isOnFloor() ? 1 : 0))));
-    crosshair.setPositionX(crosshair.getPositionX() + ((weaponStats.getAimSpread() * (combat ? 2: 0)) + (weaponStats.crouchSpread * ("Idle".equalsIgnoreCase(stance.getName().toString()) ? 2 : 0))));
+    float baseSpread = weaponStats.getSpread() + weaponStats.getMovementSpread() + (float) velocity.length();
+    float jumpContrib = weaponStats.jumpSpread * (player.isOnFloor() ? 1 : 0);
+    float aimContrib = combat ? weaponStats.getAimSpread() * 2 : 0;
+    float crouchContrib = "Idle".equalsIgnoreCase(stance.getName().toString()) ? weaponStats.crouchSpread * 2 : 0;
+    crosshair.setPositionX(baseSpread + jumpContrib + aimContrib + crouchContrib);
   }
 
 

@@ -26,14 +26,44 @@ public class CameraController extends Node3D {
   private SpringArm3D springArm;
   private Camera3D camera;
 
+  @Export
+  @RegisterProperty
+  public double yawSensitivity = 0.07;
+
+  @Export
+  @RegisterProperty
+  public double pitchSensitivity = 0.07;
+
+  @Export
+  @RegisterProperty
+  public double yawAcceleration = 15.0;
+
+  @Export
+  @RegisterProperty
+  public double pitchAcceleration = 15.0;
+
+  @Export
+  @RegisterProperty
+  public double pitchMax = 75.0;
+
+  @Export
+  @RegisterProperty
+  public double pitchMin = -55.0;
+
+  @Export
+  @RegisterProperty
+  public double shoulderOffsetLerpSpeed = 4.0;
+
+  @Export
+  @RegisterProperty
+  public double followLerpSpeed = 18.0;
+
+  @Export
+  @RegisterProperty
+  public double fovTweenDuration = 0.5;
+
   private double yaw = 0.0;
   private double pitch = 0.0;
-  private double yawSensitivity = 0.07;
-  private double pitchSensitivity = 0.07;
-  private double yawAcceleration = 15.0;
-  private double pitchAcceleration = 15.0;
-  private double pitchMax = 75.0;
-  private double pitchMin = -55.0;
 
   private Vector3 positionOffset = new Vector3(0, 0.8, 0);
   private Vector3 positionOffsetTarget = new Vector3(0, 0.8, 0);
@@ -91,7 +121,7 @@ public class CameraController extends Node3D {
   @Override
   public void _physicsProcess(double delta) {
     // Position interpolation
-    positionOffset = positionOffset.lerp(positionOffsetTarget, 4 * delta);
+    positionOffset = positionOffset.lerp(positionOffsetTarget, shoulderOffsetLerpSpeed * delta);
 
     // Apply shoulder offset along yaw's right vector (camera-relative), not world X.
     // This ensures the shoulder offset stays on the correct side regardless of player facing direction.
@@ -102,7 +132,7 @@ public class CameraController extends Node3D {
     // In combat/aim mode, tighten follow speed so the SpringArm origin stays close to
     // the player. A slow-following pivot causes the SpringArm to cast from the wrong
     // position during lateral movement, making the camera flip to the wrong side.
-    float followSpeedWeight = combat ? 1 : (float) (18.0 * delta);
+    float followSpeedWeight = combat ? 1 : (float) (followLerpSpeed * delta);
     setGlobalPosition(getGlobalPosition().lerp(targetPos, followSpeedWeight));
 
     springArm.setLength(GD.lerp(springArm.getLength(), springArmLengthTarget, followSpeedWeight));
@@ -151,7 +181,7 @@ public class CameraController extends Node3D {
     }
 
     tween = createTween();
-    tween.tweenProperty(camera, "fov", targetFov, 0.5)
+    tween.tweenProperty(camera, "fov", targetFov, fovTweenDuration)
          .setTrans(Tween.TransitionType.SINE)
          .setEase(Tween.EaseType.OUT);
   }

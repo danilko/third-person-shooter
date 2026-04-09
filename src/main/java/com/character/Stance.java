@@ -8,6 +8,7 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.core.VariantArray;
+import godot.global.GD;
 
 @RegisterClass
 public class Stance extends Node {

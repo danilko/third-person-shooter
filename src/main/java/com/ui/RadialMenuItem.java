@@ -1,14 +1,10 @@
 package com.ui;
 
+import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
-import godot.api.*;
-import godot.annotation.Export;
 import godot.annotation.RegisterProperty;
-import godot.core.NodePath;
-import godot.core.Vector2;
-import godot.core.Vector3;
-import godot.global.GD;
+import godot.api.Control;
 
 @RegisterClass(className = "RadialMenuItem")
 public class RadialMenuItem extends Control {
@@ -28,23 +24,22 @@ public class RadialMenuItem extends Control {
 
   @RegisterFunction
   public void onClicked(){
-    // workaround for now until dynamic assign weapon/check weapon count
-    int weapon = index;
-    if (weapon < 0 || weapon > 1) {
-      weapon = 0;
-    }
-
+    int weapon = clampWeaponIndex(index);
     radialMenu.getPlayer().setWeapon(weapon);
     radialMenu.hideRadialMenu();
   }
 
   @RegisterFunction
   public void onHover(){
-    // workaround for now until dynamic assign weapon/check weapon count
-    int weapon = index;
-    if (weapon < 0 || weapon > 1) {
-      weapon = 0;
-    }
+    int weapon = clampWeaponIndex(index);
     radialMenu.getPlayer().setWeapon(weapon);
+  }
+
+  private int clampWeaponIndex(int idx) {
+    int maxIndex = radialMenu.getWeaponCount() - 1;
+    if (idx < 0 || idx > maxIndex) {
+      return 0;
+    }
+    return idx;
   }
 }

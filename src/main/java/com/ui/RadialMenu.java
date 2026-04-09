@@ -7,7 +7,6 @@ import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.*;
-import godot.core.GodotEnum;
 import godot.core.Vector3;
 
 @RegisterClass(className = "RadialMenu")
@@ -20,15 +19,16 @@ public class RadialMenu extends Control {
   @RegisterProperty
   public Node camera;
 
+  @Export
+  @RegisterProperty
+  public WeaponController weaponController;
+
   private AnimationPlayer animationPlayer;
-  private String previousMovementState;
-  private WeaponController weaponController;
 
   @RegisterFunction
   @Override
   public void _ready() {
     animationPlayer = (AnimationPlayer) getNode("AnimationPlayer");
-    weaponController = (WeaponController) getOwner().getNode("WeaponController");
     hide();
   }
 
@@ -48,8 +48,6 @@ public class RadialMenu extends Control {
     player.setProcessInput(false);
     // Stop the player movement to prevent infinite move
     player.setMovementDirection(Vector3.Companion.getZERO());
-    // Store the previous state so can restore
-    previousMovementState = player.getCurrentMovementStateName();
     player.setMovementState("Idle");
     camera.setProcessInput(false);
     show();
@@ -58,7 +56,9 @@ public class RadialMenu extends Control {
 
   public void hideRadialMenu() {
     Input.setMouseMode(Input.MouseMode.CAPTURED);
-    player.setMovementState(previousMovementState);
+    // Restore to Idle and let the player's _input re-derive the correct movement state
+    // from current key presses on the next frame, avoiding stale cached state.
+    player.setMovementState("Idle");
     player.setProcessInput(true);
     camera.setProcessInput(true);
     hide();
@@ -66,6 +66,10 @@ public class RadialMenu extends Control {
 
   public Player getPlayer() {
     return player;
+  }
+
+  public int getWeaponCount() {
+    return weaponController.getWeaponCount();
   }
 
 }

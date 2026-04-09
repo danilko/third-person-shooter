@@ -19,7 +19,7 @@ signals = [
     
 ]
 properties = [
-    
+    crosshair_lerp_speed
 ]
 functions = [
     _process,

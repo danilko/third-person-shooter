@@ -1,6 +1,7 @@
 package com.character;
 import godot.annotation.*;
 import godot.api.*;
+import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.VariantArray;
 import godot.core.Vector3;
@@ -21,6 +22,30 @@ public class WeaponController extends Node {
   @RegisterProperty
   @Export
   public AnimationController animationController;
+
+  @RegisterProperty
+  @Export
+  public NodePath magLabelPath = new NodePath("UI/Mag/ColorRect/Mag");
+
+  @RegisterProperty
+  @Export
+  public NodePath ammoBackupLabelPath = new NodePath("UI/Mag/ColorRect/AmmoBackup");
+
+  @RegisterProperty
+  @Export
+  public NodePath rayCastPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+
+  @RegisterProperty
+  @Export
+  public NodePath spineIKTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
+
+  @RegisterProperty
+  @Export
+  public NodePath splattersPath = new NodePath("Splatters");
+
+  @RegisterProperty
+  @Export
+  public NodePath recoilPitchPath = new NodePath("CameraRoot/Yaw/Pitch");
 
   @RegisterSignal
   public final Signal1<Float> weaponFired = Signal1.create(this, "weaponFired");
@@ -60,6 +85,10 @@ public class WeaponController extends Node {
     return weapons.get(weapon);
   }
 
+  public int getWeaponCount() {
+    return weapons.size();
+  }
+
 
 
   private int weapon = 0;
@@ -73,8 +102,8 @@ public class WeaponController extends Node {
     fireTimer = (Timer) getNode("FireTimer");
     reloadTimer = (Timer) getNode("ReloadTimer");
 
-    magLabel = ((Label)(getOwner().getNode("UI/Mag/ColorRect/Mag")));
-    ammoBackupLabel = ((Label)(getOwner().getNode("UI/Mag/ColorRect/AmmoBackup")));
+    magLabel = (Label) getOwner().getNode(magLabelPath);
+    ammoBackupLabel = (Label) getOwner().getNode(ammoBackupLabelPath);
 
     weapons.add(pistol);
     weapons.add(rifle);
@@ -83,11 +112,11 @@ public class WeaponController extends Node {
     // Hide the muzzle flash by play once as a workaround
     muzzleFlashAnimationPlayer.play("MuzzleFlash");
 
-    rayCast3D = (RayCast3D) getOwner().getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+    rayCast3D = (RayCast3D) getOwner().getNode(rayCastPath);
 
-    marker3D = (Marker3D)getOwner().getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
+    marker3D = (Marker3D) getOwner().getNode(spineIKTargetPath);
 
-    for (Node splatterNode : getOwner().getNode("Splatters").getChildren()) {
+    for (Node splatterNode : getOwner().getNode(splattersPath).getChildren()) {
         splatters.add((GPUParticles3D) splatterNode);
     }
 
@@ -138,7 +167,7 @@ public class WeaponController extends Node {
     float spread = getCurrentWeaponStats().getSpread();
     rayCast3D.setRotationDegrees(new Vector3( currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
 
-    ((Node3D) (getOwner().getNode("CameraRoot/Yaw/Pitch"))).rotateX((float) GD.degToRad(getCurrentWeaponStats().getRecoil()));
+    ((Node3D) getOwner().getNode(recoilPitchPath)).rotateX((float) GD.degToRad(getCurrentWeaponStats().getRecoil()));
 
     // final check for collision point
     if(rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
