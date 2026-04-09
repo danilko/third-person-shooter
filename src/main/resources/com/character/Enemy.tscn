@@ -1,0 +1,46 @@
+[gd_scene load_steps=6 format=3 uid="uid://dbnx63f3e5s88"]
+
+[ext_resource type="Script" path="res://src/main/java/com/character/Enemy.java" id="1_enemy"]
+[ext_resource type="Script" path="res://src/main/java/com/character/Health.java" id="2_health"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_enemy"]
+radius = 0.35
+height = 1.5
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_enemy"]
+radius = 0.35
+height = 1.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_f0ufr"]
+size = Vector3(0.25, 0.25, 1)
+
+[node name="Enemy" type="CharacterBody3D"]
+script = ExtResource("1_enemy")
+detection_range = 30.0
+attack_range = 15.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+shape = SubResource("CapsuleShape3D_enemy")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+mesh = SubResource("CapsuleMesh_enemy")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+path_desired_distance = 0.5
+target_desired_distance = 0.5
+
+[node name="SightRay" type="RayCast3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
+target_position = Vector3(0, 0, -15)
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+max_health = 60.0
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.71098185, 0.5346862)
+mesh = SubResource("BoxMesh_f0ufr")
+
+[connection signal="died" from="Health" to="." method="on_died"]
