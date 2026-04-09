@@ -2,6 +2,7 @@ package com.character;
 
 import com.ui.Crosshair;
 import godot.api.CharacterBody3D;
+import godot.api.Label;
 import godot.annotation.*;
 import godot.api.*;
 import godot.core.*;
@@ -77,6 +78,8 @@ public class Player extends CharacterBody3D {
 
   private RayCast3D rayCast3D;
   private Marker3D marker3D;
+  private Label healthLabel;
+  private Health healthNode;
 
   @RegisterProperty
   @Export
@@ -90,6 +93,10 @@ public class Player extends CharacterBody3D {
   @Export
   public NodePath spineIKTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
 
+  @RegisterProperty
+  @Export
+  public NodePath healthLabelPath = new NodePath("UI/Health/ColorRect/Health");
+
   @RegisterFunction
   @Override
   public void _ready() {
@@ -101,9 +108,12 @@ public class Player extends CharacterBody3D {
     aimStayTimer = (Timer) getNode("AimStayTimer");
 
     rayCast3D = (RayCast3D) getNode(rayCastNodePath);
-
     rayCast3D.addException(this);
     marker3D = (Marker3D) getNode(spineIKTargetPath);
+
+    healthLabel = (Label) getNode(healthLabelPath);
+    healthNode = (Health) getNode("Health");
+    healthLabel.setText(String.valueOf((int) healthNode.getCurrentHealth()));
 
     changedMovementDirection.emit(Vector3.Companion.getBACK());
     setMovementState(MovementType.IDLE);
@@ -202,8 +212,19 @@ public class Player extends CharacterBody3D {
   }
 
   private void setCombatState() {
-
     changedCombatState.emit(combatStates.get(combat ? "Combat" : "NoCombat"));
+  }
+
+  @RegisterFunction
+  public void onPlayerDied() {
+    setProcessInput(false);
+    GD.print("Player died — game over");
+    // TODO Phase 5: show game-over screen
+  }
+
+  @RegisterFunction
+  public void onPlayerDamaged(float amount) {
+    healthLabel.setText(String.valueOf((int) healthNode.getCurrentHealth()));
   }
 
   private void roll(boolean isRoll) {

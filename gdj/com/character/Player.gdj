@@ -37,11 +37,14 @@ properties = [
 	roll_state,
 	weapon_controller,
 	ray_cast_node_path,
-	spine_i_k_target_path
+	spine_i_k_target_path,
+	health_label_path
 ]
 functions = [
     _physics_process,
 	_ready,
 	_input,
+	on_player_died,
+	on_player_damaged,
 	completed_roll
 ]

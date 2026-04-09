@@ -1,4 +1,4 @@
-[gd_scene load_steps=124 format=3 uid="uid://bwxj3ecw2ta4k"]
+[gd_scene load_steps=125 format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="1_i0ahk"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
@@ -40,6 +40,7 @@
 [ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="29_d6yvc"]
 [ext_resource type="Script" uid="uid://defb2urvdtr8u" path="res://gdj/com/ui/Crosshair.gdj" id="29_sy336"]
 [ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="31_4afhp"]
+[ext_resource type="Script" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_ige6o"]
 filters = ["Godot_Chan_Stealth/Skeleton3D:pelvis"]
@@ -627,15 +628,15 @@ parameters/WeaponChangeSeek/seek_request = -1.0
 [node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(2.0390628e-10, -0.012394616, -0.080805)
+bones/0/position = Vector3(9.532519e-10, -0.021401027, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.43507096, 0.10419421, 0.7385948, -0.504316)
+bones/1/rotation = Quaternion(0.42342722, 0.11225701, 0.7547489, -0.48832566)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.43981323, -0.12814757, 0.03271531, 0.8882974)
+bones/2/rotation = Quaternion(0.4433443, -0.111096986, 0.061994866, 0.88727665)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.097203374, -0.16395013, 0.04491725, 0.9806398)
+bones/3/rotation = Quaternion(-0.096337326, -0.18121211, 0.05108045, 0.97738034)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.057850275, -0.05667905, 0.0072141783, 0.9966889)
+bones/4/rotation = Quaternion(-0.05814877, -0.054741975, 0.0069956873, 0.99678135)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -713,24 +714,24 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19537349, -0.020639904, 0.0060298457, 0.9804932)
+bones/43/rotation = Quaternion(0.19534875, -0.020153461, 0.005908083, 0.980509)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.95332754, 0.11721574, -0.22997537, -0.1566474)
+bones/45/rotation = Quaternion(0.9298018, 0.15946794, -0.22523935, -0.24352762)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.457489, 0.19852616, -0.10208315, 0.8607381)
-bones/47/rotation = Quaternion(-0.43508527, 0.024861842, -0.024646131, 0.8997084)
-bones/48/rotation = Quaternion(-0.41900927, 0.020871323, 0.026015349, 0.90736926)
+bones/46/rotation = Quaternion(0.38423553, 0.20706135, -0.08597576, 0.89559853)
+bones/47/rotation = Quaternion(-0.5625247, 0.019638777, -0.028977107, 0.8260391)
+bones/48/rotation = Quaternion(-0.4515217, 0.021083867, 0.022736829, 0.89172125)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.9504325, -0.01728236, 0.2573643, -0.17361785)
+bones/49/rotation = Quaternion(0.952821, 0.022913365, 0.27180186, -0.13315721)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.20474333, -0.21281117, 0.02641866, 0.955036)
-bones/51/rotation = Quaternion(-0.54820627, -0.020759474, 0.021401716, 0.83581156)
-bones/52/rotation = Quaternion(-0.32244515, -0.020107025, -0.035252586, 0.9457178)
+bones/50/rotation = Quaternion(0.17504771, -0.21755353, 0.019241925, 0.96003056)
+bones/51/rotation = Quaternion(-0.5146585, -0.024468407, 0.026050813, 0.85665)
+bones/52/rotation = Quaternion(-0.2953858, -0.019859584, -0.037715644, 0.9544267)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8"]
-transform = Transform3D(-0.71321005, 0.04210007, 0.6996851, 0.68693686, 0.24057972, 0.68573993, -0.1394602, 0.9697158, -0.20050408, -0.13929912, 1.201067, 0.3662681)
+transform = Transform3D(-0.7129703, 0.041959494, 0.69993776, 0.68708736, 0.24102682, 0.6854321, -0.13994342, 0.9696107, -0.20067489, -0.1352418, 1.1916941, 0.3648964)
 bone_name = "hand_r"
 bone_idx = 27
 
@@ -771,7 +772,7 @@ bone_name = "spine_03"
 bone = 4
 
 [node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10"]
-transform = Transform3D(0.9991053, -0.014425767, -0.039756957, 0.0004597886, 0.94368005, -0.33085883, 0.042290546, 0.33054456, 0.94284236, -0.01011269, 1.2509613, -0.07408268)
+transform = Transform3D(0.99913794, -0.013781813, -0.03915969, 7.190881e-05, 0.943859, -0.3303485, 0.041513935, 0.33006084, 0.94304615, -0.0059430995, 1.2413404, -0.07544946)
 bone_name = "neck_01"
 bone_idx = 43
 
@@ -1008,6 +1009,67 @@ offset_right = 180.0
 offset_bottom = 25.0
 grow_vertical = 2
 text = "40"
+label_settings = SubResource("LabelSettings_d6yvc")
+
+[node name="Health" type="Control" parent="UI"]
+layout_mode = 1
+anchor_left = 0.034722224
+anchor_top = -0.061728396
+anchor_right = 0.15625
+anchor_bottom = 0.061728396
+offset_left = 198.0
+offset_top = 560.0
+offset_right = 238.0
+offset_bottom = 560.0
+grow_vertical = 0
+
+[node name="ColorRect" type="ColorRect" parent="UI/Health"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0.35235986, 0.64161503, 0.28235295)
+
+[node name="Health" type="Label" parent="UI/Health/ColorRect"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 10.0
+offset_top = -11.5
+offset_right = 50.0
+offset_bottom = 11.5
+grow_vertical = 2
+text = "100"
+label_settings = SubResource("LabelSettings_cet18")
+
+[node name="Slash" type="Label" parent="UI/Health/ColorRect"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 89.0
+offset_top = -19.0
+offset_right = 129.0
+offset_bottom = 19.0
+grow_vertical = 2
+text = "/"
+label_settings = SubResource("LabelSettings_cet18")
+clip_text = true
+
+[node name="Total" type="Label" parent="UI/Health/ColorRect"]
+layout_mode = 1
+anchors_preset = 4
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = 120.0
+offset_top = -5.0
+offset_right = 180.0
+offset_bottom = 25.0
+grow_vertical = 2
+text = "100"
 label_settings = SubResource("LabelSettings_d6yvc")
 
 [node name="RadialMenu" type="Control" parent="." node_paths=PackedStringArray("player", "camera", "weapon_controller")]
@@ -1294,6 +1356,9 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_pk7bh")
 draw_pass_1 = SubResource("BoxMesh_pwn40")
 
+[node name="Health" type="Node" parent="."]
+script = ExtResource("40_hlth1")
+
 [connection signal="changed_combat_state" from="." to="CameraRoot" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]
@@ -1319,5 +1384,7 @@ draw_pass_1 = SubResource("BoxMesh_pwn40")
 [connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]
 [connection signal="timeout" from="RollTimer" to="." method="completed_roll"]
 [connection signal="timeout" from="RollTimer" to="MovementController" method="completed_roll"]
+[connection signal="damaged" from="Health" to="." method="on_player_damaged"]
+[connection signal="died" from="Health" to="." method="on_player_died"]
 
 [editable path="MeshRoot/Model"]

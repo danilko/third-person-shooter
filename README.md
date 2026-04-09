@@ -19,6 +19,11 @@ This project is based on Johnny Rouddro's Third Person Controller tutorial ([You
     * Customized weapon models and swap logic.
     * Toggleable over-the-shoulder camera (Left/Right swap).
 
+* **Sample State Based Enemy:**
+  * Use Navigation 3D Agent for movement
+  * Use basic state machine for state
+  * Basic damage systems for player and enemy
+
 > **Note:** This is an experimental codebase. You may encounter "crunch-time" bugs or unstable animations. It is provided as-is for educational purposes.
 
 ---

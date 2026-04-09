@@ -68,6 +68,10 @@ public class WeaponStats extends Node3D {
 
   @RegisterProperty
   @Export
+  public float damage = 25.0f;
+
+  @RegisterProperty
+  @Export
   public AudioStreamWAV fireAudio;
 
   @RegisterProperty

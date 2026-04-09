@@ -1,6 +1,7 @@
 package com.character;
 import godot.annotation.*;
 import godot.api.*;
+import godot.api.Object;
 import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.VariantArray;
@@ -171,6 +172,15 @@ public class WeaponController extends Node {
 
     // final check for collision point
     if(rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+      // Apply damage if the hit body has a Health node
+      Object collider = rayCast3D.getCollider();
+      if (collider instanceof godot.api.Node) {
+        godot.api.Node hitNode = (godot.api.Node) collider;
+        if (hitNode.hasNode(new NodePath("Health"))) {
+          ((Health) hitNode.getNode(new NodePath("Health"))).takeDamage(getCurrentWeaponStats().damage);
+        }
+      }
+
       splatters.get(currentSplatersIndex).setGlobalPosition(rayCast3D.getCollisionPoint());
       splatters.get(currentSplatersIndex).setEmitting(true);
       currentSplatersIndex++;

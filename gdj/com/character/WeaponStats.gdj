@@ -32,6 +32,7 @@ properties = [
 	ammo_backup,
 	ammo_backup_max,
 	recoil,
+	damage,
 	fire_audio,
 	reload_audio
 ]
