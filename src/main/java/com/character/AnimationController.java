@@ -23,6 +23,18 @@ public class AnimationController extends Node {
   @Export
   public LookAtModifier3D aimLookAtModifier;
 
+  @Export
+  @RegisterProperty
+  public double animationBlendDuration = 0.25;
+
+  @Export
+  @RegisterProperty
+  public double animationSpeedDuration = 0.7;
+
+  @Export
+  @RegisterProperty
+  public double floorBlendSpeed = 10.0;
+
   private int weapon = 0;
   private int pendingWeapon = -1;
   private static final double WEAPON_SWAP_DELAY = 0.3;
@@ -46,7 +58,7 @@ public class AnimationController extends Node {
     onFloorBlendTarget = player.isOnFloor() ? 1.0 : 0.0;
 
     // Smoothly interpolate the blend value
-    onFloorBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, 10.0 * delta);
+    onFloorBlend = GD.lerp(onFloorBlend, onFloorBlendTarget, floorBlendSpeed * delta);
 
     // Access AnimationTree parameters using set() with a NodePath
     animationTree.set("parameters/OnFloorBlend/blend_amount", onFloorBlend);
@@ -55,12 +67,8 @@ public class AnimationController extends Node {
   @RegisterFunction
   public void jump(JumpState jumpState) {
     if (animationTree == null) return;
-
-    if (tween != null && tween.isValid()) {
-      tween.kill();
-    }
-
-    // Request a OneShot animation fire
+    // Do not kill the movement blend tween — the jump OneShot plays on top of the
+    // movement blend, so we want the blend to continue smoothly while airborne.
     String path = "parameters/" + jumpState.getAnimationName() + "/request";
     animationTree.set(path, AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
   }
@@ -68,12 +76,7 @@ public class AnimationController extends Node {
   @RegisterFunction
   public void roll(RollState rollState) {
     if (animationTree == null) return;
-
-    if (tween != null && tween.isValid()) {
-      tween.kill();
-    }
-
-    // Request a OneShot animation fire
+    // Same reasoning as jump: the roll OneShot is independent of movement blending.
     String path = "parameters/" + rollState.getAnimationName() + "/request";
     animationTree.set(path, AnimationNodeOneShot.OneShotRequest.FIRE.getValue());
   }
@@ -161,9 +164,9 @@ public class AnimationController extends Node {
     }
 
     String blendPath = "parameters/" + currentStanceName + "MovementBlend/blend_position";
-    tween.tweenProperty(animationTree, new NodePath(blendPath), animationDirection, 0.25);
+    tween.tweenProperty(animationTree, new NodePath(blendPath), animationDirection, animationBlendDuration);
 
     String speedPath = "parameters/MovementAnimSpeed/scale";
-    tween.parallel().tweenProperty(animationTree, new NodePath(speedPath), movementState.animationSpeed, 0.7);
+    tween.parallel().tweenProperty(animationTree, new NodePath(speedPath), movementState.animationSpeed, animationSpeedDuration);
   }
 }

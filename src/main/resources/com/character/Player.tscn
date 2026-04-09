@@ -627,15 +627,15 @@ parameters/WeaponChangeSeek/seek_request = -1.0
 [node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(3.904455e-10, -0.018310644, -0.080805)
+bones/0/position = Vector3(2.0390628e-10, -0.012394616, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.439832, 0.10677292, 0.73116803, -0.5104318)
+bones/1/rotation = Quaternion(0.43507096, 0.10419421, 0.7385948, -0.504316)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.44106027, -0.10584495, 0.03016572, 0.8907035)
+bones/2/rotation = Quaternion(0.43981323, -0.12814757, 0.03271531, 0.8882974)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.096093066, -0.15526135, 0.03876734, 0.9824241)
+bones/3/rotation = Quaternion(-0.097203374, -0.16395013, 0.04491725, 0.9806398)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.058841877, -0.074010745, 0.0067166192, 0.99549735)
+bones/4/rotation = Quaternion(-0.057850275, -0.05667905, 0.0072141783, 0.9966889)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -713,24 +713,24 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19531915, -0.019573005, 0.0057627824, 0.9805275)
+bones/43/rotation = Quaternion(0.19537349, -0.020639904, 0.0060298457, 0.9804932)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.9117712, 0.13440324, -0.23273098, -0.31055668)
+bones/45/rotation = Quaternion(0.95332754, 0.11721574, -0.22997537, -0.1566474)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.19620913, 0.22092563, -0.040054582, 0.9545101)
-bones/47/rotation = Quaternion(-0.59871185, 0.01895686, -0.03362118, 0.80003405)
-bones/48/rotation = Quaternion(-0.48539093, 0.021279242, 0.01922341, 0.87382686)
+bones/46/rotation = Quaternion(0.457489, 0.19852616, -0.10208315, 0.8607381)
+bones/47/rotation = Quaternion(-0.43508527, 0.024861842, -0.024646131, 0.8997084)
+bones/48/rotation = Quaternion(-0.41900927, 0.020871323, 0.026015349, 0.90736926)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.95991343, -0.00039967895, 0.25947857, -0.1060044)
+bones/49/rotation = Quaternion(0.9504325, -0.01728236, 0.2573643, -0.17361785)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.15890726, -0.22284704, 0.015332477, 0.96169263)
-bones/51/rotation = Quaternion(-0.47552815, -0.028398797, 0.031728502, 0.8786694)
-bones/52/rotation = Quaternion(-0.2663942, -0.019579189, -0.040297035, 0.9628224)
+bones/50/rotation = Quaternion(0.20474333, -0.21281117, 0.02641866, 0.955036)
+bones/51/rotation = Quaternion(-0.54820627, -0.020759474, 0.021401716, 0.83581156)
+bones/52/rotation = Quaternion(-0.32244515, -0.020107025, -0.035252586, 0.9457178)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8"]
-transform = Transform3D(-0.7080221, 0.04342712, 0.7048538, 0.69217217, 0.24055907, 0.6804623, -0.14000848, 0.9696622, -0.20038041, -0.13668165, 1.1962011, 0.36872748)
+transform = Transform3D(-0.71321005, 0.04210007, 0.6996851, 0.68693686, 0.24057972, 0.68573993, -0.1394602, 0.9697158, -0.20050408, -0.13929912, 1.201067, 0.3662681)
 bone_name = "hand_r"
 bone_idx = 27
 
@@ -771,7 +771,7 @@ bone_name = "spine_03"
 bone = 4
 
 [node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10"]
-transform = Transform3D(0.9991506, -0.006629706, -0.040672008, -0.0071769403, 0.9438953, -0.33016643, 0.040578846, 0.33017775, 0.9430459, -0.006919859, 1.2449987, -0.07157701)
+transform = Transform3D(0.9991053, -0.014425767, -0.039756957, 0.0004597886, 0.94368005, -0.33085883, 0.042290546, 0.33054456, 0.94284236, -0.01011269, 1.2509613, -0.07408268)
 bone_name = "neck_01"
 bone_idx = 43
 
@@ -1010,7 +1010,7 @@ grow_vertical = 2
 text = "40"
 label_settings = SubResource("LabelSettings_d6yvc")
 
-[node name="RadialMenu" type="Control" parent="." node_paths=PackedStringArray("player", "camera")]
+[node name="RadialMenu" type="Control" parent="." node_paths=PackedStringArray("player", "camera", "weapon_controller")]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -1021,6 +1021,7 @@ grow_vertical = 2
 script = ExtResource("23_k4e70")
 player = NodePath("..")
 camera = NodePath("../CameraRoot")
+weapon_controller = NodePath("../WeaponController")
 
 [node name="Panel" type="Panel" parent="RadialMenu"]
 layout_mode = 1

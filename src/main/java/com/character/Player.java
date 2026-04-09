@@ -34,13 +34,13 @@ public class Player extends CharacterBody3D {
   public final Signal1<Vector3> changedMovementDirection = Signal1.create(this, "changedMovementDirection");
 
   @RegisterSignal
-  public final Signal1<CombatState> changedCombatState= Signal1.create(this, "changedCombatState");
+  public final Signal1<CombatState> changedCombatState = Signal1.create(this, "changedCombatState");
 
   @RegisterSignal
-  public final Signal1<Integer> changedWeapon =  Signal1.create(this, "changedWeapon");
+  public final Signal1<Integer> changedWeapon = Signal1.create(this, "changedWeapon");
 
   @RegisterSignal
-  public final Signal0 reloadWeapon =  Signal0.create(this, "reloadWeapon");
+  public final Signal0 reloadWeapon = Signal0.create(this, "reloadWeapon");
 
   // Exports
   @RegisterProperty
@@ -65,21 +65,30 @@ public class Player extends CharacterBody3D {
   // Internal State
   private int airJumpCounter = 0;
   private Vector3 movementDirection = new Vector3();
-  private String currentStanceName = "Upright";
-  private String currentMovementStateName = "Idle";
+  private StanceName currentStanceName = StanceName.UPRIGHT;
+  private MovementType currentMovementType = MovementType.IDLE;
   private boolean isRolling = false;
   private Timer stanceAntispamTimer;
   private Timer rollTimer;
   private Timer aimStayTimer;
 
   private boolean combat = false;
+  private boolean wantCombat = false;
 
   private RayCast3D rayCast3D;
-  private Marker3D  marker3D;
+  private Marker3D marker3D;
 
   @RegisterProperty
   @Export
   public WeaponController weaponController;
+
+  @RegisterProperty
+  @Export
+  public NodePath rayCastNodePath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+
+  @RegisterProperty
+  @Export
+  public NodePath spineIKTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
 
   @RegisterFunction
   @Override
@@ -91,13 +100,13 @@ public class Player extends CharacterBody3D {
 
     aimStayTimer = (Timer) getNode("AimStayTimer");
 
-    rayCast3D = (RayCast3D) getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+    rayCast3D = (RayCast3D) getNode(rayCastNodePath);
 
     rayCast3D.addException(this);
-    marker3D = (Marker3D)getNode("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
+    marker3D = (Marker3D) getNode(spineIKTargetPath);
 
     changedMovementDirection.emit(Vector3.Companion.getBACK());
-    setMovementState("Idle");
+    setMovementState(MovementType.IDLE);
     setStance(currentStanceName);
     setCombatState();
     setWeapon(0);
@@ -112,22 +121,15 @@ public class Player extends CharacterBody3D {
 
 
     if (event.isActionPressed("movement", false) || event.isActionReleased("movement", false)) {
-      String movementState = "Idle";
+      MovementType movementType = MovementType.IDLE;
       movementDirection.setX(input.getActionStrength("left") - input.getActionStrength("right"));
       movementDirection.setZ(input.getActionStrength("forward") - input.getActionStrength("back"));
 
       if (isMovementOngoing()) {
-
-        if (input.isActionPressed("walk", false)) {
-          movementState = "Walk";
-        }
-        else {
-
-          movementState = "Sprint";
-        }
+        movementType = input.isActionPressed("walk", false) ? MovementType.WALK : MovementType.SPRINT;
       }
 
-      setMovementState(movementState);
+      setMovementState(movementType);
     }
 
     if (input.isActionPressed("reload", false)) {
@@ -136,48 +138,44 @@ public class Player extends CharacterBody3D {
 
     if (!isRolling) {
       // Update combat
-      boolean currentCombat = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
 
       Vector3 currentRotationDegree = rayCast3D.getRotationDegrees();
-      rayCast3D.setRotationDegrees(new Vector3( currentRotationDegree.getX(), 0.0f, 0.0f));
-      if (combat != currentCombat) {
+      rayCast3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.0f, 0.0f));
 
-        // only if combat is true, or aimStayTimer is completed
-        if(combat || aimStayTimer.getTimeLeft() <= 0) {
-          if(combat) {
-            aimStayTimer.start();
-          }
+      wantCombat = input.isActionPressed("aim", false) || input.isActionPressed("fire", false);
 
-          combat = currentCombat;
+      if (wantCombat) {
+        // Cancel any pending exit — player re-engaged aim/fire
+        aimStayTimer.stop();
+        if (!combat) {
+          combat = true;
           setCombatState();
         }
-
-
+      } else if (combat && aimStayTimer.isStopped()) {
+        // Released aim/fire and timer not yet running — begin the hold window
+        aimStayTimer.start();
       }
 
-      if (input.isActionPressed("fire", false))
-      {
+      if (input.isActionPressed("fire", false)) {
         fireWeapon.emit();
-      }
-      else{
+      } else {
         notFireWeapon.emit();
       }
 
 
-
       if (input.isActionPressed("jump", false)) {
         if (airJumpCounter <= maxAirJump) {
-          if (isStanceBlocked("Upright")) return;
+          if (isStanceBlocked(StanceName.UPRIGHT)) return;
 
-          if (!currentStanceName.equals("Upright")) {
-            setStance("Upright");
+          if (currentStanceName != StanceName.UPRIGHT) {
+            setStance(StanceName.UPRIGHT);
             return;
           }
 
           String jumpName = (airJumpCounter > 0) ? "AirJump" : "GroundJump";
           JumpState state = jumpStates.get(jumpName);
           if (state != null) {
-            getPressedJump().emit(state);
+            pressedJump.emit(state);
           }
           airJumpCounter++;
         }
@@ -190,20 +188,18 @@ public class Player extends CharacterBody3D {
           }
         }
       }
-    }
-    else {
+    } else {
       notFireWeapon.emit();
     }
 
     if (isOnFloor() && (rollTimer == null || rollTimer.getTimeLeft() <= 0)) {
       for (String stanceKey : stances.keys()) {
         if (event.isActionPressed(stanceKey.toLowerCase(), false)) {
-          setStance(stanceKey);
+          setStance(StanceName.fromKey(stanceKey));
         }
       }
     }
   }
-
 
   private void setCombatState() {
 
@@ -214,18 +210,13 @@ public class Player extends CharacterBody3D {
 
     isRolling = isRoll;
 
-    // If not crouch, then disable collider to enable crouch
-    if (! currentStanceName.equals("Crouch")) {
+    // If not crouch, swap to crouch collider during roll
+    if (currentStanceName != StanceName.CROUCH) {
 
-      String disabledStanceColliderName = currentStanceName;
-      String enabledStanceColliderName = "Crouch";
+      StanceName disabledStanceName = isRoll ? currentStanceName : StanceName.CROUCH;
+      StanceName enabledStanceName  = isRoll ? StanceName.CROUCH  : currentStanceName;
 
-      if(!isRoll) {
-        disabledStanceColliderName = enabledStanceColliderName;
-        enabledStanceColliderName = currentStanceName;
-      }
-
-      NodePath disabledStancePath = stances.get(disabledStanceColliderName);
+      NodePath disabledStancePath = stances.get(disabledStanceName.getKey());
       if (disabledStancePath != null) {
         Stance currentStanceNode = (Stance) getNode(disabledStancePath);
         if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
@@ -233,9 +224,9 @@ public class Player extends CharacterBody3D {
         }
       }
 
-      NodePath enabledStanceStancePath = stances.get(enabledStanceColliderName);
-      if (enabledStanceStancePath != null) {
-        Stance currentStanceNode = (Stance) getNode(enabledStanceStancePath);
+      NodePath enabledStancePath = stances.get(enabledStanceName.getKey());
+      if (enabledStancePath != null) {
+        Stance currentStanceNode = (Stance) getNode(enabledStancePath);
         if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
           currentStanceNode.getCollider().setDisabled(false);
         }
@@ -266,10 +257,15 @@ public class Player extends CharacterBody3D {
     }
 
     if (combat) {
-      if(rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
-        marker3D.setGlobalPosition(rayCast3D.getCollisionPoint());
+      // Exit combat once the aim-stay timer has finished and player is no longer engaging
+      if (aimStayTimer.isStopped() && !wantCombat) {
+        combat = false;
+        setCombatState();
       }
-      else {
+
+      if (rayCast3D.isColliding() && (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+        marker3D.setGlobalPosition(rayCast3D.getCollisionPoint());
+      } else {
         marker3D.setGlobalPosition(rayCast3D.toGlobal(rayCast3D.getTargetPosition()));
       }
     }
@@ -279,19 +275,17 @@ public class Player extends CharacterBody3D {
     return Math.abs(movementDirection.getX()) > 0 || Math.abs(movementDirection.getZ()) > 0;
   }
 
-  public void setMovementState(String state) {
-
-    NodePath path = stances.get(currentStanceName);
-
+  public void setMovementState(MovementType type) {
+    NodePath path = stances.get(currentStanceName.getKey());
     if (path == null) return;
 
     Stance stanceNode = (Stance) getNode(path);
     if (stanceNode == null) return;
-    currentMovementStateName = state;
-    changedMovementState.emit(stanceNode.getMovementState(state));
+    currentMovementType = type;
+    changedMovementState.emit(stanceNode.getMovementState(type));
   }
 
-  private void setStance(String stanceName) {
+  private void setStance(StanceName stanceName) {
     if (stanceAntispamTimer.getTimeLeft() > 0) {
       return;
     }
@@ -301,12 +295,12 @@ public class Player extends CharacterBody3D {
       stanceAntispamTimer.start();
     }
 
-    String nextStanceName = (stanceName.equals(currentStanceName)) ? "Upright" : stanceName;
+    StanceName nextStanceName = (stanceName == currentStanceName) ? StanceName.UPRIGHT : stanceName;
 
     if (isStanceBlocked(nextStanceName)) return;
 
     // Disable current collider
-    NodePath currentPath = stances.get(currentStanceName);
+    NodePath currentPath = stances.get(currentStanceName.getKey());
     if (currentPath != null) {
       Stance currentStanceNode = (Stance) getNode(currentPath);
       if (currentStanceNode != null && currentStanceNode.getCollider() != null) {
@@ -316,7 +310,7 @@ public class Player extends CharacterBody3D {
 
     // Update name and enable new collider
     currentStanceName = nextStanceName;
-    NodePath nextPath = stances.get(currentStanceName);
+    NodePath nextPath = stances.get(currentStanceName.getKey());
     if (nextPath != null) {
       Stance nextStanceNode = (Stance) getNode(nextPath);
       if (nextStanceNode != null) {
@@ -327,96 +321,19 @@ public class Player extends CharacterBody3D {
       }
     }
 
-    setMovementState(currentMovementStateName);
+    setMovementState(currentMovementType);
   }
 
-  private boolean isStanceBlocked(String stanceName) {
-    NodePath path = stances.get(stanceName);
+  private boolean isStanceBlocked(StanceName stanceName) {
+    NodePath path = stances.get(stanceName.getKey());
     if (path == null) return false;
 
     Stance stanceNode = (Stance) getNode(path);
     return (stanceNode != null) && stanceNode.isBlocked();
   }
 
-
-  public Signal1<JumpState> getPressedJump() {
-    return pressedJump;
-  }
-
-  public Signal1<RollState> getPressedRoll() {
-    return pressedRoll;
-  }
-
-
-  public Signal1<Stance> getChangedStance() {
-    return changedStance;
-  }
-
-
-  public Signal1<MovementState> getChangedMovementState() {
-    return changedMovementState;
-  }
-
-
-  public Signal1<Vector3> getChangedMovementDirection() {
-    return changedMovementDirection;
-  }
-
-
-  public int getMaxAirJump() {
-    return maxAirJump;
-  }
-
-  public void setMaxAirJump(int maxAirJump) {
-    this.maxAirJump = maxAirJump;
-  }
-
-  public Dictionary<String, JumpState> getJumpStates() {
-    return jumpStates;
-  }
-
-  public void setJumpStates(Dictionary<String, JumpState> jumpStates) {
-    this.jumpStates = jumpStates;
-  }
-
-  public Dictionary<String, NodePath> getStances() {
-    return stances;
-  }
-
-  public void setStances(Dictionary<String, NodePath> stances) {
-    this.stances = stances;
-  }
-
-  public int getAirJumpCounter() {
-    return airJumpCounter;
-  }
-
-  public void setAirJumpCounter(int airJumpCounter) {
-    this.airJumpCounter = airJumpCounter;
-  }
-
-  public Vector3 getMovementDirection() {
-    return movementDirection;
-  }
-
   public void setMovementDirection(Vector3 movementDirection) {
     this.movementDirection = movementDirection;
-  }
-
-  public String getCurrentStanceName() {
-    return currentStanceName;
-  }
-
-  public void setCurrentStanceName(String currentStanceName) {
-    this.currentStanceName = currentStanceName;
-  }
-
-  public String getCurrentMovementStateName() {
-    return currentMovementStateName;
-  }
-
-  public void setCurrentMovementStateName(String currentMovementStateName) {
-    this.currentMovementStateName = currentMovementStateName;
   }
 
 

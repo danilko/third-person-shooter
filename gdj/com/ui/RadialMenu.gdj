@@ -20,7 +20,8 @@ signals = [
 ]
 properties = [
     player,
-	camera
+	camera,
+	weapon_controller
 ]
 functions = [
     _ready,

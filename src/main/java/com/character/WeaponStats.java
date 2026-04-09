@@ -74,13 +74,10 @@ public class WeaponStats extends Node3D {
   @Export
   public AudioStreamWAV reloadAudio;
 
-  @Override
-  public void _ready() {
-    // Ready logic here
-  }
-
   public void decrementMag(){
-    mag--;
+    if (mag > 0) {
+      mag--;
+    }
   }
 
   public void fillMag(){

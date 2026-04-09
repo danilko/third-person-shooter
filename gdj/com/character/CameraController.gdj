@@ -18,7 +18,16 @@ signals = [
     set_cam_rotation
 ]
 properties = [
-    player
+    player,
+	yaw_sensitivity,
+	pitch_sensitivity,
+	yaw_acceleration,
+	pitch_acceleration,
+	pitch_max,
+	pitch_min,
+	shoulder_offset_lerp_speed,
+	follow_lerp_speed,
+	fov_tween_duration
 ]
 functions = [
     _physics_process,
