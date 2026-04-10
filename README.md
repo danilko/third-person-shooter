@@ -76,3 +76,4 @@ Did use Gemini/Claude AI during debugging/documentation.
 ## 🎮 Screenshots
 ![screenshot1.png](images/screenshot1.png)
 ![screenshot2.png](images/screenshot2.png)
+![screenshot3.png](images/screenshot3.png)
