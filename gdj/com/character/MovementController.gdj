@@ -21,6 +21,8 @@ properties = [
 	mesh_root,
 	rotation_speed,
 	fall_gravity,
+	world_space_movement,
+	face_camera_in_combat,
 	weapon_controller,
 	crosshair
 ]

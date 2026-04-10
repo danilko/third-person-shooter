@@ -36,6 +36,22 @@ public class MovementController extends Node {
   private Vector3 velocity = new Vector3();
   private double acceleration = 0.0;
   private double speed = 0.0;
+  /**
+   * When true the incoming movementDirection is already in world space (Enemy/AI).
+   * When false it is in camera-relative input space and is rotated by camRotation (Player).
+   */
+  @Export
+  @RegisterProperty
+  public boolean worldSpaceMovement = false;
+
+  /**
+   * When true the character faces the camera direction in combat (Player).
+   * When false it faces the movement direction regardless of combat state (Enemy/AI).
+   */
+  @Export
+  @RegisterProperty
+  public boolean faceCameraInCombat = true;
+
   private double camRotation = 0.0;
   private double playerInitRotation = 0.0;
   private boolean combat = false;
@@ -97,8 +113,8 @@ public class MovementController extends Node {
     if (rolling && direction.lengthSquared() > 0.001) {
       // During roll: always face movement direction, even in combat
       targetRotation = atan2(direction.getX(), direction.getZ()) - playerInitRotation;
-    } else if (combat) {
-      // Face camera direction regardless of movement
+    } else if (combat && faceCameraInCombat) {
+      // Face camera direction (Player only — set faceCameraInCombat=false for AI/Enemy)
       targetRotation = camRotation - playerInitRotation;
     } else {
       // Face movement direction (only when actually moving)
@@ -120,7 +136,9 @@ public class MovementController extends Node {
     float jumpContrib = weaponStats.jumpSpread * (player.isOnFloor() ? 1 : 0);
     float aimContrib = combat ? weaponStats.getAimSpread() * 2 : 0;
     float crouchContrib = currentMovementType == MovementType.IDLE ? weaponStats.crouchSpread * 2 : 0;
-    crosshair.setPositionX(baseSpread + jumpContrib + aimContrib + crouchContrib);
+    if (crosshair != null) {
+      crosshair.setPositionX(baseSpread + jumpContrib + aimContrib + crouchContrib);
+    }
   }
 
 
@@ -163,7 +181,13 @@ public class MovementController extends Node {
 
   @RegisterFunction
   public void onSetMovementDirection(Vector3 movementDirection) {
-    direction = movementDirection.rotated(Vector3.Companion.getUP(), camRotation + playerInitRotation);
+    if (worldSpaceMovement) {
+      // Enemy/AI: direction is already world-space — use it directly
+      direction = movementDirection;
+    } else {
+      // Player: direction is camera-relative input space — rotate into world space
+      direction = movementDirection.rotated(Vector3.Companion.getUP(), camRotation + playerInitRotation);
+    }
   }
 
   @RegisterFunction

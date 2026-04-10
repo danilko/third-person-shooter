@@ -4,23 +4,20 @@ import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
-import godot.api.CharacterBody3D;
 import godot.api.NavigationAgent3D;
 import godot.api.RayCast3D;
-import godot.core.NodePath;
 import godot.core.Vector3;
 import godot.global.GD;
 
 @RegisterClass(className = "Enemy")
-public class Enemy extends CharacterBody3D {
+public class Enemy extends Character {
 
-    // --- Internal FSM state (enum is Java-only, not exposed to Godot) ---
     private enum State { PATROL, CHASE, ATTACK }
 
-    // --- Inspector-tunable properties ---
+    // ── Inspector-tunable properties ──────────────────────────────────────────
     @Export
     @RegisterProperty
-    public CharacterBody3D player;
+    public Character player;
 
     @Export
     @RegisterProperty
@@ -28,32 +25,15 @@ public class Enemy extends CharacterBody3D {
 
     @Export
     @RegisterProperty
-    public float attackRange = 2.0f;
-
-    @Export
-    @RegisterProperty
-    public float moveSpeed = 3.5f;
-
-    @Export
-    @RegisterProperty
-    public float attackDamage = 15.0f;
-
-    @Export
-    @RegisterProperty
-    public float attackCooldown = 1.5f;
+    public float attackRange = 15.0f;
 
     @Export
     @RegisterProperty
     public float patrolRadius = 8.0f;
 
-    @Export
-    @RegisterProperty
-    public float gravity = 9.8f;
-
-    // --- Internal state ---
+    // ── AI state ──────────────────────────────────────────────────────────────
     private NavigationAgent3D navAgent;
     private RayCast3D sightRay;
-    private Health health;
 
     private State state = State.PATROL;
     private Vector3 spawnPosition;
@@ -63,153 +43,170 @@ public class Enemy extends CharacterBody3D {
 
     private static final double LOST_PLAYER_TIMEOUT = 3.0;
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
     @RegisterFunction
     @Override
     public void _ready() {
-        navAgent = (NavigationAgent3D) getNode("NavigationAgent3D");
-        sightRay = (RayCast3D) getNode("SightRay");
-        health = (Health) getNode("Health");
+        super._ready();
+        navAgent      = (NavigationAgent3D) getNode("NavigationAgent3D");
+        sightRay      = (RayCast3D)         getNode("SightRay");
         spawnPosition = new Vector3(getGlobalPosition());
         setNextPatrolTarget();
     }
 
-    @RegisterFunction
+    // ── Input gathering (AI FSM → CharacterInput) ─────────────────────────────
+    /**
+     * Runs the AI FSM for this tick and expresses its decisions as a
+     * CharacterInput — the same struct the Player produces from keyboard input.
+     *
+     * This makes the Enemy a drop-in for any future network-authoritative
+     * simulation: the server can run the same FSM, produce CharacterInputs,
+     * and broadcast them to clients exactly as it would for a human player.
+     */
     @Override
-    public void _physicsProcess(double delta) {
-        if (isDead) return;
+    protected CharacterInput gatherInput(double delta) {
+        CharacterInput input = new CharacterInput();
 
-        // Apply gravity when airborne
-        if (!isOnFloor()) {
-            Vector3 vel = getVelocity();
-            vel.setY(vel.getY() - gravity * (float) delta);
-            setVelocity(vel);
-        }
+        if (isDead) return input;   // empty input → applyInput is a no-op
 
         attackTimer = Math.max(0.0, attackTimer - delta);
 
         switch (state) {
-            case PATROL: updatePatrol(delta); break;
-            case CHASE:  updateChase(delta);  break;
-            case ATTACK: updateAttack(delta); break;
+            case PATROL: fillPatrolInput(input);        break;
+            case CHASE:  fillChaseInput(input, delta);  break;
+            case ATTACK: fillAttackInput(input);        break;
         }
 
-        moveAndSlide();
+        return input;
     }
 
-    // --- State update methods ---
+    // ── FSM input translators ─────────────────────────────────────────────────
 
-    private void updatePatrol(double delta) {
+    private void fillPatrolInput(CharacterInput input) {
         if (canSeePlayer()) {
             state = State.CHASE;
             lostPlayerTimer = 0.0;
+            // Transition — let CHASE fill the input on this same tick
+            fillChaseInput(input, 0.0);
             return;
         }
 
+        input.wantCombat   = false;
+        input.movementType = MovementType.WALK;
+
         if (!navAgent.isNavigationFinished()) {
-            Vector3 nextPos = navAgent.getNextPathPosition();
-            Vector3 dir = nextPos.minus(getGlobalPosition()).normalized();
-            setVelocity(new Vector3(dir.getX() * moveSpeed, getVelocity().getY(), dir.getZ() * moveSpeed));
-            faceDirection(dir);
+            Vector3 dir = navAgent.getNextPathPosition()
+                                  .minus(getGlobalPosition())
+                                  .normalized();
+            input.movementDirection.setX(dir.getX());
+            input.movementDirection.setZ(dir.getZ());
         } else {
             setNextPatrolTarget();
         }
     }
 
-    private void updateChase(double delta) {
+    private void fillChaseInput(CharacterInput input, double delta) {
         if (player == null) {
             state = State.PATROL;
+            fillPatrolInput(input);
             return;
         }
 
         float dist = (float) getGlobalPosition().distanceTo(player.getGlobalPosition());
-
         if (dist <= attackRange) {
             state = State.ATTACK;
+            fillAttackInput(input);
             return;
         }
+
+        input.wantCombat   = true;
+        input.movementType = MovementType.SPRINT;
 
         if (canSeePlayer()) {
             lostPlayerTimer = 0.0;
             navAgent.setTargetPosition(player.getGlobalPosition());
+            input.aimTargetPosition = new Vector3(
+                    player.getGlobalPosition().getX(),
+                    player.getGlobalPosition().getY(),
+                    player.getGlobalPosition().getZ());
         } else {
             lostPlayerTimer += delta;
             if (lostPlayerTimer >= LOST_PLAYER_TIMEOUT) {
                 state = State.PATROL;
                 setNextPatrolTarget();
+                fillPatrolInput(input);
                 return;
             }
         }
 
-        Vector3 nextPos = navAgent.getNextPathPosition();
-        Vector3 dir = nextPos.minus(getGlobalPosition()).normalized();
-        setVelocity(new Vector3(dir.getX() * moveSpeed, getVelocity().getY(), dir.getZ() * moveSpeed));
-        faceDirection(dir);
+        Vector3 dir = navAgent.getNextPathPosition()
+                              .minus(getGlobalPosition())
+                              .normalized();
+        input.movementDirection.setX(dir.getX());
+        input.movementDirection.setZ(dir.getZ());
     }
 
-    private void updateAttack(double delta) {
+    private void fillAttackInput(CharacterInput input) {
         if (player == null) {
             state = State.PATROL;
+            fillPatrolInput(input);
             return;
         }
 
         float dist = (float) getGlobalPosition().distanceTo(player.getGlobalPosition());
         if (dist > attackRange) {
             state = State.CHASE;
+            fillChaseInput(input, 0.0);
             return;
         }
 
-        // Face the player and stand still
-        Vector3 toPlayer = player.getGlobalPosition().minus(getGlobalPosition()).normalized();
-        faceDirection(toPlayer);
-        setVelocity(new Vector3(0.0f, getVelocity().getY(), 0.0f));
+        // Face and aim toward the player while standing still
+        Vector3 toPlayer = player.getGlobalPosition()
+                                 .minus(getGlobalPosition())
+                                 .normalized();
+        input.movementDirection.setX(toPlayer.getX());
+        input.movementDirection.setZ(toPlayer.getZ());
+        input.movementType      = MovementType.IDLE;
+        input.wantCombat        = true;
+        input.aimTargetPosition = new Vector3(
+                player.getGlobalPosition().getX(),
+                player.getGlobalPosition().getY(),
+                player.getGlobalPosition().getZ());
 
+        // Fire on cooldown
         if (attackTimer <= 0.0) {
-            attackTimer = attackCooldown;
-            if (player.hasNode(new NodePath("Health"))) {
-                Health playerHealth = (Health) player.getNode(new NodePath("Health"));
-                playerHealth.takeDamage(attackDamage);
-            }
+            double fireRate = (weaponController != null
+                    && weaponController.getCurrentWeaponStats() != null)
+                    ? weaponController.getCurrentWeaponStats().getFireRate()
+                    : 0.0;
+            attackTimer = (fireRate > 0.0) ? 1.0 / fireRate : 1.5;
+            input.fire  = true;
         }
     }
 
-    // --- Helpers ---
-
+    // ── Helpers ───────────────────────────────────────────────────────────────
     private boolean canSeePlayer() {
         if (player == null) return false;
         float dist = (float) getGlobalPosition().distanceTo(player.getGlobalPosition());
         if (dist > detectionRange) return false;
 
-        // Cast sight ray toward player in the ray's local space
-        Vector3 playerPosLocal = sightRay.toLocal(player.getGlobalPosition());
-        sightRay.setTargetPosition(playerPosLocal);
+        sightRay.setTargetPosition(sightRay.toLocal(player.getGlobalPosition()));
         sightRay.forceRaycastUpdate();
 
-        // Clear line-of-sight if ray hits nothing, or if it hits the player directly
-        if (!sightRay.isColliding()) return true;
+        if (!sightRay.isColliding()) return false;
         return sightRay.getCollider() == player;
     }
 
     private void setNextPatrolTarget() {
         float angle = GD.randf() * (float) Math.PI * 2.0f;
         float dist  = GD.randf() * patrolRadius;
-        Vector3 target = spawnPosition.plus(new Vector3(
-            (float) Math.cos(angle) * dist,
-            0.0f,
-            (float) Math.sin(angle) * dist
-        ));
-        navAgent.setTargetPosition(target);
+        navAgent.setTargetPosition(spawnPosition.plus(new Vector3(
+                (float) Math.cos(angle) * dist, 0.0f, (float) Math.sin(angle) * dist)));
     }
 
-    private void faceDirection(Vector3 dir) {
-        if (Math.abs(dir.getX()) < 0.001f && Math.abs(dir.getZ()) < 0.001f) return;
-        double targetY = Math.atan2(dir.getX(), dir.getZ());
-        Vector3 rot = getRotation();
-        setRotation(new Vector3(rot.getX(), (float) targetY, rot.getZ()));
-    }
-
-    // --- Signal receiver: connected in scene ---
-
+    // ── Signal receiver ───────────────────────────────────────────────────────
     @RegisterFunction
+    @Override
     public void onDied() {
         isDead = true;
         queueFree();

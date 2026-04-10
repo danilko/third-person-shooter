@@ -1,13 +1,12 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = Player
-fqName = com.character.Player
-relativeSourcePath = src/main/java/com/character/Player.java
+registeredName = Character
+fqName = com.character.Character
+relativeSourcePath = src/main/java/com/character/Character.java
 baseType = CharacterBody3D
 supertypes = [
-    com.character.Character,
-	godot.api.CharacterBody3D,
+    godot.api.CharacterBody3D,
 	godot.api.PhysicsBody3D,
 	godot.api.CollisionObject3D,
 	godot.api.Node3D,
@@ -31,9 +30,7 @@ signals = [
 	reload_weapon
 ]
 properties = [
-    ray_cast_node_path,
-	health_label_path,
-	max_air_jump,
+    max_air_jump,
 	jump_states,
 	stances,
 	combat_states,
@@ -46,6 +43,5 @@ functions = [
     _physics_process,
 	_ready,
 	completed_roll,
-	on_died,
-	on_player_damaged
+	on_died
 ]

@@ -23,7 +23,6 @@ properties = [
 	mag_label_path,
 	ammo_backup_label_path,
 	ray_cast_path,
-	spine_i_k_target_path,
 	splatters_path,
 	recoil_pitch_path,
 	weapon_audio,

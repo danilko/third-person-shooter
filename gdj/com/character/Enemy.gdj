@@ -6,7 +6,8 @@ fqName = com.character.Enemy
 relativeSourcePath = src/main/java/com/character/Enemy.java
 baseType = CharacterBody3D
 supertypes = [
-    godot.api.CharacterBody3D,
+    com.character.Character,
+	godot.api.CharacterBody3D,
 	godot.api.PhysicsBody3D,
 	godot.api.CollisionObject3D,
 	godot.api.Node3D,
@@ -18,20 +19,34 @@ supertypes = [
 	kotlin.Any
 ]
 signals = [
-    
+    pressed_jump,
+	pressed_roll,
+	changed_stance,
+	fire_weapon,
+	not_fire_weapon,
+	changed_movement_state,
+	changed_movement_direction,
+	changed_combat_state,
+	changed_weapon,
+	reload_weapon
 ]
 properties = [
     player,
 	detection_range,
 	attack_range,
-	move_speed,
-	attack_damage,
-	attack_cooldown,
 	patrol_radius,
-	gravity
+	max_air_jump,
+	jump_states,
+	stances,
+	combat_states,
+	roll_state,
+	weapon_controller,
+	aim_target_path,
+	aim_ray_path
 ]
 functions = [
     _physics_process,
 	_ready,
+	completed_roll,
 	on_died
 ]

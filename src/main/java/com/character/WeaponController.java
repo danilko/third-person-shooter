@@ -38,10 +38,6 @@ public class WeaponController extends Node {
 
   @RegisterProperty
   @Export
-  public NodePath spineIKTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget");
-
-  @RegisterProperty
-  @Export
   public NodePath splattersPath = new NodePath("Splatters");
 
   @RegisterProperty
@@ -70,7 +66,6 @@ public class WeaponController extends Node {
   private Label magLabel;
   private Label ammoBackupLabel;
   private RayCast3D rayCast3D;
-  private Marker3D marker3D;
 
   private int currentSplatersIndex = 0;
   private int maxSplatterSize = 0;
@@ -103,26 +98,29 @@ public class WeaponController extends Node {
     fireTimer = (Timer) getNode("FireTimer");
     reloadTimer = (Timer) getNode("ReloadTimer");
 
-    magLabel = (Label) getOwner().getNode(magLabelPath);
-    ammoBackupLabel = (Label) getOwner().getNode(ammoBackupLabelPath);
+    if (getOwner().hasNode(magLabelPath)) {
+      magLabel = (Label) getOwner().getNode(magLabelPath);
+    }
+    if (getOwner().hasNode(ammoBackupLabelPath)) {
+      ammoBackupLabel = (Label) getOwner().getNode(ammoBackupLabelPath);
+    }
 
     weapons.add(pistol);
     weapons.add(rifle);
 
     muzzleFlashAnimationPlayer = ((AnimationPlayer)neckBoneAttachement.getNode("AnimationPlayer"));
-    // Hide the muzzle flash by play once as a workaround
+    // Hide the muzzle flash by playing once as a workaround
     muzzleFlashAnimationPlayer.play("MuzzleFlash");
 
-    rayCast3D = (RayCast3D) getOwner().getNode(rayCastPath);
-
-    marker3D = (Marker3D) getOwner().getNode(spineIKTargetPath);
+    if (getOwner().hasNode(rayCastPath)) {
+      rayCast3D = (RayCast3D) getOwner().getNode(rayCastPath);
+    }
 
     for (Node splatterNode : getOwner().getNode(splattersPath).getChildren()) {
         splatters.add((GPUParticles3D) splatterNode);
     }
 
     maxSplatterSize = splatters.size();
-
   }
 
   @RegisterFunction
@@ -164,14 +162,19 @@ public class WeaponController extends Node {
     weaponAudio.play();
 
 
-    Vector3 currentRotationDegree = rayCast3D.getRotationDegrees();
-    float spread = getCurrentWeaponStats().getSpread();
-    rayCast3D.setRotationDegrees(new Vector3( currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
+    if (getOwner().hasNode(recoilPitchPath)) {
+      ((Node3D) getOwner().getNode(recoilPitchPath)).rotateX((float) GD.degToRad(getCurrentWeaponStats().getRecoil()));
+    }
 
-    ((Node3D) getOwner().getNode(recoilPitchPath)).rotateX((float) GD.degToRad(getCurrentWeaponStats().getRecoil()));
+    // Apply spread and check for collision
+    if(rayCast3D != null) {
+      Vector3 currentRotationDegree = rayCast3D.getRotationDegrees();
+      float spread = getCurrentWeaponStats().getSpread();
+      rayCast3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
+    }
 
     // final check for collision point
-    if(rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+    if(rayCast3D != null && rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
       // Apply damage if the hit body has a Health node
       Object collider = rayCast3D.getCollider();
       if (collider instanceof godot.api.Node) {
@@ -253,8 +256,12 @@ public class WeaponController extends Node {
   @RegisterFunction
   @Override
   public void _process(double delta) {
-    magLabel.setText(String.valueOf(weapons.get(weapon).getMag()));
-    ammoBackupLabel.setText(String.valueOf(weapons.get(weapon).getAmmoBackup()));
+    if (magLabel != null) {
+      magLabel.setText(String.valueOf(weapons.get(weapon).getMag()));
+    }
+    if (ammoBackupLabel != null) {
+      ammoBackupLabel.setText(String.valueOf(weapons.get(weapon).getAmmoBackup()));
+    }
   }
 
 
