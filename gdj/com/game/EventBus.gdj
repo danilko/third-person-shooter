@@ -1,9 +1,9 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = WeaponController
-fqName = com.character.WeaponController
-relativeSourcePath = src/main/java/com/character/WeaponController.java
+registeredName = EventBus
+fqName = com.game.EventBus
+relativeSourcePath = src/main/java/com/game/EventBus.java
 baseType = Node
 supertypes = [
     godot.api.Node,
@@ -14,24 +14,14 @@ supertypes = [
 	kotlin.Any
 ]
 signals = [
-    weapon_fired,
-	ammo_changed
+    player_died,
+	enemy_killed,
+	player_health_changed,
+	ammo_picked_up
 ]
 properties = [
-    animation_controller,
-	ray_cast_path,
-	splatters_path,
-	recoil_pitch_path,
-	weapon_attachment_path,
-	weapon_audio,
-	neck_bone_attachement
+    
 ]
 functions = [
-    _ready,
-	on_weapon_fire,
-	on_weapon_reload,
-	on_weapon_reload_complete,
-	on_weapon_not_fire,
-	on_set_weapon,
-	on_weapon_transition_complete
+    
 ]

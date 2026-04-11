@@ -63,6 +63,7 @@ transform = Transform3D(0.2888312, 0, 0.9573802, 0, 1, 0, -0.9573802, 0, 0.28883
 roll_state = ExtResource("2_hbo2n")
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.031542182, 0, 0.004375696)
 navigation_mesh = SubResource("NavigationMesh_world")
 
 [node name="StaticBody3D" type="StaticBody3D" parent="NavigationRegion3D"]

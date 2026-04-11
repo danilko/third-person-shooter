@@ -40,13 +40,34 @@ public class Stance extends Node {
   @RegisterProperty
   public RayCast3D colRaycast;
 
+  /**
+   * Stances that require more vertical clearance than this one (i.e. taller stances).
+   *
+   * When {@code colRaycast} detects a ceiling obstruction, all stances listed here
+   * are also considered blocked — preventing the character from standing up into a
+   * surface even if they are not the direct target of the transition.
+   *
+   * Example: Crawl.higherStances = [Crouch, Upright].  When crawling under a low
+   * ceiling, neither Crouch nor Upright can be entered until the ceiling clears.
+   *
+   * Inspector: assign the sibling Stance nodes that are blocked by this stance's ceiling raycast.
+   */
   @Export
   @RegisterProperty
   public VariantArray<Stance> higherStances = new VariantArray<>(Stance.class);
 
+  /**
+   * Returns true if this stance's space is obstructed (ceiling too low).
+   * Also returns true if any of the {@link #higherStances} are themselves blocked,
+   * preventing an upward transition that would collide.
+   */
   @RegisterFunction
   public boolean isBlocked() {
-    return colRaycast != null && colRaycast.isColliding();
+    if (colRaycast != null && colRaycast.isColliding()) return true;
+    for (Stance taller : higherStances) {
+      if (taller != null && taller.isBlocked()) return true;
+    }
+    return false;
   }
 
   public MovementState getIdleState() {

@@ -15,7 +15,7 @@ public class AmmoRefill extends Area3D {
     if (!(node instanceof Player)) {
       return;
     }
-    ((WeaponController) node.getNode("WeaponController")).getCurrentWeaponStats().fillAmmo();
+    ((WeaponController) node.getNode("WeaponController")).fillWeaponAmmo();
   }
 
 }

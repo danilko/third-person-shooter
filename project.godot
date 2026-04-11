@@ -15,6 +15,11 @@ run/main_scene="uid://jvsaup8qx28"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://icon.svg"
 
+[autoload]
+
+EventBus="*res://gdj/com/game/EventBus.gdj"
+GameManager="*res://gdj/com/game/GameManager.gdj"
+
 [display]
 
 window/stretch/mode="canvas_items"
