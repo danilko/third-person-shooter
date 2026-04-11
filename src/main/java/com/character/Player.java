@@ -1,5 +1,7 @@
 package com.character;
 
+import com.game.EventBus;
+import com.ui.CharacterHUD;
 import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
@@ -18,11 +20,11 @@ public class Player extends Character {
 
     @RegisterProperty
     @Export
-    public NodePath healthLabelPath = new NodePath("UI/Health/ColorRect/Health");
+    public NodePath hudPath = new NodePath("UI");
 
     // ── Player-specific nodes ─────────────────────────────────────────────────
     private RayCast3D rayCast3D;
-    private godot.api.Label healthLabel;
+    private CharacterHUD hud;
     private Timer aimStayTimer;
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -36,8 +38,10 @@ public class Player extends Character {
         rayCast3D = (RayCast3D) getNode(rayCastNodePath);
         rayCast3D.addException(this);
 
-        healthLabel = (godot.api.Label) getNode(healthLabelPath);
-        healthLabel.setText(String.valueOf((int) healthNode.getCurrentHealth()));
+        if (hasNode(hudPath)) {
+            hud = (CharacterHUD) getNode(hudPath);
+            hud.onHealthChanged(healthNode.getCurrentHealth());
+        }
     }
 
     // ── Input gathering (human input → CharacterInput) ────────────────────────
@@ -127,12 +131,16 @@ public class Player extends Character {
     @Override
     public void onDied() {
         setProcessInput(false);
-        GD.print("Player died — game over");
-        // TODO Phase 5: show game-over screen
+        Node eventBusNode = getNodeOrNull("/root/EventBus");
+        if (eventBusNode instanceof EventBus) {
+            ((EventBus) eventBusNode).playerDied.emit();
+        }
     }
 
     @RegisterFunction
     public void onPlayerDamaged(float amount) {
-        healthLabel.setText(String.valueOf((int) healthNode.getCurrentHealth()));
+        if (hud != null) {
+            hud.onHealthChanged(healthNode.getCurrentHealth());
+        }
     }
 }

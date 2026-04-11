@@ -1,9 +1,11 @@
 package com.character;
+import com.util.ObjectPool;
 import godot.annotation.*;
 import godot.api.*;
 import godot.api.Object;
 import godot.core.NodePath;
 import godot.core.Signal1;
+import godot.core.Signal2;
 import godot.core.VariantArray;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -15,22 +17,7 @@ public class WeaponController extends Node {
 
   @RegisterProperty
   @Export
-  public WeaponStats pistol;
-  @RegisterProperty
-  @Export
-  public WeaponStats rifle;
-
-  @RegisterProperty
-  @Export
   public AnimationController animationController;
-
-  @RegisterProperty
-  @Export
-  public NodePath magLabelPath = new NodePath("UI/Mag/ColorRect/Mag");
-
-  @RegisterProperty
-  @Export
-  public NodePath ammoBackupLabelPath = new NodePath("UI/Mag/ColorRect/AmmoBackup");
 
   @RegisterProperty
   @Export
@@ -44,8 +31,18 @@ public class WeaponController extends Node {
   @Export
   public NodePath recoilPitchPath = new NodePath("CameraRoot/Yaw/Pitch");
 
+
+  @RegisterProperty
+  @Export
+  public NodePath weaponAttachmentPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment");
+
+
   @RegisterSignal
   public final Signal1<Float> weaponFired = Signal1.create(this, "weaponFired");
+
+  /** Emitted whenever magazine or backup ammo count changes (mag, ammoBackup). */
+  @RegisterSignal
+  public final Signal2<Integer, Integer> ammoChanged = Signal2.create(this, "ammoChanged");
 
   @RegisterProperty
   @Export
@@ -63,15 +60,11 @@ public class WeaponController extends Node {
   private Timer fireTimer;
   private Timer reloadTimer;
 
-  private Label magLabel;
-  private Label ammoBackupLabel;
   private RayCast3D rayCast3D;
 
-  private int currentSplatersIndex = 0;
-  private int maxSplatterSize = 0;
-
-
-  private ArrayList<GPUParticles3D> splatters = new ArrayList<>();
+  // Round-robin VFX pool: acquire → position → emit → release immediately.
+  // Particles continue emitting independently; the pool just tracks order.
+  private ObjectPool<GPUParticles3D> splatterPool;
 
   public int getWeapon() {
     return weapon;
@@ -85,8 +78,6 @@ public class WeaponController extends Node {
     return weapons.size();
   }
 
-
-
   private int weapon = 0;
   private int pendingWeapon = 0;
   private boolean isWeaponFired = false;
@@ -98,15 +89,13 @@ public class WeaponController extends Node {
     fireTimer = (Timer) getNode("FireTimer");
     reloadTimer = (Timer) getNode("ReloadTimer");
 
-    if (getOwner().hasNode(magLabelPath)) {
-      magLabel = (Label) getOwner().getNode(magLabelPath);
+    // Discover all WeaponStats children dynamically — add more weapon nodes to
+    // the scene without touching this class.
+    for (Node child : getOwner().getNode(weaponAttachmentPath).getChildren()) {
+      if (child instanceof WeaponStats) {
+        weapons.add((WeaponStats) child);
+      }
     }
-    if (getOwner().hasNode(ammoBackupLabelPath)) {
-      ammoBackupLabel = (Label) getOwner().getNode(ammoBackupLabelPath);
-    }
-
-    weapons.add(pistol);
-    weapons.add(rifle);
 
     muzzleFlashAnimationPlayer = ((AnimationPlayer)neckBoneAttachement.getNode("AnimationPlayer"));
     // Hide the muzzle flash by playing once as a workaround
@@ -116,11 +105,18 @@ public class WeaponController extends Node {
       rayCast3D = (RayCast3D) getOwner().getNode(rayCastPath);
     }
 
+    ArrayList<GPUParticles3D> splatterNodes = new ArrayList<>();
     for (Node splatterNode : getOwner().getNode(splattersPath).getChildren()) {
-        splatters.add((GPUParticles3D) splatterNode);
+      splatterNodes.add((GPUParticles3D) splatterNode);
     }
-
-    maxSplatterSize = splatters.size();
+    int poolSize = splatterNodes.size();
+    int[] idx = {0};
+    // Factory cycles through the pre-existing scene nodes; reset is a no-op
+    // because particles continue emitting fire-and-forget after release.
+    splatterPool = new ObjectPool<>(poolSize,
+        () -> splatterNodes.get(idx[0]++),
+        p -> {});  // no reset — particle keeps playing after release
+    emitInitialAmmoState();
   }
 
   @RegisterFunction
@@ -144,6 +140,7 @@ public class WeaponController extends Node {
     weaponAudio.setStream(weapons.get(weapon).getFireAudio());
 
     weapons.get(weapon).decrementMag();
+    ammoChanged.emit(weapons.get(weapon).getMag(), weapons.get(weapon).getAmmoBackup());
 
     fireTimer.start();
 
@@ -184,16 +181,20 @@ public class WeaponController extends Node {
         }
       }
 
-      splatters.get(currentSplatersIndex).setGlobalPosition(rayCast3D.getCollisionPoint());
-      splatters.get(currentSplatersIndex).setEmitting(true);
-      currentSplatersIndex++;
-
-      if(currentSplatersIndex >= maxSplatterSize) {
-        currentSplatersIndex = 0;
-      }
+      GPUParticles3D splatter = splatterPool.acquire();
+      splatter.setGlobalPosition(rayCast3D.getCollisionPoint());
+      splatter.setEmitting(true);
+      splatterPool.release(splatter); // immediately back; particle keeps emitting
     }
   }
 
+  public void fillWeaponAmmo() {
+    for(int index = 0; index < weapons.size(); index++) {
+      weapons.get(index).fillAmmo();;
+    }
+
+    ammoChanged.emit(weapons.get(weapon).getMag(), weapons.get(weapon).getAmmoBackup());
+  }
 
   @RegisterFunction
   public void onWeaponReload() {
@@ -212,6 +213,7 @@ public class WeaponController extends Node {
   @RegisterFunction
   public void onWeaponReloadComplete() {
     weapons.get(weapon).fillMag();
+    ammoChanged.emit(weapons.get(weapon).getMag(), weapons.get(weapon).getAmmoBackup());
   }
 
  public boolean isWeaponReloading(){
@@ -250,17 +252,15 @@ public class WeaponController extends Node {
     showWeapon(weapon);
     // equip current weapon
     animationController.onWeaponTransition(weapon, true);
+    // notify HUD of the newly equipped weapon's ammo
+    ammoChanged.emit(weapons.get(weapon).getMag(), weapons.get(weapon).getAmmoBackup());
   }
 
 
-  @RegisterFunction
-  @Override
-  public void _process(double delta) {
-    if (magLabel != null) {
-      magLabel.setText(String.valueOf(weapons.get(weapon).getMag()));
-    }
-    if (ammoBackupLabel != null) {
-      ammoBackupLabel.setText(String.valueOf(weapons.get(weapon).getAmmoBackup()));
+  /** Emit initial ammo state so HUD listeners can populate on first frame. */
+  private void emitInitialAmmoState() {
+    if (!weapons.isEmpty()) {
+      ammoChanged.emit(weapons.get(weapon).getMag(), weapons.get(weapon).getAmmoBackup());
     }
   }
 

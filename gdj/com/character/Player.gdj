@@ -32,7 +32,7 @@ signals = [
 ]
 properties = [
     ray_cast_node_path,
-	health_label_path,
+	hud_path,
 	max_air_jump,
 	jump_states,
 	stances,

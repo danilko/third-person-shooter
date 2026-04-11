@@ -1,4 +1,4 @@
-[gd_scene load_steps=125 format=3 uid="uid://bwxj3ecw2ta4k"]
+[gd_scene load_steps=126 format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="1_i0ahk"]
 [ext_resource type="PackedScene" uid="uid://eq2pwhqx1o4e" path="res://assets/merged_animation.tscn" id="1_rl0hp"]
@@ -39,8 +39,9 @@
 [ext_resource type="PackedScene" uid="uid://2cwjeq8se2u2" path="res://src/main/resources/com/character/ui/LinePivot.tscn" id="29_cet18"]
 [ext_resource type="FontFile" uid="uid://btgb34w8m7xgt" path="res://assets/ui/DSEG7ClassicMini-Bold.ttf" id="29_d6yvc"]
 [ext_resource type="Script" uid="uid://defb2urvdtr8u" path="res://gdj/com/ui/Crosshair.gdj" id="29_sy336"]
+[ext_resource type="Script" uid="uid://daim07aoitehv" path="res://src/main/java/com/ui/CharacterHUD.java" id="30_pk7bh"]
 [ext_resource type="Script" uid="uid://byduim3uwqqc5" path="res://gdj/com/character/WeaponController.gdj" id="31_4afhp"]
-[ext_resource type="Script" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
+[ext_resource type="Script" uid="uid://b8wux304md2q" path="res://src/main/java/com/character/Health.java" id="40_hlth1"]
 
 [sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_ige6o"]
 filters = ["Godot_Chan_Stealth/Skeleton3D:pelvis"]
@@ -628,15 +629,15 @@ parameters/WeaponChangeSeek/seek_request = -1.0
 [node name="Model" parent="MeshRoot" instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(9.532519e-10, -0.021401027, -0.080805)
+bones/0/position = Vector3(1.0305049e-09, -0.022623908, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.42342722, 0.11225701, 0.7547489, -0.48832566)
+bones/1/rotation = Quaternion(0.42724073, 0.11008493, 0.7521968, -0.48943502)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.4433443, -0.111096986, 0.061994866, 0.88727665)
+bones/2/rotation = Quaternion(0.44314653, -0.109991595, 0.057191115, 0.8878357)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.096337326, -0.18121211, 0.05108045, 0.97738034)
+bones/3/rotation = Quaternion(-0.09642782, -0.18158562, 0.050432198, 0.97733575)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.05814877, -0.054741975, 0.0069956873, 0.99678135)
+bones/4/rotation = Quaternion(-0.05817399, -0.054898936, 0.0069518206, 0.99677163)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -714,38 +715,29 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19534875, -0.020153461, 0.005908083, 0.980509)
+bones/43/rotation = Quaternion(0.19534776, -0.020133724, 0.0059031444, 0.9805097)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.9298018, 0.15946794, -0.22523935, -0.24352762)
+bones/45/rotation = Quaternion(0.92809325, 0.1563172, -0.22711067, -0.25025687)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.38423553, 0.20706135, -0.08597576, 0.89559853)
-bones/47/rotation = Quaternion(-0.5625247, 0.019638777, -0.028977107, 0.8260391)
-bones/48/rotation = Quaternion(-0.4515217, 0.021083867, 0.022736829, 0.89172125)
+bones/46/rotation = Quaternion(0.35053194, 0.20993464, -0.07729844, 0.9094394)
+bones/47/rotation = Quaternion(-0.55579984, 0.019758428, -0.029138273, 0.83057034)
+bones/48/rotation = Quaternion(-0.44825953, 0.021063624, 0.023069855, 0.8933574)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.952821, 0.022913365, 0.27180186, -0.13315721)
+bones/49/rotation = Quaternion(0.95295966, 0.017035864, 0.2696624, -0.13733175)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.17504771, -0.21755353, 0.019241925, 0.96003056)
-bones/51/rotation = Quaternion(-0.5146585, -0.024468407, 0.026050813, 0.85665)
-bones/52/rotation = Quaternion(-0.2953858, -0.019859584, -0.037715644, 0.9544267)
+bones/50/rotation = Quaternion(0.17959926, -0.2176745, 0.020423014, 0.9591376)
+bones/51/rotation = Quaternion(-0.51872975, -0.024344362, 0.026219895, 0.85418934)
+bones/52/rotation = Quaternion(-0.298134, -0.019885348, -0.037467886, 0.95358115)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8"]
-transform = Transform3D(-0.7129703, 0.041959494, 0.69993776, 0.68708736, 0.24102682, 0.6854321, -0.13994342, 0.9696107, -0.20067489, -0.1352418, 1.1916941, 0.3648964)
+transform = Transform3D(-0.71388376, 0.04176182, 0.69901776, 0.68614787, 0.24113682, 0.68633366, -0.13989648, 0.9695919, -0.20079865, -0.13642865, 1.190354, 0.36425352)
 bone_name = "hand_r"
 bone_idx = 27
 
-[node name="Rifile" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment"]
-transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406, -0.16160382, -0.38944525, 0.537192, -0.74816924, -0.041, 0.021, 0.044)
-visible = false
-script = ExtResource("9_u0wnu")
-fire_audio = ExtResource("10_ufc68")
-reload_audio = ExtResource("11_4t16q")
-
-[node name="AssaultRifle2_12" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile" instance=ExtResource("9_j83q5")]
-transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)
-
 [node name="Pistol" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment"]
+transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
 visible = false
 script = ExtResource("9_u0wnu")
 spread = 25.0
@@ -766,13 +758,23 @@ reload_audio = ExtResource("14_d6yvc")
 [node name="Pistol_52" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol" instance=ExtResource("10_1qhsf")]
 transform = Transform3D(-0.026545947, 0.107987374, 0.11503909, 0.15446925, 0.04156776, -0.003375052, -0.032164898, 0.11050269, -0.11115124, -0.011984825, 0.045636475, 0.009359002)
 
+[node name="Rifile" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment"]
+transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406, -0.16160382, -0.38944525, 0.537192, -0.74816924, -0.041, 0.021, 0.044)
+visible = false
+script = ExtResource("9_u0wnu")
+fire_audio = ExtResource("10_ufc68")
+reload_audio = ExtResource("11_4t16q")
+
+[node name="AssaultRifle2_12" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile" instance=ExtResource("9_j83q5")]
+transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)
+
 [node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9"]
 target_node = NodePath("../../../../../CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget")
 bone_name = "spine_03"
 bone = 4
 
 [node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10"]
-transform = Transform3D(0.99913794, -0.013781813, -0.03915969, 7.190881e-05, 0.943859, -0.3303485, 0.041513935, 0.33006084, 0.94304615, -0.0059430995, 1.2413404, -0.07544946)
+transform = Transform3D(0.9991436, -0.014956971, -0.038577635, 0.0013744852, 0.9438597, -0.3303433, 0.041352723, 0.3300073, 0.9430721, -0.007248107, 1.2401438, -0.07611079)
 bone_name = "neck_01"
 bone_idx = 43
 
@@ -904,6 +906,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("30_pk7bh")
 
 [node name="Crosshair" type="Control" parent="UI"]
 layout_mode = 1
@@ -1172,10 +1175,8 @@ libraries = {
 &"": SubResource("AnimationLibrary_psjdo")
 }
 
-[node name="WeaponController" type="Node" parent="." node_paths=PackedStringArray("pistol", "rifle", "animation_controller", "weapon_audio", "neck_bone_attachement")]
+[node name="WeaponController" type="Node" parent="." node_paths=PackedStringArray("animation_controller", "weapon_audio", "neck_bone_attachement")]
 script = ExtResource("31_4afhp")
-pistol = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol")
-rifle = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile")
 animation_controller = NodePath("../AnimationController")
 weapon_audio = NodePath("../WeaponAudio")
 neck_bone_attachement = NodePath("../MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/NeckAttachment")
@@ -1379,6 +1380,7 @@ script = ExtResource("40_hlth1")
 [connection signal="pressed_roll" from="." to="AnimationController" method="roll"]
 [connection signal="reload_weapon" from="." to="WeaponController" method="on_weapon_reload"]
 [connection signal="set_cam_rotation" from="CameraRoot" to="MovementController" method="on_set_cam_rotation"]
+[connection signal="ammo_changed" from="WeaponController" to="UI" method="on_ammo_changed"]
 [connection signal="weapon_fired" from="WeaponController" to="UI/Crosshair" method="on_weapon_fire"]
 [connection signal="timeout" from="WeaponController/TransitionTimer" to="WeaponController" method="on_weapon_transition_complete"]
 [connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]
