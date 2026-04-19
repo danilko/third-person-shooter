@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://bb60nshfmm7so"]
+
+[ext_resource type="Script" uid="uid://bwod6o4yfvkuf" path="res://gdj/com/character/WeaponStats.gdj" id="1_1wcjt"]
+[ext_resource type="AudioStream" uid="uid://c0v8ncowcuy0l" path="res://assets/audio/Pistol_fire.wav" id="2_avd6t"]
+[ext_resource type="AudioStream" uid="uid://b11jauobcpulr" path="res://assets/audio/Pistol_reload.wav" id="3_8lcua"]
+[ext_resource type="PackedScene" uid="uid://dxy5klgkpin02" path="res://assets/Pistol_5.blend" id="4_h5f0a"]
+
+[node name="Pistol" type="Node3D" unique_id=358619058]
+transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
+visible = false
+script = ExtResource("1_1wcjt")
+spread = 25.0
+movement_spread = 3.5
+crouch_spread = -5.0
+jump_spread = 10.0
+switch_speed = 1.5
+fire_rate = 6.0
+auto = false
+mag = 15
+mag_size = 15
+ammo_backup = 30
+ammo_backup_max = 30
+recoil = 0.5
+damage = 10.0
+fire_audio = ExtResource("2_avd6t")
+reload_audio = ExtResource("3_8lcua")
+
+[node name="Pistol_52" parent="." unique_id=1222425938 instance=ExtResource("4_h5f0a")]
+transform = Transform3D(-0.026545947, 0.107987374, 0.11503909, 0.15446925, 0.04156776, -0.003375052, -0.032164898, 0.11050269, -0.11115124, -0.011984825, 0.045636475, 0.009359002)

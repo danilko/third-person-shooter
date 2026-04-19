@@ -227,6 +227,11 @@ public class WeaponController extends Node {
     return stats.getMag() > 0 || stats.getAmmoBackup() > 0;
   }
 
+  public WeaponStats getWeaponStats(int index) {
+    if (index < 0 || index >= weapons.size()) return null;
+    return weapons.get(index);
+  }
+
   @RegisterFunction
   public void onWeaponNotFire() {
     isWeaponFired = false;

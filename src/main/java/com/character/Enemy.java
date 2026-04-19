@@ -117,15 +117,23 @@ public class Enemy extends Character {
     }
 
     /**
-     * Returns the best weapon index: prefers weapon 2 (index 1) if it has ammo,
-     * falls back to weapon 1 (index 0), returns -1 if all weapons are dry.
+     * Returns the index of the weapon that has ammo and the highest damage stat.
+     * Returns -1 if all weapons are dry.
      */
     public int selectBestWeapon() {
-        if (weaponController == null) return 0;
+        if (weaponController == null) return -1;
         int count = weaponController.getWeaponCount();
-        if (count > 1 && weaponController.hasAmmoForWeapon(1)) return 1;
-        if (count > 0 && weaponController.hasAmmoForWeapon(0)) return 0;
-        return -1;
+        int bestIndex = -1;
+        float bestDamage = -1f;
+        for (int i = 0; i < count; i++) {
+            if (!weaponController.hasAmmoForWeapon(i)) continue;
+            WeaponStats stats = weaponController.getWeaponStats(i);
+            if (stats != null && stats.damage > bestDamage) {
+                bestDamage = stats.damage;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
     }
 
     public boolean hasAnyAmmo() {
