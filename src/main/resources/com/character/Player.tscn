@@ -13,19 +13,14 @@
 [ext_resource type="Resource" uid="uid://7ik6f781r71n" path="res://src/main/resources/com/character/movementstates/crawl/CrawlIdle.tres" id="7_d7d1u"]
 [ext_resource type="Resource" uid="uid://c2wokahkmhfdd" path="res://src/main/resources/com/character/combatstates/NoCombat.tres" id="7_dnye5"]
 [ext_resource type="Resource" uid="uid://dv4pugkv3xrms" path="res://src/main/resources/com/character/movementstates/crouch/CrouchIdle.tres" id="8_ttk2h"]
+[ext_resource type="PackedScene" uid="uid://bb60nshfmm7so" path="res://src/main/resources/com/weapon/pistol.tscn" id="9_d6yvc"]
 [ext_resource type="Resource" uid="uid://i6kix7q2sxsp" path="res://src/main/resources/com/character/movementstates/crouch/CrouchWalk.tres" id="9_gguhd"]
-[ext_resource type="PackedScene" uid="uid://cgkct1784t5mt" path="res://assets/AssaultRifle2_1.glb" id="9_j83q5"]
-[ext_resource type="Script" uid="uid://bwod6o4yfvkuf" path="res://gdj/com/character/WeaponStats.gdj" id="9_u0wnu"]
-[ext_resource type="PackedScene" uid="uid://dxy5klgkpin02" path="res://assets/Pistol_5.blend" id="10_1qhsf"]
+[ext_resource type="PackedScene" uid="uid://chmmjlji5vapb" path="res://src/main/resources/com/weapon/rifile.tscn" id="10_cet18"]
 [ext_resource type="Resource" uid="uid://cmplp30ynbkn2" path="res://src/main/resources/com/character/movementstates/crouch/CrouchSprint.tres" id="10_gguhd"]
-[ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="10_ufc68"]
-[ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="11_4t16q"]
 [ext_resource type="Resource" uid="uid://dp6lq3acc0o7a" path="res://src/main/resources/com/character/movementstates/upright/UprightIdle.tres" id="11_kuqdj"]
 [ext_resource type="Resource" uid="uid://cgumc1fkdl0pb" path="res://src/main/resources/com/character/movementstates/upright/UprightWalk.tres" id="12_agpyf"]
 [ext_resource type="Script" uid="uid://4oxog7dktcxk" path="res://gdj/com/character/AnimationController.gdj" id="13_4afhp"]
 [ext_resource type="Resource" uid="uid://c4pino5mywh5a" path="res://src/main/resources/com/character/movementstates/upright/UprightSprint.tres" id="13_jwg7l"]
-[ext_resource type="AudioStream" uid="uid://c0v8ncowcuy0l" path="res://assets/audio/Pistol_fire.wav" id="13_rgjax"]
-[ext_resource type="AudioStream" uid="uid://b11jauobcpulr" path="res://assets/audio/Pistol_reload.wav" id="14_d6yvc"]
 [ext_resource type="Resource" uid="uid://y37kb4rla2gt" path="res://src/main/resources/com/character/movementstates/crawl/CrawlSprint.tres" id="15_bgnjm"]
 [ext_resource type="Texture2D" uid="uid://ca77s5fasgwv2" path="res://assets/ui/flash1.png" id="16_jxrhs"]
 [ext_resource type="Resource" uid="uid://cmkj336jpwf0o" path="res://src/main/resources/com/character/movementstates/crawl/CrawlWalk.tres" id="16_u0j3k"]
@@ -629,15 +624,15 @@ parameters/WeaponChangeSeek/seek_request = -1.0
 [node name="Model" parent="MeshRoot" unique_id=159922343 instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(6.629176e-10, -0.01684073, -0.080805)
+bones/0/position = Vector3(-2.4585095e-10, -0.006369312, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.4619489, 0.087394096, 0.67704767, -0.5661907)
+bones/1/rotation = Quaternion(0.46537155, 0.0909567, 0.6776508, -0.5620905)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.42482144, -0.17837393, -0.058947515, 0.88557035)
+bones/2/rotation = Quaternion(0.42935494, -0.13012081, -0.053218838, 0.8921271)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.098773114, -0.10538448, 0.0266162, 0.98915595)
+bones/3/rotation = Quaternion(-0.09704454, -0.14263393, 0.033365633, 0.98444134)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.058066197, -0.067104876, 0.004570771, 0.9960444)
+bones/4/rotation = Quaternion(-0.057056908, -0.06672908, 0.009668486, 0.99609154)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -715,58 +710,32 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19544752, -0.022098023, 0.006394786, 0.9804444)
+bones/43/rotation = Quaternion(0.19538678, -0.020900674, 0.006095116, 0.98048466)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.96615404, 0.011149487, -0.24704647, -0.07341811)
+bones/45/rotation = Quaternion(0.9442481, 0.046226833, -0.25109124, -0.20787436)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.14944915, 0.22707818, -0.017298771, 0.96218574)
-bones/47/rotation = Quaternion(-0.44868773, 0.02192207, -0.023309834, 0.8931156)
-bones/48/rotation = Quaternion(-0.31039605, 0.019998698, 0.036355738, 0.94970137)
+bones/46/rotation = Quaternion(0.15663618, 0.2247397, -0.024157416, 0.96144354)
+bones/47/rotation = Quaternion(-0.5282932, 0.019805724, -0.028441526, 0.8483544)
+bones/48/rotation = Quaternion(-0.40431562, 0.020767575, 0.027468093, 0.91397107)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.92357, -0.14215028, 0.20595208, -0.2905092)
+bones/49/rotation = Quaternion(0.9622299, -0.082190506, 0.22369696, -0.13159816)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.2556519, -0.20015396, 0.0383611, 0.94504446)
-bones/51/rotation = Quaternion(-0.64863276, -0.005781441, 0.007890975, 0.76103866)
-bones/52/rotation = Quaternion(-0.4079883, -0.020793796, -0.027106656, 0.9123478)
+bones/50/rotation = Quaternion(0.47283053, -0.19818303, 0.12178409, 0.84989613)
+bones/51/rotation = Quaternion(-0.5180681, -0.017900057, 0.022527913, 0.85485536)
+bones/52/rotation = Quaternion(-0.3344427, -0.020212224, -0.03414352, 0.94158053)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1377854886]
-transform = Transform3D(-0.7050488, 0.044756666, 0.7077451, 0.69525075, 0.24030787, 0.6774056, -0.13975835, 0.9696641, -0.20054609, -0.14635995, 1.1986314, 0.37947845)
+transform = Transform3D(-0.7088245, 0.043632936, 0.7040342, 0.6915014, 0.24003112, 0.68133026, -0.13926171, 0.96978384, -0.20031244, -0.14506052, 1.2082044, 0.37771237)
 bone_name = "hand_r"
 bone_idx = 27
 
-[node name="Pistol" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=791976497]
-transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
-visible = false
-script = ExtResource("9_u0wnu")
-spread = 25.0
-movement_spread = 3.5
-crouch_spread = -5.0
-jump_spread = 10.0
-switch_speed = 1.5
-fire_rate = 6.0
-auto = false
-mag = 15
-mag_size = 15
-ammo_backup = 30
-ammo_backup_max = 30
-recoil = 0.5
-fire_audio = ExtResource("13_rgjax")
-reload_audio = ExtResource("14_d6yvc")
+[node name="Pistol" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=358619058 instance=ExtResource("9_d6yvc")]
+transform = Transform3D(1, 0, 5.5879354e-09, 0, 0.99999994, 0, -5.5879354e-09, 0, 1, 0, 0, 0)
 
-[node name="Pistol_52" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Pistol" unique_id=1963895502 instance=ExtResource("10_1qhsf")]
-transform = Transform3D(-0.026545947, 0.107987374, 0.11503909, 0.15446925, 0.04156776, -0.003375052, -0.032164898, 0.11050269, -0.11115124, -0.011984825, 0.045636475, 0.009359002)
-
-[node name="Rifile" type="Node3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=369406522]
-transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406, -0.16160382, -0.38944525, 0.537192, -0.74816924, -0.041, 0.021, 0.044)
-visible = false
-script = ExtResource("9_u0wnu")
-fire_audio = ExtResource("10_ufc68")
-reload_audio = ExtResource("11_4t16q")
-
-[node name="AssaultRifle2_12" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment/Rifile" unique_id=1114699538 instance=ExtResource("9_j83q5")]
-transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)
+[node name="Rifile" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1788483088 instance=ExtResource("10_cet18")]
+transform = Transform3D(-0.22872101, 0.7304517, 0.64352703, 0.892199, 0.42174056, -0.16160387, -0.38944528, 0.537192, -0.7481692, -0.041, 0.021, 0.044)
 
 [node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=353292672]
 target_node = NodePath("../../../../../CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/SpineIKTarget")
@@ -774,7 +743,7 @@ bone_name = "spine_03"
 bone = 4
 
 [node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=1958644969]
-transform = Transform3D(0.9989058, -0.004663134, -0.046533335, -0.010978724, 0.94382733, -0.3302563, 0.045459352, 0.33040586, 0.94274354, -0.016516637, 1.2468923, -0.060861204)
+transform = Transform3D(0.99906564, -0.008649636, -0.042344674, -0.0058549237, 0.9436505, -0.3308916, 0.042820483, 0.33083025, 0.9427182, -0.015560397, 1.2574006, -0.062624805)
 bone_name = "neck_01"
 bone_idx = 43
 

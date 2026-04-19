@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://chmmjlji5vapb"]
+
+[ext_resource type="Script" uid="uid://bwod6o4yfvkuf" path="res://gdj/com/character/WeaponStats.gdj" id="1_baof6"]
+[ext_resource type="AudioStream" uid="uid://b20m3cbdfyf00" path="res://assets/audio/Rifle_fire.wav" id="2_o1kqx"]
+[ext_resource type="AudioStream" uid="uid://c333cb6cupk6h" path="res://assets/audio/Rifle_reload.wav" id="3_jkr78"]
+[ext_resource type="PackedScene" uid="uid://cgkct1784t5mt" path="res://assets/AssaultRifle2_1.glb" id="4_eti2j"]
+
+[node name="Rifile" type="Node3D" unique_id=1788483088]
+transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406, -0.16160382, -0.38944525, 0.537192, -0.74816924, 0, 0, 0)
+visible = false
+script = ExtResource("1_baof6")
+fire_audio = ExtResource("2_o1kqx")
+reload_audio = ExtResource("3_jkr78")
+
+[node name="AssaultRifle2_12" parent="." unique_id=491564191 instance=ExtResource("4_eti2j")]
+transform = Transform3D(0.16, 0, 0, 0, 0.16, 0, 0, 0, 0.16, 0, 0, 0)

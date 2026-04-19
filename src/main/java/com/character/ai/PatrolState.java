@@ -25,6 +25,13 @@ public class PatrolState implements EnemyAIState {
 
     @Override
     public EnemyAIState update(Enemy enemy, CharacterInput input, double delta) {
+        // Keep best-damage weapon equipped while idle
+        int bestWeapon = enemy.selectBestWeapon();
+        if (bestWeapon >= 0 && enemy.weaponController != null
+                && bestWeapon != enemy.weaponController.getWeapon()) {
+            input.desiredWeapon = bestWeapon;
+        }
+
         if (enemy.canSeePlayer()) {
             return ChaseState.INSTANCE;
         }

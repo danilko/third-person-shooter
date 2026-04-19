@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://jvsaup8qx28"]
+[gd_scene format=3 uid="uid://jvsaup8qx28"]
 
 [ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
 [ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="2_hbo2n"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://b722ufsi6a0p5" path="res://gdj/com/environment/AmmoRefil.gdj" id="4_kj2pm"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
 [ext_resource type="PackedScene" uid="uid://dbnx63f3e5s88" path="res://src/main/resources/com/character/Enemy.tscn" id="6_enemy"]
+[ext_resource type="Script" uid="uid://be3bdglh1u53c" path="res://gdj/com/character/Enemy.gdj" id="7_lagp7"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/ui/PauseMenu.tscn" id="7_pmenu"]
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_world"]
@@ -56,141 +57,143 @@ size = Vector3(2, 0.1, 2)
 [sub_resource type="BoxShape3D" id="BoxShape3D_hbo2n"]
 size = Vector3(2, 0.1, 2)
 
-[node name="World" type="Node3D"]
+[node name="World" type="Node3D" unique_id=822990337]
 
-[node name="Player" parent="." instance=ExtResource("2_lj72b")]
+[node name="Player" parent="." unique_id=131388266 instance=ExtResource("2_lj72b")]
 transform = Transform3D(0.2888312, 0, 0.9573802, 0, 1, 0, -0.9573802, 0, 0.2888312, 0, 0.7612269, 4.1552534)
 roll_state = ExtResource("2_hbo2n")
 
-[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=689824235]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.031542182, 0, 0.004375696)
 navigation_mesh = SubResource("NavigationMesh_world")
 
-[node name="StaticBody3D" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D" type="StaticBody3D" parent="NavigationRegion3D" unique_id=1472192261]
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D" unique_id=1817442076]
 size = Vector3(100, 1, 100)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D"]
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D" unique_id=1621446447]
 shape = SubResource("ConcavePolygonShape3D_lj72b")
 
-[node name="StaticBody3D2" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D2" type="StaticBody3D" parent="NavigationRegion3D" unique_id=1658346879]
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D2"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D2" unique_id=1182207297]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 size = Vector3(120, 30, 0.25)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D2"]
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D2" unique_id=34039170]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 shape = SubResource("ConcavePolygonShape3D_deotm")
 
-[node name="StaticBody3D5" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D5" type="StaticBody3D" parent="NavigationRegion3D" unique_id=811597381]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -91.95308, 0, 0)
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D5"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D5" unique_id=1706669005]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 size = Vector3(120, 30, 0.25)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D5"]
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D5" unique_id=536444419]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 shape = SubResource("ConcavePolygonShape3D_lagp7")
 
-[node name="StaticBody3D6" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D6" type="StaticBody3D" parent="NavigationRegion3D" unique_id=249864316]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.1567535, 0, 0)
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D6"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D6" unique_id=321812161]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 size = Vector3(120, 30, 0.25)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D6"]
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D6" unique_id=1347759674]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 shape = SubResource("ConcavePolygonShape3D_ksdac")
 
-[node name="StaticBody3D7" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D7" type="StaticBody3D" parent="NavigationRegion3D" unique_id=482612596]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.1567535, 0, 89.98566)
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D7"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D7" unique_id=1174992206]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 size = Vector3(120, 30, 0.25)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D7"]
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D7" unique_id=2987627]
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 48.447693, 1.8199883, -2.3455791)
 shape = SubResource("ConcavePolygonShape3D_m0gj3")
 
-[node name="StaticBody3D4" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D4" type="StaticBody3D" parent="NavigationRegion3D" unique_id=78286559]
 transform = Transform3D(0.6028321, 0, -0.7978681, 0, 1, 0, 0.7978681, 0, 0.6028321, 26.682243, 0, 0)
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D4"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D4" unique_id=1045641605]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8199883, -2.3455791)
 size = Vector3(15, 5, 0.25)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D2" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D4"]
+[node name="CSGBakedCollisionShape3D2" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D4" unique_id=183512558]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8199883, -2.3455791)
 shape = SubResource("ConcavePolygonShape3D_x8bpg")
 
-[node name="StaticBody3D8" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D8" type="StaticBody3D" parent="NavigationRegion3D" unique_id=563283709]
 transform = Transform3D(0.6028321, 0, -0.7978681, 0, 1, 0, 0.7978681, 0, 0.6028321, 4.1686363, 0, 0)
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D8"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D8" unique_id=1118882795]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8199883, -2.3455791)
 size = Vector3(15, 5, 0.25)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D2" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D8"]
+[node name="CSGBakedCollisionShape3D2" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D8" unique_id=1060124581]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8199883, -2.3455791)
 shape = SubResource("ConcavePolygonShape3D_x8bpg")
 
-[node name="StaticBody3D3" type="StaticBody3D" parent="NavigationRegion3D"]
+[node name="StaticBody3D3" type="StaticBody3D" parent="NavigationRegion3D" unique_id=1775987732]
 
-[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D3"]
+[node name="CSGBox3D" type="CSGBox3D" parent="NavigationRegion3D/StaticBody3D3" unique_id=170314913]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2770534, -21.148846)
 size = Vector3(15, 1.8553467, 10)
 material = SubResource("StandardMaterial3D_lj72b")
 
-[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D3"]
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="NavigationRegion3D/StaticBody3D3" unique_id=1666361071]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2770534, -21.148846)
 shape = SubResource("ConcavePolygonShape3D_hbo2n")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=543689444]
 environment = SubResource("Environment_x8bpg")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment"]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=336851902]
 transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 4.677, 0)
 light_energy = 0.7
 sky_mode = 1
 
-[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="WorldEnvironment"]
+[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="WorldEnvironment" unique_id=7119178]
 transform = Transform3D(0.9658932, -0.07774715, -0.24699299, 0.078457184, 0.996893, -0.00698126, 0.24676836, -0.012635224, 0.9689921, 0, 4.677, 0)
 light_energy = 0.03
 
-[node name="AmmoRefill" type="Area3D" parent="."]
+[node name="AmmoRefill" type="Area3D" parent="." unique_id=671726989]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75007653, 0)
 script = ExtResource("4_kj2pm")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="AmmoRefill"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="AmmoRefill" unique_id=872433639]
 mesh = SubResource("BoxMesh_kj2pm")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="AmmoRefill"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AmmoRefill" unique_id=128269220]
 shape = SubResource("BoxShape3D_hbo2n")
 
-[node name="Label3D" type="Label3D" parent="AmmoRefill"]
+[node name="Label3D" type="Label3D" parent="AmmoRefill" unique_id=1916886821]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63201284, 0)
 outline_modulate = Color(0, 0.40344608, 0.7485906, 1)
 text = "AMMO REFILL"
 font = ExtResource("5_uecv0")
 font_size = 60
 
-[node name="Enemy" parent="." node_paths=PackedStringArray("player") instance=ExtResource("6_enemy")]
+[node name="Enemy" parent="." unique_id=1159876964 node_paths=PackedStringArray("player", "ammo_refill") instance=ExtResource("6_enemy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.75, -5)
+script = ExtResource("7_lagp7")
 player = NodePath("../Player")
+ammo_refill = NodePath("../AmmoRefill")
 
-[node name="PauseMenu" parent="." instance=ExtResource("7_pmenu")]
+[node name="PauseMenu" parent="." unique_id=1764356925 instance=ExtResource("7_pmenu")]
 grow_horizontal = 2
 grow_vertical = 2
 
