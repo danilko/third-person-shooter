@@ -22,7 +22,7 @@ public class WeaponController extends Node {
 
   @RegisterProperty
   @Export
-  public NodePath rayCastPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+  public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
 
   @RegisterProperty
   @Export
@@ -61,7 +61,7 @@ public class WeaponController extends Node {
   private Timer fireTimer;
   private Timer reloadTimer;
 
-  private RayCast3D rayCast3D;
+  private RayCast3D aimRay3D;
 
   // Round-robin VFX pool: acquire → position → emit → release immediately.
   // Particles continue emitting independently; the pool just tracks order.
@@ -102,8 +102,8 @@ public class WeaponController extends Node {
     // Hide the muzzle flash by playing once as a workaround
     muzzleFlashAnimationPlayer.play("MuzzleFlash");
 
-    if (getOwner().hasNode(rayCastPath)) {
-      rayCast3D = (RayCast3D) getOwner().getNode(rayCastPath);
+    if (getOwner().hasNode(aimRayPath)) {
+      aimRay3D = (RayCast3D) getOwner().getNode(aimRayPath);
     }
 
     ArrayList<GPUParticles3D> splatterNodes = new ArrayList<>();
@@ -165,25 +165,30 @@ public class WeaponController extends Node {
     }
 
     // Apply spread and check for collision
-    if(rayCast3D != null) {
-      Vector3 currentRotationDegree = rayCast3D.getRotationDegrees();
+    if(aimRay3D != null) {
+      Vector3 currentRotationDegree = aimRay3D.getRotationDegrees();
       float spread = getCurrentWeaponStats().getSpread();
-      rayCast3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
+      aimRay3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
     }
 
     // final check for collision point
-    if(rayCast3D != null && rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+    if(aimRay3D != null && aimRay3D.isColliding() &&  (aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+      GD.print("Hit something");
+
       // Apply damage if the hit body has a Health node
-      Object collider = rayCast3D.getCollider();
+      Object collider = aimRay3D.getCollider();
       if (collider instanceof godot.api.Node) {
         godot.api.Node hitNode = (godot.api.Node) collider;
         if (hitNode.hasNode(new NodePath("Health"))) {
+        GD.print("Hit player");
           ((Health) hitNode.getNode(new NodePath("Health"))).takeDamage(getCurrentWeaponStats().damage);
         }
       }
 
+
+
       GPUParticles3D splatter = splatterPool.acquire();
-      splatter.setGlobalPosition(rayCast3D.getCollisionPoint());
+      splatter.setGlobalPosition(aimRay3D.getCollisionPoint());
       splatter.setEmitting(true);
       splatterPool.release(splatter); // immediately back; particle keeps emitting
     }

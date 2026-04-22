@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://dgjf58g3rfgvx" path="res://gdj/com/character/jumpstates/JumpState.gdj" id="2_arx8k"]
 [ext_resource type="Resource" uid="uid://cemhpckfs3peb" path="res://src/main/resources/com/character/jumpstates/AirJump.tres" id="3_ttk2h"]
 [ext_resource type="Resource" uid="uid://i3rr4c4emq7j" path="res://src/main/resources/com/character/jumpstates/GroundJump.tres" id="4_6f0xc"]
-[ext_resource type="Script" uid="uid://cdhqufum5menr" path="res://src/main/java/com/character/MovementController.java" id="4_ige6o"]
+[ext_resource type="Script" uid="uid://dq365bfvm36hb" path="res://src/main/java/com/character/MovementController.java" id="4_ige6o"]
 [ext_resource type="Script" uid="uid://cynnu6moxlqc6" path="res://gdj/com/character/CombatState.gdj" id="5_gapvf"]
 [ext_resource type="Resource" uid="uid://hfsbhmhtpqq8" path="res://src/main/resources/com/character/combatstates/Combat.tres" id="6_j83q5"]
 [ext_resource type="Script" uid="uid://bor7f5iyg250q" path="res://gdj/com/character/stances/Stance.gdj" id="7_2iqcg"]
@@ -500,6 +500,12 @@ material = SubResource("StandardMaterial3D_v5nep")
 [sub_resource type="SphereShape3D" id="SphereShape3D_cam"]
 radius = 0.1
 
+[sub_resource type="BoxMesh" id="BoxMesh_gapvf"]
+size = Vector3(0.2, 0.2, 0.2)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gapvf"]
+albedo_color = Color(1, 0, 0.28627452, 1)
+
 [node name="Character" type="CharacterBody3D" unique_id=802038165 node_paths=PackedStringArray("weapon_controller")]
 script = ExtResource("1_char")
 jump_states = Dictionary[String, ExtResource("2_arx8k")]({
@@ -517,8 +523,6 @@ combat_states = Dictionary[String, ExtResource("5_gapvf")]({
 })
 roll_state = ExtResource("50_roll")
 weapon_controller = NodePath("WeaponController")
-aim_target_path = NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget")
-aim_ray_path = NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay")
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1655806234]
 root_node = NodePath("../MeshRoot/Model")
@@ -564,15 +568,15 @@ parameters/WeaponChangeSeek/seek_request = -1.0
 [node name="Model" parent="MeshRoot" unique_id=2091451191 instance=ExtResource("1_rl0hp")]
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(1.9497592e-10, -0.0147714745, -0.080805)
+bones/0/position = Vector3(-1.6608298e-10, -0.007873501, -0.080805)
 bones/0/rotation = Quaternion(0.5, 0.50000006, 0.5000001, 0.5)
-bones/1/rotation = Quaternion(0.44596952, 0.10320858, 0.7205843, -0.52078557)
+bones/1/rotation = Quaternion(0.42753667, 0.10903073, 0.7387197, -0.5095272)
 bones/2/position = Vector3(-4.312979e-09, 0.0825587, 2.4930492e-07)
-bones/2/rotation = Quaternion(0.43915802, -0.10994023, 0.013244888, 0.89155924)
+bones/2/rotation = Quaternion(0.43945274, -0.13917866, 0.035484083, 0.8867082)
 bones/3/position = Vector3(-9.352236e-09, 0.062253702, -7.9959435e-08)
-bones/3/rotation = Quaternion(-0.09628833, -0.15209782, 0.03710568, 0.9829639)
+bones/3/rotation = Quaternion(-0.09724117, -0.15311025, 0.04391245, 0.9824323)
 bones/4/position = Vector3(-1.0000514e-09, 0.085567504, 6.092507e-07)
-bones/4/rotation = Quaternion(-0.058550384, -0.07344475, 0.0072269654, 0.99555284)
+bones/4/rotation = Quaternion(-0.057902828, -0.058521904, 0.0066629853, 0.9965832)
 bones/5/position = Vector3(0.02108, 0.21339317, 0.0025152778)
 bones/5/rotation = Quaternion(0.11814317, -0.14993714, -0.66216815, 0.72463405)
 bones/6/position = Vector3(6.3927655e-07, 0.12742604, -1.3376692e-07)
@@ -650,24 +654,24 @@ bones/41/rotation = Quaternion(0.29465878, -0.70493525, -0.37333435, 0.5261787)
 bones/42/position = Vector3(-3.5936741e-06, 0.030804886, 6.378343e-06)
 bones/42/rotation = Quaternion(0.21353133, -0.14242, -0.26180336, 0.9303655)
 bones/43/position = Vector3(-1.83399e-09, 0.2767148, -0.01678027)
-bones/43/rotation = Quaternion(0.19533, -0.019785453, 0.0058159614, 0.9805208)
+bones/43/rotation = Quaternion(0.19538572, -0.020880124, 0.006089973, 0.98048526)
 bones/44/position = Vector3(-1.5879006e-10, 0.10856647, -1.95961e-06)
 bones/44/rotation = Quaternion(-0.21635216, -3.5744065e-08, -1.4256554e-08, 0.9763155)
 bones/45/position = Vector3(0.08844696, -0.0048132977, -0.010240627)
-bones/45/rotation = Quaternion(0.9133067, 0.12099338, -0.23549904, -0.30947015)
+bones/45/rotation = Quaternion(0.9567842, 0.11545001, -0.22521254, -0.14322966)
 bones/46/position = Vector3(2.2808717e-06, 0.3478073, -1.4668584e-06)
-bones/46/rotation = Quaternion(0.17225808, 0.22229035, -0.032912586, 0.95907825)
-bones/47/rotation = Quaternion(-0.5880115, 0.018947866, -0.032881584, 0.8079618)
-bones/48/rotation = Quaternion(-0.47988093, 0.021249335, 0.019802049, 0.87685275)
+bones/46/rotation = Quaternion(0.48378018, 0.19743678, -0.10534396, 0.8460958)
+bones/47/rotation = Quaternion(-0.48800167, 0.021974092, -0.022680566, 0.87227124)
+bones/48/rotation = Quaternion(-0.41935778, 0.020873724, 0.025980672, 0.9072091)
 bones/49/position = Vector3(-0.08844691, -0.004813351, -0.010240724)
-bones/49/rotation = Quaternion(0.9635599, -0.005052225, 0.25430435, -0.08280272)
+bones/49/rotation = Quaternion(0.9498714, -0.015451744, 0.25739622, -0.1767845)
 bones/50/position = Vector3(-2.304464e-06, 0.34780726, -1.4402048e-06)
-bones/50/rotation = Quaternion(0.2683523, -0.21927075, 0.051840894, 0.93660027)
-bones/51/rotation = Quaternion(-0.5020827, -0.026484547, 0.031788107, 0.8638293)
-bones/52/rotation = Quaternion(-0.2711709, -0.019626457, -0.039875753, 0.9615046)
+bones/50/rotation = Quaternion(0.18838753, -0.2109733, 0.022120254, 0.95891154)
+bones/51/rotation = Quaternion(-0.5503643, -0.019548466, 0.01915943, 0.8344759)
+bones/52/rotation = Quaternion(-0.32215816, -0.020104475, -0.03527898, 0.94581467)
 
 [node name="WeaponAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1709979392]
-transform = Transform3D(-0.71457547, 0.0832233, 0.6945905, 0.6974846, 0.16115369, 0.6982441, -0.05382576, 0.9834139, -0.17320348, -0.12192381, 1.1653712, 0.39215213)
+transform = Transform3D(-0.7143326, 0.043102987, 0.6984779, 0.6571026, 0.38463837, 0.64828205, -0.24071841, 0.9220604, -0.30308294, -0.13753495, 1.2648481, 0.33144465)
 bone_name = "hand_r"
 bone_idx = 27
 
@@ -677,11 +681,12 @@ transform = Transform3D(1, 0, 1.6763806e-08, 0, 0.99999994, -1.4901161e-08, 2.60
 [node name="Rifile" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/WeaponAttachment" unique_id=1788483088 instance=ExtResource("10_omh8y")]
 
 [node name="AimModifier" type="LookAtModifier3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="9" unique_id=178617702]
+target_node = NodePath("../../../../../CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget")
 bone_name = "spine_03"
 bone = 4
 
 [node name="NeckAttachment" type="BoneAttachment3D" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=374203861]
-transform = Transform3D(0.9999864, 0.0050749797, -0.0011946894, -0.0051230006, 0.91386867, -0.4059775, -0.0009685308, 0.40597808, 0.91388226, -0.010669753, 1.2504958, -0.047692984)
+transform = Transform3D(0.99914044, -0.01546587, -0.0384622, 0.008114204, 0.9828167, -0.18440592, 0.040653087, 0.18393525, 0.98209727, -0.009020228, 1.2476594, -0.11158578)
 bone_name = "neck_01"
 bone_idx = 43
 
@@ -979,11 +984,21 @@ fov = 65.0
 far = 8192.0
 
 [node name="AimTarget" type="Marker3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=1416140619]
-transform = Transform3D(1, -2.4868996e-14, 4.2632564e-14, 3.5527133e-15, 1, -1.7881393e-07, 1.4210855e-14, 2.0861626e-07, 1, 0, 0, -20)
+transform = Transform3D(1, -2.4868999e-14, 4.2632564e-14, 3.5527133e-15, 1, -1.7881393e-07, 1.4210855e-14, 2.0861626e-07, 1, -7.95304e-07, 2.3841858e-07, -5.2670627)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget" unique_id=1283815597]
+transform = Transform3D(1, -1.4210861e-14, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
+mesh = SubResource("BoxMesh_gapvf")
+surface_material_override/0 = SubResource("StandardMaterial3D_gapvf")
 
 [node name="AimRay" type="RayCast3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" unique_id=847198473]
 transform = Transform3D(1, 0, 7.1054274e-15, 3.5527137e-15, -5.9604645e-08, -0.99999994, 1.4210855e-14, 0.99999994, -5.9604645e-08, -2.842171e-14, -1.1920929e-07, -3.5762787e-07)
-target_position = Vector3(0, -1000, 0)
+target_position = Vector3(0, -2000, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay" unique_id=1012080304]
+transform = Transform3D(1, -1.4210855e-14, 8.4703295e-22, 0, 0.99999994, 0, -4.2351647e-22, 0, 0.99999994, 0, 0, 0)
+visible = false
+mesh = SubResource("BoxMesh_gapvf")
 
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]

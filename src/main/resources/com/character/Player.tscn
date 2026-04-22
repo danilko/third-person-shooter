@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://bwxj3ecw2ta4k"]
 
 [ext_resource type="PackedScene" uid="uid://dhp225d838mq7" path="res://src/main/resources/com/character/Character.tscn" id="1_base"]
-[ext_resource type="Script" uid="uid://do4hfd78xb1p2" path="res://src/main/java/com/character/Player.java" id="2_script"]
-[ext_resource type="Script" uid="uid://pcamctrl01" path="res://src/main/java/com/character/PlayerCameraController.java" id="3_camera"]
+[ext_resource type="Script" uid="uid://bskpgg8yequvp" path="res://src/main/java/com/character/Player.java" id="2_script"]
+[ext_resource type="Script" uid="uid://crvwop0mvksx7" path="res://src/main/java/com/character/PlayerCameraController.java" id="3_camera"]
 [ext_resource type="PackedScene" uid="uid://ch2k70cs37qt6" path="res://src/main/resources/com/ui/RadiaMenuItem.tscn" id="4_menuitem"]
 [ext_resource type="Script" uid="uid://br7t3gtwtycws" path="res://gdj/com/ui/RadialMenu.gdj" id="5_radialmenu"]
 [ext_resource type="Script" uid="uid://cynpcwvmn42g5" path="res://src/main/java/com/ui/RadialMenuItem.java" id="6_menuitemscript"]
@@ -68,16 +68,39 @@ _data = {
 &"Zoom": SubResource("Animation_radial_zoom")
 }
 
-[node name="Player" instance=ExtResource("1_base")]
+[node name="Player" unique_id=73893577 instance=ExtResource("1_base")]
 script = ExtResource("2_script")
+hud_path = NodePath("UI")
 
-[node name="MovementController" parent="." node_paths=PackedStringArray("player", "mesh_root", "weapon_controller", "crosshair")]
+[node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
+bones/0/position = Vector3(1.0686769e-09, -0.02210261, -0.080805)
+bones/1/rotation = Quaternion(0.42423654, 0.11368117, 0.75090694, -0.49319243)
+bones/2/rotation = Quaternion(0.4433063, -0.107255146, 0.05938495, 0.88794667)
+bones/3/rotation = Quaternion(-0.0960127, -0.17404602, 0.048204448, 0.9788595)
+bones/4/rotation = Quaternion(-0.058493648, -0.061548915, 0.006668847, 0.99636626)
+bones/43/rotation = Quaternion(0.19533436, -0.019871177, 0.005837421, 0.980518)
+bones/45/rotation = Quaternion(0.91281044, 0.16560367, -0.22379492, -0.29877815)
+bones/46/rotation = Quaternion(0.31003916, 0.21378809, -0.06816454, 0.92386365)
+bones/47/rotation = Quaternion(-0.59181726, 0.018770136, -0.031214096, 0.805249)
+bones/48/rotation = Quaternion(-0.4772697, 0.0212349, 0.0200753, 0.87827086)
+bones/49/rotation = Quaternion(0.95594573, 0.027521327, 0.2717513, -0.107525036)
+bones/50/rotation = Quaternion(0.16137621, -0.22017986, 0.015851839, 0.9618874)
+bones/51/rotation = Quaternion(-0.4852741, -0.026925374, 0.028837906, 0.87347144)
+bones/52/rotation = Quaternion(-0.2734238, -0.019648608, -0.039676517, 0.9608742)
+
+[node name="WeaponAttachment" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1709979392]
+transform = Transform3D(-0.7164853, 0.061971016, 0.6948446, 0.6947074, 0.15402977, 0.7026066, -0.0634854, 0.9861205, -0.153412, -0.12649487, 1.1535977, 0.38788325)
+
+[node name="NeckAttachment" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=374203861]
+transform = Transform3D(0.99979895, -0.007647886, -0.018541196, -0.00069096417, 0.91076136, -0.41293192, 0.020044386, 0.41286165, 0.9105728, -0.006489138, 1.242559, -0.04889115)
+
+[node name="MovementController" parent="." index="3" unique_id=349324944 node_paths=PackedStringArray("crosshair")]
 crosshair = NodePath("../UI/Crosshair")
 
-[node name="CameraRoot" parent="." unique_id=1945688108]
+[node name="CameraRoot" parent="." index="14" unique_id=1945688108]
 script = ExtResource("3_camera")
 
-[node name="UI" type="Control" parent="." unique_id=1616245982]
+[node name="UI" type="Control" parent="." index="15" unique_id=1616245982]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -86,7 +109,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("14_hud")
 
-[node name="Crosshair" type="Control" parent="UI" unique_id=2091775217]
+[node name="Crosshair" type="Control" parent="UI" index="0" unique_id=2091775217]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -101,38 +124,38 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("13_crosshair")
 
-[node name="Center" type="Node2D" parent="UI/Crosshair" unique_id=1058332206]
+[node name="Center" type="Node2D" parent="UI/Crosshair" index="0" unique_id=1058332206]
 
-[node name="Border" type="Line2D" parent="UI/Crosshair/Center" unique_id=576878727]
+[node name="Border" type="Line2D" parent="UI/Crosshair/Center" index="0" unique_id=576878727]
 points = PackedVector2Array(-0.1, 0, 0.1, 0)
 width = 6.0
 default_color = Color(0.15686275, 0.29411766, 0.6509804, 0.4117647)
 begin_cap_mode = 2
 end_cap_mode = 2
 
-[node name="Dot" type="Line2D" parent="UI/Crosshair/Center" unique_id=437652447]
+[node name="Dot" type="Line2D" parent="UI/Crosshair/Center" index="1" unique_id=437652447]
 points = PackedVector2Array(-0.1, 0, 0.1, 0)
 width = 2.0
 default_color = Color(0.10980392, 0.8235294, 1, 1)
 begin_cap_mode = 2
 end_cap_mode = 2
 
-[node name="Reticle" type="Node2D" parent="UI/Crosshair" unique_id=1350582932]
+[node name="Reticle" type="Node2D" parent="UI/Crosshair" index="1" unique_id=1350582932]
 
-[node name="Lines" type="Node2D" parent="UI/Crosshair/Reticle" unique_id=659984193]
+[node name="Lines" type="Node2D" parent="UI/Crosshair/Reticle" index="0" unique_id=659984193]
 
-[node name="LinePivot" parent="UI/Crosshair/Reticle/Lines" unique_id=1807034973 instance=ExtResource("11_linepivot")]
+[node name="LinePivot" parent="UI/Crosshair/Reticle/Lines" index="0" unique_id=1807034973 instance=ExtResource("11_linepivot")]
 
-[node name="LinePivot2" parent="UI/Crosshair/Reticle/Lines" unique_id=1783738741 instance=ExtResource("11_linepivot")]
+[node name="LinePivot2" parent="UI/Crosshair/Reticle/Lines" index="1" unique_id=1783738741 instance=ExtResource("11_linepivot")]
 rotation = 1.5707964
 
-[node name="LinePivot3" parent="UI/Crosshair/Reticle/Lines" unique_id=1275410537 instance=ExtResource("11_linepivot")]
+[node name="LinePivot3" parent="UI/Crosshair/Reticle/Lines" index="2" unique_id=1275410537 instance=ExtResource("11_linepivot")]
 rotation = 3.1415927
 
-[node name="LinePivot4" parent="UI/Crosshair/Reticle/Lines" unique_id=504203517 instance=ExtResource("11_linepivot")]
+[node name="LinePivot4" parent="UI/Crosshair/Reticle/Lines" index="3" unique_id=504203517 instance=ExtResource("11_linepivot")]
 rotation = 4.712389
 
-[node name="Mag" type="Control" parent="UI" unique_id=911275195]
+[node name="Mag" type="Control" parent="UI" index="1" unique_id=911275195]
 layout_mode = 1
 anchor_left = 0.034722224
 anchor_top = -0.061728396
@@ -143,7 +166,7 @@ offset_right = 40.0
 offset_bottom = 560.0
 grow_vertical = 0
 
-[node name="ColorRect" type="ColorRect" parent="UI/Mag" unique_id=211275931]
+[node name="ColorRect" type="ColorRect" parent="UI/Mag" index="0" unique_id=211275931]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -152,7 +175,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0.35235986, 0.64161503, 0.28235295)
 
-[node name="Mag" type="Label" parent="UI/Mag/ColorRect" unique_id=321338645]
+[node name="Mag" type="Label" parent="UI/Mag/ColorRect" index="0" unique_id=321338645]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -165,7 +188,7 @@ grow_vertical = 2
 text = "40"
 label_settings = SubResource("LabelSettings_large")
 
-[node name="Slash" type="Label" parent="UI/Mag/ColorRect" unique_id=210065513]
+[node name="Slash" type="Label" parent="UI/Mag/ColorRect" index="1" unique_id=210065513]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -179,7 +202,7 @@ text = "/"
 label_settings = SubResource("LabelSettings_large")
 clip_text = true
 
-[node name="AmmoBackup" type="Label" parent="UI/Mag/ColorRect" unique_id=1249640069]
+[node name="AmmoBackup" type="Label" parent="UI/Mag/ColorRect" index="2" unique_id=1249640069]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -192,7 +215,7 @@ grow_vertical = 2
 text = "40"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="Health" type="Control" parent="UI" unique_id=1730242652]
+[node name="Health" type="Control" parent="UI" index="2" unique_id=1730242652]
 layout_mode = 1
 anchor_left = 0.034722224
 anchor_top = -0.061728396
@@ -204,7 +227,7 @@ offset_right = 238.0
 offset_bottom = 560.0
 grow_vertical = 0
 
-[node name="ColorRect" type="ColorRect" parent="UI/Health" unique_id=1440267123]
+[node name="ColorRect" type="ColorRect" parent="UI/Health" index="0" unique_id=1440267123]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -213,7 +236,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0, 0.35235986, 0.64161503, 0.28235295)
 
-[node name="Health" type="Label" parent="UI/Health/ColorRect" unique_id=2036673660]
+[node name="Health" type="Label" parent="UI/Health/ColorRect" index="0" unique_id=2036673660]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -226,7 +249,7 @@ grow_vertical = 2
 text = "100"
 label_settings = SubResource("LabelSettings_large")
 
-[node name="Slash" type="Label" parent="UI/Health/ColorRect" unique_id=1713194659]
+[node name="Slash" type="Label" parent="UI/Health/ColorRect" index="1" unique_id=1713194659]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -240,7 +263,7 @@ text = "/"
 label_settings = SubResource("LabelSettings_large")
 clip_text = true
 
-[node name="Total" type="Label" parent="UI/Health/ColorRect" unique_id=454324509]
+[node name="Total" type="Label" parent="UI/Health/ColorRect" index="2" unique_id=454324509]
 layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
@@ -253,7 +276,7 @@ grow_vertical = 2
 text = "100"
 label_settings = SubResource("LabelSettings_small")
 
-[node name="RadialMenu" type="Control" parent="." unique_id=1050306215 node_paths=PackedStringArray("player", "camera", "weapon_controller")]
+[node name="RadialMenu" type="Control" parent="." index="16" unique_id=1050306215 node_paths=PackedStringArray("player", "camera", "weapon_controller")]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -266,7 +289,7 @@ player = NodePath("..")
 camera = NodePath("../CameraRoot")
 weapon_controller = NodePath("../WeaponController")
 
-[node name="Panel" type="Panel" parent="RadialMenu" unique_id=1746263855]
+[node name="Panel" type="Panel" parent="RadialMenu" index="0" unique_id=1746263855]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -274,7 +297,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Blur" type="TextureRect" parent="RadialMenu/Panel" unique_id=1059936426]
+[node name="Blur" type="TextureRect" parent="RadialMenu/Panel" index="0" unique_id=1059936426]
 material = SubResource("ShaderMaterial_wev4p")
 layout_mode = 1
 anchors_preset = 15
@@ -284,7 +307,7 @@ grow_horizontal = 2
 grow_vertical = 2
 texture = ExtResource("7_white")
 
-[node name="Circle" type="Control" parent="RadialMenu/Panel" unique_id=837324231]
+[node name="Circle" type="Control" parent="RadialMenu/Panel" index="1" unique_id=837324231]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -299,59 +322,59 @@ grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(0.8, 0.8)
 
-[node name="0" parent="RadialMenu/Panel/Circle" unique_id=851538717 instance=ExtResource("4_menuitem")]
+[node name="0" parent="RadialMenu/Panel/Circle" index="0" unique_id=851538717 instance=ExtResource("4_menuitem")]
 layout_mode = 1
 script = ExtResource("6_menuitemscript")
 
-[node name="1" parent="RadialMenu/Panel/Circle" unique_id=918354907 instance=ExtResource("4_menuitem")]
+[node name="1" parent="RadialMenu/Panel/Circle" index="1" unique_id=918354907 instance=ExtResource("4_menuitem")]
 layout_mode = 1
 rotation = 1.0471976
 script = ExtResource("6_menuitemscript")
 index = 1
 
-[node name="2" parent="RadialMenu/Panel/Circle" unique_id=1513972075 instance=ExtResource("4_menuitem")]
+[node name="2" parent="RadialMenu/Panel/Circle" index="2" unique_id=1513972075 instance=ExtResource("4_menuitem")]
 layout_mode = 1
 rotation = 2.0943952
 script = ExtResource("6_menuitemscript")
 index = 2
 
-[node name="3" parent="RadialMenu/Panel/Circle" unique_id=1923203331 instance=ExtResource("4_menuitem")]
+[node name="3" parent="RadialMenu/Panel/Circle" index="3" unique_id=1923203331 instance=ExtResource("4_menuitem")]
 layout_mode = 1
 rotation = 3.1415927
 script = ExtResource("6_menuitemscript")
 index = 3
 
-[node name="4" parent="RadialMenu/Panel/Circle" unique_id=2115274014 instance=ExtResource("4_menuitem")]
+[node name="4" parent="RadialMenu/Panel/Circle" index="4" unique_id=2115274014 instance=ExtResource("4_menuitem")]
 layout_mode = 1
 rotation = 4.1887903
 script = ExtResource("6_menuitemscript")
 index = 4
 
-[node name="5" parent="RadialMenu/Panel/Circle" unique_id=1044050712 instance=ExtResource("4_menuitem")]
+[node name="5" parent="RadialMenu/Panel/Circle" index="5" unique_id=1044050712 instance=ExtResource("4_menuitem")]
 layout_mode = 1
 rotation = 5.2359877
 script = ExtResource("6_menuitemscript")
 index = 5
 
-[node name="Icons" type="Control" parent="RadialMenu/Panel/Circle" unique_id=2027416132]
+[node name="Icons" type="Control" parent="RadialMenu/Panel/Circle" index="6" unique_id=2027416132]
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="Pistol" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons" unique_id=509155327]
+[node name="Pistol" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons" index="0" unique_id=509155327]
 position = Vector2(25.999985, -153)
 scale = Vector2(0.35, 0.35)
 texture = ExtResource("9_pistol")
 
-[node name="AssultRifle" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons" unique_id=305999881]
+[node name="AssultRifle" type="Sprite2D" parent="RadialMenu/Panel/Circle/Icons" index="1" unique_id=305999881]
 position = Vector2(176, -48)
 scale = Vector2(0.35, 0.35)
 texture = ExtResource("10_rifle")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="RadialMenu" unique_id=221410025]
+[node name="AnimationPlayer" type="AnimationPlayer" parent="RadialMenu" index="1" unique_id=221410025]
 libraries/ = SubResource("AnimationLibrary_radial")
 
-[node name="AimStayTimer" type="Timer" parent="." unique_id=139926006]
+[node name="AimStayTimer" type="Timer" parent="." index="17" unique_id=139926006]
 process_callback = 0
 wait_time = 0.5
 one_shot = true

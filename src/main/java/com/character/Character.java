@@ -177,12 +177,7 @@ public class Character extends CharacterBody3D {
         if (input.aimTargetPosition != null && aimTarget != null) {
             aimTarget.setGlobalPosition(input.aimTargetPosition);
         }
-
-        // ── AimRay → AimTarget (WeaponController raycast origin) ──────────
-        if (combat && aimTarget != null && aimRay != null) {
-            aimRay.setTargetPosition(aimRay.toLocal(aimTarget.getGlobalPosition()));
-        }
-
+        
         // ── Fire / not-fire ────────────────────────────────────────────────
         if (!isRolling) {
             if (input.fire) {

@@ -17,7 +17,7 @@ signals = [
 ]
 properties = [
     animation_controller,
-	ray_cast_path,
+	aim_ray_path,
 	splatters_path,
 	recoil_pitch_path,
 	weapon_attachment_path,
