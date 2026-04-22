@@ -173,19 +173,14 @@ public class WeaponController extends Node {
 
     // final check for collision point
     if(aimRay3D != null && aimRay3D.isColliding() &&  (aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin())).length() > 0.1) {
-      GD.print("Hit something");
-
       // Apply damage if the hit body has a Health node
       Object collider = aimRay3D.getCollider();
       if (collider instanceof godot.api.Node) {
         godot.api.Node hitNode = (godot.api.Node) collider;
         if (hitNode.hasNode(new NodePath("Health"))) {
-        GD.print("Hit player");
           ((Health) hitNode.getNode(new NodePath("Health"))).takeDamage(getCurrentWeaponStats().damage);
         }
       }
-
-
 
       GPUParticles3D splatter = splatterPool.acquire();
       splatter.setGlobalPosition(aimRay3D.getCollisionPoint());

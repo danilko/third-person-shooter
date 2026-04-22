@@ -18,15 +18,11 @@ public class Crosshair extends Control {
 
   private VariantArray<Node> lines;
 
-  public float getPositionX() {
-    return positionX;
-  }
-
   public void setPositionX(float positionX) {
     this.positionX = positionX;
   }
 
-  private float positionX = 15.0f;
+  private float positionX = 5.0f;
 
   @RegisterFunction
   @Override
