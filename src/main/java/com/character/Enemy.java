@@ -8,7 +8,6 @@ import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
 import godot.api.Area3D;
 import godot.api.NavigationAgent3D;
-import godot.api.RayCast3D;
 import godot.core.Vector3;
 import godot.global.GD;
 
@@ -17,6 +16,13 @@ public class Enemy extends Character {
 
     /** Matches the AimRay node's Y-offset in the scene. */
     public static final float EYE_HEIGHT = 1.4f;
+
+    /**
+     * Y-offset from the player's CharacterBody3D origin (feet) to the upper body.
+     * Used for aim targeting and line-of-sight so the enemy shoots at the torso,
+     * not the ground point returned by getGlobalPosition().
+     */
+    public static final float PLAYER_BODY_HEIGHT = 0.9f;
 
     // ── Inspector-tunable properties ──────────────────────────────────────────
     @Export
@@ -53,7 +59,6 @@ public class Enemy extends Character {
 
     // ── AI state ──────────────────────────────────────────────────────────────
     private NavigationAgent3D navAgent;
-    private RayCast3D sightRay;
 
     private EnemyAIState currentState;
     private Vector3 spawnPosition;
@@ -72,7 +77,7 @@ public class Enemy extends Character {
     public void _ready() {
         super._ready();
         navAgent      = (NavigationAgent3D) getNode("NavigationAgent3D");
-        sightRay      = (RayCast3D)         getNode("SightRay");
+
         spawnPosition = new Vector3(getGlobalPosition());
 
         transitionTo(PatrolState.INSTANCE);
@@ -123,10 +128,15 @@ public class Enemy extends Character {
     /** Pure LoS raycast with no distance limit — use when already engaged with the player. */
     public boolean hasLineOfSight() {
         if (player == null) return false;
-        sightRay.setTargetPosition(sightRay.toLocal(player.getGlobalPosition()));
-        sightRay.forceRaycastUpdate();
-        if (!sightRay.isColliding()) return false;
-        return sightRay.getCollider() == player;
+        // Aim at the player's upper body, not their feet — avoids false negatives
+        // when low cover blocks the ankle but the torso is clearly visible.
+        Vector3 playerBodyPos = player.getGlobalPosition()
+                                      .plus(new Vector3(0, PLAYER_BODY_HEIGHT, 0));
+        cameraRoot.lookAt(playerBodyPos);
+        aimRay.setTargetPosition(aimRay.toLocal(playerBodyPos));
+        aimRay.forceRaycastUpdate();
+        if (!aimRay.isColliding()) return false;
+        return aimRay.getCollider() == player;
     }
 
     /**

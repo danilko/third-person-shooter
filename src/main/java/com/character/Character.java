@@ -71,6 +71,10 @@ public class Character extends CharacterBody3D {
 
     @RegisterProperty
     @Export
+    public NodePath cameraRootPath = new NodePath("CameraRoot");
+
+    @RegisterProperty
+    @Export
     public NodePath aimTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget");
 
     @RegisterProperty
@@ -90,6 +94,8 @@ public class Character extends CharacterBody3D {
     protected Health healthNode;
     protected Marker3D aimTarget;
     protected RayCast3D aimRay;
+
+    protected Node3D cameraRoot;
 
     // ── Tick counter (stamped onto every CharacterInput for network ordering) ─
     protected long currentTick = 0;
@@ -113,6 +119,10 @@ public class Character extends CharacterBody3D {
         }
         if (hasNode(aimRayPath)) {
             aimRay = (RayCast3D) getNode(aimRayPath);
+        }
+
+        if (hasNode(cameraRootPath)) {
+            cameraRoot = (Node3D) getNode(cameraRootPath);
         }
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());

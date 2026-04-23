@@ -42,6 +42,7 @@ properties = [
 	combat_states,
 	roll_state,
 	weapon_controller,
+	camera_root_path,
 	aim_target_path,
 	aim_ray_path
 ]

@@ -48,9 +48,12 @@ public class AttackState implements EnemyAIState {
             input.movementDirection.setZ(dz / hDist);
         }
 
-        // Compute vertical pitch from eye to player (same coordinate frame as CameraController)
+        // Compute vertical pitch from eye to player's upper body.
+        // Using the feet position (getGlobalPosition().Y) makes the spine aim at
+        // the ground and shots pass below the torso — offset to body center.
         Vector3 eyePos = enemyPos.plus(new Vector3(0, Enemy.EYE_HEIGHT, 0));
-        float dy = (float) (playerPos.getY() - eyePos.getY());
+        float targetY   = (float) playerPos.getY() + Enemy.PLAYER_BODY_HEIGHT;
+        float dy = targetY - (float) eyePos.getY();
         float pitchDeg = (hDist > 0.01f)
                 ? (float) Math.toDegrees(Math.atan2(dy, hDist))
                 : 0f;
@@ -85,7 +88,11 @@ public class AttackState implements EnemyAIState {
             return RefillAmmoState.INSTANCE;
         }
         if (enemy.weaponController != null && bestWeapon != enemy.weaponController.getWeapon()) {
-            input.desiredWeapon = bestWeapon;
+            // Only send the switch request once — resending every frame restarts
+            // transitionTimer before it fires, locking the enemy in an infinite loop.
+            if (!enemy.weaponController.isWeaponTransitioning()) {
+                input.desiredWeapon = bestWeapon;
+            }
             return this;
         }
 

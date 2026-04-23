@@ -221,6 +221,11 @@ public class WeaponController extends Node {
     return reloadTimer.getTimeLeft() > 0;
   }
 
+  /** True while a weapon-switch animation is in flight (transitionTimer hasn't fired yet). */
+  public boolean isWeaponTransitioning() {
+    return transitionTimer.getTimeLeft() > 0;
+  }
+
   public boolean hasAmmoForWeapon(int index) {
     if (index < 0 || index >= weapons.size()) return false;
     WeaponStats stats = weapons.get(index);
