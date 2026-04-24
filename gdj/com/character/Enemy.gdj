@@ -36,6 +36,10 @@ properties = [
 	attack_range,
 	patrol_radius,
 	ammo_refill,
+	hit_chance,
+	reaction_time,
+	aim_scatter_radius,
+	strafe_change_duration,
 	max_air_jump,
 	jump_states,
 	stances,
@@ -48,6 +52,7 @@ properties = [
 ]
 functions = [
     _ready,
+	on_enemy_damaged,
 	on_died,
 	_physics_process,
 	completed_roll

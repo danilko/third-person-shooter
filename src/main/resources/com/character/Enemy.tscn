@@ -2,41 +2,66 @@
 
 [ext_resource type="PackedScene" uid="uid://dhp225d838mq7" path="res://src/main/resources/com/character/Character.tscn" id="1_base"]
 [ext_resource type="Script" uid="uid://bueyt8h17g3mc" path="res://src/main/java/com/character/Enemy.java" id="2_script"]
-[ext_resource type="Script" uid="uid://ecamctrl01" path="res://src/main/java/com/character/EnemyCameraController.java" id="3_ecam"]
+[ext_resource type="Script" uid="uid://n2nm7nsou05h" path="res://src/main/java/com/character/EnemyCameraController.java" id="3_ecam"]
 
-[node name="Enemy" instance=ExtResource("1_base")]
+[node name="Enemy" unique_id=1865541393 instance=ExtResource("1_base")]
 script = ExtResource("2_script")
-detection_range = 10.0
+detection_range = 100.0
+aim_pitch_min = -55.0
+aim_pitch_max = 75.0
+attack_range = 100.0
+patrol_radius = 200.0
+hit_chance = 0.75
+reaction_time = 0.3
+aim_scatter_radius = 1.5
+strafe_change_duration = 1.2
 
-[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=24024727]
-path_desired_distance = 0.5
-target_desired_distance = 0.5
+[node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
+bones/0/position = Vector3(1.0105327e-10, -0.010034421, -0.080805)
+bones/1/rotation = Quaternion(0.45565313, 0.09718575, 0.7009811, -0.5399636)
+bones/2/rotation = Quaternion(0.4349879, -0.119004995, -0.01793008, 0.89235747)
+bones/3/rotation = Quaternion(-0.09663127, -0.14783818, 0.03540664, 0.9836425)
+bones/4/rotation = Quaternion(-0.057873037, -0.07042053, 0.008325592, 0.9958024)
+bones/43/rotation = Quaternion(0.19535562, -0.020288056, 0.0059417747, 0.9805047)
+bones/45/rotation = Quaternion(0.93542695, 0.08079936, -0.24463971, -0.24207313)
+bones/46/rotation = Quaternion(0.17367077, 0.22317466, -0.031189356, 0.9586756)
+bones/47/rotation = Quaternion(-0.5552043, 0.019613894, -0.03096473, 0.83090603)
+bones/48/rotation = Quaternion(-0.43340686, 0.02096838, 0.024574542, 0.9006192)
+bones/49/rotation = Quaternion(0.9643305, -0.031347767, 0.24378505, -0.0982492)
+bones/50/rotation = Quaternion(0.3950857, -0.20728104, 0.10257776, 0.8890555)
+bones/51/rotation = Quaternion(-0.56979483, -0.020536022, 0.031668793, 0.8209198)
+bones/52/rotation = Quaternion(-0.31055182, -0.019999992, -0.036341667, 0.949651)
 
-[node name="SightRay" type="RayCast3D" parent="." unique_id=1571819106]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, 0)
-target_position = Vector3(0, 0, -15)
+[node name="WeaponAttachment" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1709979392]
+transform = Transform3D(-0.7108895, 0.04503239, 0.7018608, 0.6606883, 0.3848616, 0.6444941, -0.24109618, 0.9218749, -0.30334657, -0.14149427, 1.2637496, 0.33467078)
 
-[node name="Health" parent="."]
-max_health = 60.0
+[node name="NeckAttachment" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=374203861]
+transform = Transform3D(0.9992143, -0.009848082, -0.03839114, 0.0026318054, 0.9829874, -0.18365398, 0.03954655, 0.18340848, 0.982241, -0.013037373, 1.2456757, -0.108341165)
 
-[node name="MovementController" parent="."]
+[node name="MovementController" parent="." index="3" unique_id=349324944]
 world_space_movement = true
 face_camera_in_combat = false
 
-[node name="StanceAntispamTimer" parent="."]
-wait_time = 0.3
-
-[node name="RollTimer" parent="."]
+[node name="RollTimer" parent="." index="9" unique_id=832343372]
 wait_time = 0.5
 
-[node name="AimTarget" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4, -10)
+[node name="StanceAntispamTimer" parent="." index="10" unique_id=37994442]
+wait_time = 0.3
 
-[node name="AimRay" parent="."]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 1.4, 0)
+[node name="Health" parent="." index="13" unique_id=1822801054]
+max_health = 60.0
+
+[node name="CameraRoot" parent="." index="14" unique_id=1945688108]
+script = ExtResource("3_ecam")
+
+[node name="SightRay" type="RayCast3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" parent_id_path=PackedInt32Array(1227212050) index="2" unique_id=1571819106]
+transform = Transform3D(-1, 0, -1.5099573e-07, -4.5000235e-15, 1, 2.9802322e-08, 1.5099573e-07, 2.9802322e-08, -1, 0, -0.6999999, -2.0861624e-08)
 target_position = Vector3(0, 0, -15)
 
-[node name="CameraRoot" parent="." unique_id=1945688108]
-script = ExtResource("3_ecam")
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." index="15" unique_id=24024727]
+path_desired_distance = 0.5
+target_desired_distance = 0.5
+
+[connection signal="damaged" from="Health" to="." method="on_enemy_damaged"]
 
 [editable path="MeshRoot/Model"]

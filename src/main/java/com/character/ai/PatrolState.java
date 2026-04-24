@@ -7,7 +7,8 @@ import godot.core.Vector3;
 
 /**
  * Enemy wanders within its patrol radius.
- * Transitions to {@link ChaseState} when the player enters detection range and LoS.
+ * Transitions to {@link ChaseState} or {@link AttackState} when the player is spotted.
+ * Transitions to {@link SearchState} immediately when hit (even without visual contact).
  */
 public class PatrolState implements EnemyAIState {
 
@@ -34,18 +35,20 @@ public class PatrolState implements EnemyAIState {
             input.desiredWeapon = bestWeapon;
         }
 
-        if (enemy.canSeePlayer(delta)) {
-            // Prime combat mode this frame so the animation and LookAtModifier
-            // start immediately rather than lagging one extra frame.
+        if (enemy.canSeePlayer()) {
+            // Prime combat mode this frame so animation and LookAtModifier start immediately.
             input.wantCombat = true;
-            // Skip ChaseState when already in attack range — saves one full frame
-            // of pipeline delay before AttackState can fire.
             float dist = (float) enemy.getGlobalPosition()
                                       .distanceTo(enemy.getPlayer().getGlobalPosition());
             if (dist <= enemy.attackRange && enemy.hasAnyAmmo()) {
                 return AttackState.INSTANCE;
             }
             return ChaseState.INSTANCE;
+        }
+
+        // React to being hit even without visual contact — search toward attacker
+        if (enemy.isUnderAttack() && enemy.hasLastKnownPosition()) {
+            return SearchState.INSTANCE;
         }
 
         input.wantCombat   = false;
