@@ -177,8 +177,8 @@ public class WeaponController extends Node {
       Object collider = aimRay3D.getCollider();
       if (collider instanceof godot.api.Node) {
         godot.api.Node hitNode = (godot.api.Node) collider;
-        if (hitNode.hasNode(new NodePath("Health"))) {
-          ((Health) hitNode.getNode(new NodePath("Health"))).takeDamage(getCurrentWeaponStats().damage);
+        if (hitNode.getOwner().hasNode(new NodePath("Health"))) {
+          ((Health) hitNode.getOwner().getNode(new NodePath("Health"))).takeDamage(hitNode, getCurrentWeaponStats().damage);
         }
       }
 

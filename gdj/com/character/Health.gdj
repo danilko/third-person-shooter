@@ -20,6 +20,5 @@ properties = [
 ]
 functions = [
     _ready,
-	take_damage,
 	heal
 ]

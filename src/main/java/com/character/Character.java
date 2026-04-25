@@ -81,6 +81,10 @@ public class Character extends CharacterBody3D {
     @Export
     public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
 
+    @RegisterProperty
+    @Export
+    public NodePath physicalBoneSimulatorPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D");
+
     // ── Protected state ───────────────────────────────────────────────────────
     protected int airJumpCounter = 0;
     protected Vector3 movementDirection = new Vector3();
@@ -96,6 +100,7 @@ public class Character extends CharacterBody3D {
     protected RayCast3D aimRay;
 
     protected Node3D cameraRoot;
+    protected PhysicalBoneSimulator3D physicalBoneSimulator;
 
     // ── Tick counter (stamped onto every CharacterInput for network ordering) ─
     protected long currentTick = 0;
@@ -119,10 +124,21 @@ public class Character extends CharacterBody3D {
         }
         if (hasNode(aimRayPath)) {
             aimRay = (RayCast3D) getNode(aimRayPath);
+
         }
 
         if (hasNode(cameraRootPath)) {
             cameraRoot = (Node3D) getNode(cameraRootPath);
+        }
+        if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
+            physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
+            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+                Node child = physicalBoneSimulator.getChild(i);
+                if (child instanceof PhysicalBone3D bone) {
+                    // let the character's own bone to be exception list
+                    aimRay.addException(bone);
+                }
+            }
         }
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());
@@ -332,9 +348,51 @@ public class Character extends CharacterBody3D {
         changedWeapon.emit(weapon);
     }
 
+    // ── Ragdoll ───────────────────────────────────────────────────────────────
+    protected void enableRagdoll() {
+        setPhysicsProcess(false);
+        if (physicalBoneSimulator == null) return;
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            Node child = physicalBoneSimulator.getChild(i);
+            if (child instanceof PhysicalBone3D bone) {
+                // Allow ragdoll bones to rest on world geometry (layer 1)
+                bone.setCollisionLayer(1);
+            }
+        }
+        physicalBoneSimulator.physicalBonesStartSimulation();
+        GD.print("enableRagdoll");
+    }
+
+    /**
+     * Apply a physics impulse to a named bone during ragdoll.
+     * Only has effect when the ragdoll is active (call after enableRagdoll or on death).
+     */
+    public void applyBoneImpulse(String boneName, Vector3 impulse) {
+        if (physicalBoneSimulator == null) return;
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            Node child = physicalBoneSimulator.getChild(i);
+            if (child instanceof PhysicalBone3D bone && boneName.equalsIgnoreCase(String.valueOf(bone.getName()))) {
+                bone.applyCentralImpulse(impulse);
+                return;
+            }
+        }
+    }
+
     // ── Override in subclasses ────────────────────────────────────────────────
     @RegisterFunction
     public void onDied() {
         GD.print(getName() + " died");
+        // Disable animation tree
+        AnimationTree animationTree = (AnimationTree) getNode("AnimationTree");
+        animationTree.setActive(false);
+
+        enableRagdoll();
+
+        // Disabled current stance to let ragdoll take over
+            NodePath enabledPath = stances.get(currentStanceName.getKey());
+            if (enabledPath != null) {
+                Stance s = (Stance) getNode(enabledPath);
+                if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
+            }
     }
 }

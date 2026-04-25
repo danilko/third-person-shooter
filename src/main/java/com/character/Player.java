@@ -29,6 +29,8 @@ public class Player extends Character {
         super._ready();
 
         aimStayTimer = (Timer) getNode("AimStayTimer");
+        GD.print("HAS TIMER "+ hasNode("AimStayTimer"));
+
         aimRay.addException(this);
 
         if (hasNode(hudPath)) {
@@ -124,6 +126,7 @@ public class Player extends Character {
     @Override
     public void onDied() {
         setProcessInput(false);
+        super.onDied(); // stops physics processing and activates ragdoll
         Node eventBusNode = getNodeOrNull("/root/EventBus");
         if (eventBusNode instanceof EventBus) {
             ((EventBus) eventBusNode).playerDied.emit();

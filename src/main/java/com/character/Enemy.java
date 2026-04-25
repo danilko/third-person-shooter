@@ -6,9 +6,7 @@ import godot.annotation.Export;
 import godot.annotation.RegisterClass;
 import godot.annotation.RegisterFunction;
 import godot.annotation.RegisterProperty;
-import godot.api.Area3D;
-import godot.api.NavigationAgent3D;
-import godot.api.RayCast3D;
+import godot.api.*;
 import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -175,7 +173,7 @@ public class Enemy extends Character {
         sightRay.setTargetPosition(sightRay.toLocal(playerBodyPos));
         sightRay.forceRaycastUpdate();
         if (!sightRay.isColliding()) return false;
-        return sightRay.getCollider() == player;
+      return sightRay.getCollider() instanceof Node3D && ((Node3D) sightRay.getCollider()).getOwner() == player;
     }
 
     /**
@@ -334,6 +332,6 @@ public class Enemy extends Character {
     @Override
     public void onDied() {
         isDead = true;
-        queueFree();
+        super.onDied(); // stops physics processing and activates ragdoll
     }
 }

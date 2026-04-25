@@ -1,11 +1,11 @@
 [gd_scene format=3 uid="uid://dbnx63f3e5s88"]
 
 [ext_resource type="PackedScene" uid="uid://dhp225d838mq7" path="res://src/main/resources/com/character/Character.tscn" id="1_base"]
-[ext_resource type="Script" uid="uid://bueyt8h17g3mc" path="res://src/main/java/com/character/Enemy.java" id="2_script"]
+[ext_resource type="Script" uid="uid://be3bdglh1u53c" path="res://gdj/com/character/Enemy.gdj" id="2_trpk3"]
 [ext_resource type="Script" uid="uid://n2nm7nsou05h" path="res://src/main/java/com/character/EnemyCameraController.java" id="3_ecam"]
 
 [node name="Enemy" unique_id=1865541393 instance=ExtResource("1_base")]
-script = ExtResource("2_script")
+script = ExtResource("2_trpk3")
 detection_range = 100.0
 aim_pitch_min = -55.0
 aim_pitch_max = 75.0
@@ -17,26 +17,111 @@ aim_scatter_radius = 1.5
 strafe_change_duration = 1.2
 
 [node name="Skeleton3D" parent="MeshRoot/Model/Godot_Chan_Stealth" index="0"]
-bones/0/position = Vector3(1.0105327e-10, -0.010034421, -0.080805)
-bones/1/rotation = Quaternion(0.45565313, 0.09718575, 0.7009811, -0.5399636)
-bones/2/rotation = Quaternion(0.4349879, -0.119004995, -0.01793008, 0.89235747)
-bones/3/rotation = Quaternion(-0.09663127, -0.14783818, 0.03540664, 0.9836425)
-bones/4/rotation = Quaternion(-0.057873037, -0.07042053, 0.008325592, 0.9958024)
-bones/43/rotation = Quaternion(0.19535562, -0.020288056, 0.0059417747, 0.9805047)
-bones/45/rotation = Quaternion(0.93542695, 0.08079936, -0.24463971, -0.24207313)
-bones/46/rotation = Quaternion(0.17367077, 0.22317466, -0.031189356, 0.9586756)
-bones/47/rotation = Quaternion(-0.5552043, 0.019613894, -0.03096473, 0.83090603)
-bones/48/rotation = Quaternion(-0.43340686, 0.02096838, 0.024574542, 0.9006192)
-bones/49/rotation = Quaternion(0.9643305, -0.031347767, 0.24378505, -0.0982492)
-bones/50/rotation = Quaternion(0.3950857, -0.20728104, 0.10257776, 0.8890555)
-bones/51/rotation = Quaternion(-0.56979483, -0.020536022, 0.031668793, 0.8209198)
-bones/52/rotation = Quaternion(-0.31055182, -0.019999992, -0.036341667, 0.949651)
+bones/0/position = Vector3(3.9550715e-10, -0.013431707, -0.080805)
+bones/1/rotation = Quaternion(0.45459718, 0.0915851, 0.6917556, -0.5535593)
+bones/2/rotation = Quaternion(0.4280222, -0.18133304, -0.03859185, 0.88454854)
+bones/3/rotation = Quaternion(-0.09886696, -0.10373111, 0.027968455, 0.9892841)
+bones/4/rotation = Quaternion(-0.058172718, -0.06732649, 0.0040334268, 0.9960255)
+bones/43/rotation = Quaternion(0.19544397, -0.022028504, 0.0063773845, 0.98044676)
+bones/45/rotation = Quaternion(0.96838397, 0.026633043, -0.24101116, -0.058624763)
+bones/46/rotation = Quaternion(0.2183777, 0.2255726, -0.03077817, 0.9489367)
+bones/47/rotation = Quaternion(-0.4689967, 0.021024294, -0.02176157, 0.8826815)
+bones/48/rotation = Quaternion(-0.32967436, 0.020170875, 0.03458549, 0.9432454)
+bones/49/rotation = Quaternion(0.9269601, -0.11930342, 0.21500576, -0.28334478)
+bones/50/rotation = Quaternion(0.23177965, -0.2001612, 0.031569142, 0.95142895)
+bones/51/rotation = Quaternion(-0.64096314, -0.0077190367, 0.0088418415, 0.7674819)
+bones/52/rotation = Quaternion(-0.39330864, -0.020686666, -0.028544929, 0.9187304)
 
 [node name="WeaponAttachment" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="8" unique_id=1709979392]
-transform = Transform3D(-0.7108895, 0.04503239, 0.7018608, 0.6606883, 0.3848616, 0.6444941, -0.24109618, 0.9218749, -0.30334657, -0.14149427, 1.2637496, 0.33467078)
+transform = Transform3D(-0.7076563, 0.04663862, 0.705016, 0.6639021, 0.3853369, 0.64089745, -0.24177821, 0.92159635, -0.3036499, -0.14422315, 1.2613724, 0.33836207)
 
 [node name="NeckAttachment" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D" index="10" unique_id=374203861]
-transform = Transform3D(0.9992143, -0.009848082, -0.03839114, 0.0026318054, 0.9829874, -0.18365398, 0.03954655, 0.18340848, 0.982241, -0.013037373, 1.2456757, -0.108341165)
+transform = Transform3D(0.9990627, -0.0067264596, -0.042763665, -0.0012102006, 0.98312867, -0.18291122, 0.04327233, 0.18279128, 0.98219895, -0.015740901, 1.2423496, -0.104602784)
+
+[node name="Physical Bone pelvis" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="0" unique_id=1746322989]
+transform = Transform3D(0.7305029, 0.56966823, 0.3766214, 0.026220432, 0.5276918, -0.84903115, -0.68240607, 0.63009495, 0.37054342, -0.015833946, 0.79745364, -0.047305465)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.1582647e-05, 0.0001110018, 0.04193529)
+body_offset = Transform3D(0.99999976, -0.00023406744, -8.955598e-05, -8.9496374e-05, 0.00018028915, -0.9999999, 0.00023406744, 1, 0.00018025935, 3.536418e-05, 0.041935265, -0.00011855364)
+
+[node name="Physical Bone spine_01" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="1" unique_id=1338132887]
+transform = Transform3D(0.92826897, 0.3451523, -0.1385161, -0.013610543, -0.34066892, -0.9400849, -0.37166053, 0.8745368, -0.31153467, -0.026779147, 0.86126655, -0.052552514)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.3384063e-06, -3.7555747e-06, 0.031122807)
+body_offset = Transform3D(0.9999999, 6.0856342e-05, -3.2164156e-05, -3.210455e-05, 0.00012758374, -0.99999994, -6.082654e-05, 0.9999999, 0.00012737513, -3.3713877e-07, 0.031122804, -2.0861626e-07)
+
+[node name="Physical Bone spine_02" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="2" unique_id=757714071]
+transform = Transform3D(0.9862786, 0.16159792, -0.033773053, -0.0100367395, -0.14550246, -0.989307, -0.16478401, 0.9760713, -0.14188404, -0.021019397, 0.9329058, -0.036774334)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4364782e-07, 1.2499725e-06, 0.042832788)
+body_offset = Transform3D(0.9999999, 5.4448843e-05, -1.6763806e-07, -8.381903e-08, -8.478761e-06, -1.0000001, -5.428493e-05, 1, -8.657575e-06, 4.5076013e-07, 0.04283279, -8.791685e-07)
+
+[node name="Physical Bone spine_03" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="3" unique_id=820002353]
+transform = Transform3D(-0.1148696, -0.9870028, -0.11238566, 0.20794275, 0.086737014, -0.9742877, 0.97137266, -0.13528582, 0.19527662, -0.0075217644, 1.0797389, -0.051668137)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5154947e-06, -6.2488107e-06, 0.107314564)
+body_offset = Transform3D(-0.11847103, -0.9880755, -0.09834286, -2.8163195e-06, 0.09904067, -0.99508333, 0.99295753, -0.11788848, -0.011736497, 0.010547627, 0.10678756, 0.0012572557)
+
+[node name="Physical Bone upperarm_l" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="4" unique_id=2139273424]
+transform = Transform3D(-0.7641647, -0.48908556, 0.4205326, -0.5623157, 0.82452977, -0.06286363, -0.31599596, -0.28451025, -0.905097, 0.07660023, 1.2109121, 0.07000713)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.228909e-06, 3.0607476e-05, 0.109470405)
+body_offset = Transform3D(1.0000001, -0.00020926446, 9.9122524e-05, 9.870529e-05, -0.00014987588, -0.9999998, 0.00020934641, 0.9999997, -0.00015002489, -1.9073486e-05, 0.109470375, -1.41859055e-05)
+
+[node name="Physical Bone lowerarm_l" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="5" unique_id=131082064]
+transform = Transform3D(-0.7208825, 0.39325964, 0.5706798, 0.39455777, 0.9098323, -0.12856688, -0.56978303, 0.13248454, -0.81104577, -0.025744982, 1.2304723, 0.24909317)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5269444e-06, -9.691403e-06, 0.09867568)
+body_offset = Transform3D(0.99999994, 0.00031790137, -4.735589e-05, -4.7326088e-05, -9.11206e-06, -0.9999999, -0.0003183782, 0.99999994, -9.290874e-06, 1.4901161e-07, 0.09867567, 1.0609627e-05)
+
+[node name="Physical Bone hand_l" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="6" unique_id=1030953935]
+transform = Transform3D(-0.13670832, -0.82809395, 0.54366475, -0.9592661, 0.24763052, 0.13596919, -0.24722323, -0.50293106, -0.8282156, -0.10662706, 1.2369663, 0.3666146)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.9150625e-06, 3.8983067e-05, 0.04529622)
+body_offset = Transform3D(-0.33421472, 0.9289267, 0.1593594, -1.3068318e-05, 0.1690777, -0.98560274, -0.94249696, -0.32940525, -0.056496352, -0.0072565675, 0.044637486, 0.0025663376)
+
+[node name="Physical Bone upperarm_r" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="7" unique_id=1444960253]
+transform = Transform3D(-0.922162, 0.3862311, -0.021042014, 0.38675395, 0.91980416, -0.06619539, -0.006212189, -0.069180965, -0.9975848, -0.1619999, 1.2057335, 0.038515143)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.2062503e-05, 2.5382364e-05, 0.10945688)
+body_offset = Transform3D(0.99999994, -3.5797566e-05, -2.415618e-05, -2.4183653e-05, 2.655387e-05, -1, 3.5912555e-05, 0.99999994, 2.6218593e-05, -9.417534e-06, 0.10945688, -2.8252602e-05)
+
+[node name="Physical Bone lowerarm_r" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="8" unique_id=1558192436]
+transform = Transform3D(-0.9960653, 0.041224327, -0.07845092, 0.05935259, 0.9676838, -0.24508241, 0.06581233, -0.24877435, -0.96632296, -0.15196092, 1.2371904, 0.24302752)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.288848e-07, -3.213122e-07, 0.09864318)
+body_offset = Transform3D(0.99999994, 4.4330955e-07, 3.259629e-05, 3.2499433e-05, 2.0429492e-05, -1, -4.209578e-07, 0.99999994, 2.0176172e-05, -2.7865171e-06, 0.09864318, -1.66893e-06)
+
+[node name="Physical Bone hand_r" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="9" unique_id=1300020775]
+transform = Transform3D(0.9009219, 0.43313268, 0.027129004, 0.38228124, -0.7624524, -0.52204156, -0.20542869, 0.48068956, -0.85248846, -0.14544809, 1.2849969, 0.37698537)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.724382e-06, -2.2750755e-05, 0.04529211)
+body_offset = Transform3D(-0.33407754, -0.9289229, -0.1596694, 2.6971102e-06, 0.16940138, -0.9855474, 0.9425454, -0.32924947, -0.056590855, 0.0072128773, 0.044641376, 0.0025492907)
+
+[node name="Physical Bone neck_01" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="10" unique_id=931085682]
+transform = Transform3D(0.9990626, -0.04276395, 0.0067245294, -0.0012111072, -0.1828895, -0.9831328, 0.04327248, 0.982203, -0.18276986, -0.016106034, 1.2957352, -0.09467968)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.8473733e-08, 1.5547881e-06, 0.05430126)
+body_offset = Transform3D(0.9999999, -1.3411045e-07, -9.955838e-07, -8.63336e-07, 2.208352e-05, -1.0000001, 3.1664968e-07, 0.99999994, 2.1860003e-05, 5.5879354e-09, 0.054301262, -2.7418137e-06)
+
+[node name="Physical Bone thigh_l" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="11" unique_id=1093952325]
+transform = Transform3D(0.35020584, -0.8808702, -0.3184706, -0.15369867, -0.38943514, 0.9081393, -0.92397654, -0.26908717, -0.27177104, 0.1159479, 0.5968242, -0.04946693)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.3837657e-06, -2.0176471e-06, 0.17387931)
+body_offset = Transform3D(0.9999998, 6.446242e-05, 1.3202429e-05, 1.32620335e-05, 5.6251884e-06, -0.9999997, -6.429851e-05, 0.9999989, 5.6028366e-06, 3.0882657e-06, 0.17387927, 1.0430813e-06)
+
+[node name="Physical Bone calf_l" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="12" unique_id=2004858163]
+transform = Transform3D(0.71559024, -0.6984427, 0.010410239, -0.0022655642, 0.012582524, 0.99991834, -0.6985166, -0.7155554, 0.007421565, 0.16948675, 0.2609423, -0.0035246662)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2098523e-06, -4.4621947e-06, 0.17794597)
+body_offset = Transform3D(0.9999999, 1.3589859e-05, 1.3214536e-05, 1.3615936e-05, 2.2778753e-05, -0.9999996, -1.2785196e-05, 0.9999992, 2.3191795e-05, -1.4156103e-07, 0.17794591, 3.3527613e-07)
+
+[node name="Physical Bone foot_l" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="13" unique_id=404403200]
+transform = Transform3D(0.7265642, -0.35801008, -0.5864582, 0.05573496, -0.82000726, 0.5696329, -0.68483436, -0.4465611, -0.5758343, 0.2014036, 0.050176103, 0.028314838)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5862651e-06, 1.519212e-06, 0.057588574)
+body_offset = Transform3D(0.9999997, 6.9886446e-05, -5.811453e-06, -6.2584877e-06, -6.273389e-05, -0.9999995, -6.908178e-05, 0.99999946, -6.312132e-05, -1.2516975e-06, 0.057588547, 2.115965e-06)
+
+[node name="Physical Bone thigh_r" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="14" unique_id=461211121]
+transform = Transform3D(0.9598313, -0.26373172, 0.095758036, -0.09364565, 0.020599779, 0.9953925, -0.26448914, -0.9643761, -0.004925015, -0.08527316, 0.57702035, 0.02487866)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.867381e-07, -6.8298523e-06, 0.17388363)
+body_offset = Transform3D(0.99999994, -1.4424324e-05, 2.0373845e-06, 1.9767322e-06, 2.2299588e-05, -0.9999999, 1.41859055e-05, 0.9999991, 2.2096094e-05, -1.3411045e-06, 0.17388362, 2.9876828e-06)
+
+[node name="Physical Bone calf_r" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="15" unique_id=870937235]
+transform = Transform3D(0.7797125, -0.5225123, 0.3450065, -0.04517516, 0.5026262, 0.8633228, -0.624506, -0.6887292, 0.36829928, -0.16331927, 0.25026643, -0.039815094)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.9559475e-06, -5.2484093e-06, 0.17795646)
+body_offset = Transform3D(0.99999964, -0.00021091104, 5.4851174e-05, 5.455315e-05, 2.7269125e-05, -0.9999996, 0.00021022558, 0.99999917, 2.7745962e-05, 1.937151e-07, 0.1779564, 3.1292439e-07)
+
+[node name="Physical Bone foot_r" parent="MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D" parent_id_path=PackedInt32Array(939471750) index="16" unique_id=1666808336]
+transform = Transform3D(0.7712623, -0.45056865, -0.44960254, -0.06525315, -0.7585945, 0.6482873, -0.633164, -0.47066152, -0.6144764, -0.19881892, 0.059290122, -0.06998287)
+joint_offset = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4213205e-08, 8.009215e-08, 0.05759104)
+body_offset = Transform3D(0.9999996, -2.220273e-05, 2.1487474e-05, 2.1964312e-05, -5.182624e-05, -0.9999994, 2.1725893e-05, 0.99999964, -5.236268e-05, -1.2516975e-06, 0.057591006, 2.9355288e-06)
 
 [node name="MovementController" parent="." index="3" unique_id=349324944]
 world_space_movement = true
@@ -57,6 +142,7 @@ script = ExtResource("3_ecam")
 [node name="SightRay" type="RayCast3D" parent="CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera" parent_id_path=PackedInt32Array(1227212050) index="2" unique_id=1571819106]
 transform = Transform3D(-1, 0, -1.5099573e-07, -4.5000235e-15, 1, 2.9802322e-08, 1.5099573e-07, 2.9802322e-08, -1, 0, -0.6999999, -2.0861624e-08)
 target_position = Vector3(0, 0, -15)
+collision_mask = 9
 
 [node name="NavigationAgent3D" type="NavigationAgent3D" parent="." index="15" unique_id=24024727]
 path_desired_distance = 0.5

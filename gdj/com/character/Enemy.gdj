@@ -48,7 +48,8 @@ properties = [
 	weapon_controller,
 	camera_root_path,
 	aim_target_path,
-	aim_ray_path
+	aim_ray_path,
+	physical_bone_simulator_path
 ]
 functions = [
     _ready,
