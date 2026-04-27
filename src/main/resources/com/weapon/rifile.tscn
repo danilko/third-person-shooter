@@ -9,6 +9,11 @@
 transform = Transform3D(-0.22872102, 0.7304517, 0.6435271, 0.89219904, 0.4217406, -0.16160382, -0.38944525, 0.537192, -0.74816924, 0, 0, 0)
 visible = false
 script = ExtResource("1_baof6")
+spread = 0.5
+bloom_per_shot = 0.5
+bloom_decay_speed = 2.5
+bloom_max = 5.0
+ammo_backup = 30
 fire_audio = ExtResource("2_o1kqx")
 reload_audio = ExtResource("3_jkr78")
 

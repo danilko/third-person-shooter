@@ -25,11 +25,11 @@ properties = [
 	pitch_min,
 	shoulder_offset_lerp_speed,
 	follow_lerp_speed,
-	fov_tween_duration
+	fov_tween_duration,
+	recoil_recovery_speed
 ]
 functions = [
     _ready,
-	_input,
 	_physics_process,
 	on_set_combat_state,
 	on_set_movement_state,

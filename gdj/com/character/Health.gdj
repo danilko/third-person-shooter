@@ -16,10 +16,10 @@ signals = [
 	died
 ]
 properties = [
-    max_health
+    max_health,
+	display_name
 ]
 functions = [
     _ready,
-	take_damage,
 	heal
 ]

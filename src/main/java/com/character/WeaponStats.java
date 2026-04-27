@@ -10,25 +10,25 @@ import static godot.global.GD.min;
 
 @RegisterClass(className = "WeaponStats")
 public class WeaponStats extends Node3D {
+  /** Base spread in degrees for a stationary first shot. */
   @RegisterProperty
   @Export
-  public float spread = 18.0f;
+  public float spread = 1.0f;
 
+  /** Degrees of bloom added per shot (accumulated spread). */
   @RegisterProperty
   @Export
-  public float movementSpread = 5.5f;
+  public float bloomPerShot = 0.4f;
 
+  /** Degrees per second the bloom decays when not firing. */
   @RegisterProperty
   @Export
-  public float aimSpread = -7.0f;
+  public float bloomDecaySpeed = 3.0f;
 
+  /** Maximum accumulated bloom in degrees. */
   @RegisterProperty
   @Export
-  public float crouchSpread = -6.0f;
-
-  @RegisterProperty
-  @Export
-  public float jumpSpread = 12.0f;
+  public float bloomMax = 4.0f;
 
   @RegisterProperty
   @Export
@@ -103,36 +103,28 @@ public class WeaponStats extends Node3D {
     this.spread = spread;
   }
 
-  public float getMovementSpread() {
-    return movementSpread;
+  public float getBloomPerShot() {
+    return bloomPerShot;
   }
 
-  public void setMovementSpread(float movementSpread) {
-    this.movementSpread = movementSpread;
+  public void setBloomPerShot(float bloomPerShot) {
+    this.bloomPerShot = bloomPerShot;
   }
 
-  public float getAimSpread() {
-    return aimSpread;
+  public float getBloomDecaySpeed() {
+    return bloomDecaySpeed;
   }
 
-  public void setAimSpread(float aimSpread) {
-    this.aimSpread = aimSpread;
+  public void setBloomDecaySpeed(float bloomDecaySpeed) {
+    this.bloomDecaySpeed = bloomDecaySpeed;
   }
 
-  public float getCrouchSpread() {
-    return crouchSpread;
+  public float getBloomMax() {
+    return bloomMax;
   }
 
-  public void setCrouchSpread(float crouchSpread) {
-    this.crouchSpread = crouchSpread;
-  }
-
-  public float getJumpSpread() {
-    return jumpSpread;
-  }
-
-  public void setJumpSpread(float jumpSpread) {
-    this.jumpSpread = jumpSpread;
+  public void setBloomMax(float bloomMax) {
+    this.bloomMax = bloomMax;
   }
 
   public float getReloadSpeed() {

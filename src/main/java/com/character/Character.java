@@ -71,11 +71,19 @@ public class Character extends CharacterBody3D {
 
     @RegisterProperty
     @Export
-    public NodePath aimTargetPath = new NodePath("AimTarget");
+    public NodePath cameraRootPath = new NodePath("CameraRoot");
 
     @RegisterProperty
     @Export
-    public NodePath aimRayPath = new NodePath("AimRay");
+    public NodePath aimTargetPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimTarget");
+
+    @RegisterProperty
+    @Export
+    public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
+
+    @RegisterProperty
+    @Export
+    public NodePath physicalBoneSimulatorPath = new NodePath("MeshRoot/Model/Godot_Chan_Stealth/Skeleton3D/PhysicalBoneSimulator3D");
 
     // ── Protected state ───────────────────────────────────────────────────────
     protected int airJumpCounter = 0;
@@ -85,11 +93,17 @@ public class Character extends CharacterBody3D {
     protected boolean isRolling = false;
     protected boolean combat = false;
 
+    // False for AI-controlled characters whose accuracy is managed by their own system.
+    protected boolean useWeaponSpread = true;
+
     protected Timer stanceAntispamTimer;
     protected Timer rollTimer;
     protected Health healthNode;
     protected Marker3D aimTarget;
     protected RayCast3D aimRay;
+
+    protected Node3D cameraRoot;
+    protected PhysicalBoneSimulator3D physicalBoneSimulator;
 
     // ── Tick counter (stamped onto every CharacterInput for network ordering) ─
     protected long currentTick = 0;
@@ -113,6 +127,21 @@ public class Character extends CharacterBody3D {
         }
         if (hasNode(aimRayPath)) {
             aimRay = (RayCast3D) getNode(aimRayPath);
+
+        }
+
+        if (hasNode(cameraRootPath)) {
+            cameraRoot = (Node3D) getNode(cameraRootPath);
+        }
+        if (physicalBoneSimulatorPath != null && !physicalBoneSimulatorPath.isEmpty() && hasNode(physicalBoneSimulatorPath)) {
+            physicalBoneSimulator = (PhysicalBoneSimulator3D) getNode(physicalBoneSimulatorPath);
+
+            for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+                Node child = physicalBoneSimulator.getChild(i);
+                if (child instanceof PhysicalBone3D bone) {
+                   aimRay.addException(bone);
+                }
+            }
         }
 
         changedMovementDirection.emit(Vector3.Companion.getBACK());
@@ -177,12 +206,7 @@ public class Character extends CharacterBody3D {
         if (input.aimTargetPosition != null && aimTarget != null) {
             aimTarget.setGlobalPosition(input.aimTargetPosition);
         }
-
-        // ── AimRay → AimTarget (WeaponController raycast origin) ──────────
-        if (combat && aimTarget != null && aimRay != null) {
-            aimRay.setTargetPosition(aimRay.toLocal(aimTarget.getGlobalPosition()));
-        }
-
+        
         // ── Fire / not-fire ────────────────────────────────────────────────
         if (!isRolling) {
             if (input.fire) {
@@ -327,9 +351,71 @@ public class Character extends CharacterBody3D {
         changedWeapon.emit(weapon);
     }
 
+    // ── Ragdoll ───────────────────────────────────────────────────────────────
+    protected void enableRagdoll() {
+        // Stop Character's own input/apply cycle
+        setPhysicsProcess(false);
+
+        // Stop MovementController — it is a separate Node with its own
+        // _physicsProcess that applies gravity and calls moveAndSlide().
+        // Without this, the CharacterBody3D keeps falling even after death.
+        if (hasNode("MovementController")) {
+            getNode("MovementController").setPhysicsProcess(false);
+        }
+
+        // Disable all CharacterBody3D stance capsules so the frozen corpse
+        // shell doesn't block navigation or other characters.
+        for (int i = 0; i < getChildCount(); i++) {
+            Node child = getChild(i);
+            if (child instanceof CollisionShape3D shape) {
+                shape.setDisabled(true);
+            }
+        }
+
+        if (physicalBoneSimulator == null) return;
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            Node child = physicalBoneSimulator.getChild(i);
+            if (child instanceof PhysicalBone3D bone) {
+                // setCollisionMaskValue adds layer 1 (world) to what the bone
+                // *detects*, so it rests on the floor.
+                // setCollisionLayer would only change what others detect the
+                // bone as — bones would still fall through everything.
+                bone.setCollisionMaskValue(1, true);
+            }
+        }
+        physicalBoneSimulator.physicalBonesStartSimulation();
+    }
+
+    /**
+     * Apply a physics impulse to a named bone during ragdoll.
+     * Only has effect when the ragdoll is active (call after enableRagdoll or on death).
+     */
+    public void applyBoneImpulse(String boneName, Vector3 impulse) {
+        if (physicalBoneSimulator == null) return;
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            Node child = physicalBoneSimulator.getChild(i);
+            if (child instanceof PhysicalBone3D bone && boneName.equalsIgnoreCase(String.valueOf(bone.getName()))) {
+                bone.applyCentralImpulse(impulse);
+                return;
+            }
+        }
+    }
+
     // ── Override in subclasses ────────────────────────────────────────────────
     @RegisterFunction
     public void onDied() {
         GD.print(getName() + " died");
+        // Disable animation tree
+        AnimationTree animationTree = (AnimationTree) getNode("AnimationTree");
+        animationTree.setActive(false);
+
+        enableRagdoll();
+
+        // Disabled current stance to let ragdoll take over
+            NodePath enabledPath = stances.get(currentStanceName.getKey());
+            if (enabledPath != null) {
+                Stance s = (Stance) getNode(enabledPath);
+                if (s != null && s.getCollider() != null) s.getCollider().setDisabled(true);
+            }
     }
 }

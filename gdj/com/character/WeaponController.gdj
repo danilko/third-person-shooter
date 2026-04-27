@@ -17,15 +17,17 @@ signals = [
 ]
 properties = [
     animation_controller,
-	ray_cast_path,
+	aim_ray_path,
 	splatters_path,
-	recoil_pitch_path,
+	camera_controller_path,
 	weapon_attachment_path,
 	weapon_audio,
 	neck_bone_attachement
 ]
 functions = [
-    _ready,
+    _physics_process,
+	on_set_stance,
+	_ready,
 	on_weapon_fire,
 	on_weapon_reload,
 	on_weapon_reload_complete,

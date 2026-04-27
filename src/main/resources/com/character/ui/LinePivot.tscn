@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://2cwjeq8se2u2"]
+[gd_scene format=3 uid="uid://2cwjeq8se2u2"]
 
 [sub_resource type="Animation" id="Animation_l441s"]
 resource_name = "Fire"
@@ -12,7 +12,7 @@ tracks/0/keys = {
 "times": PackedFloat32Array(0, 1),
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
-"values": [Vector2(40, 0), Vector2(0, 0)]
+"values": [Vector2(5, 0), Vector2(0, 0)]
 }
 
 [sub_resource type="Animation" id="Animation_wloc0"]
@@ -27,7 +27,7 @@ tracks/0/keys = {
 "times": PackedFloat32Array(0),
 "transitions": PackedFloat32Array(1),
 "update": 0,
-"values": [Vector2(40, 0)]
+"values": [Vector2(5, 0)]
 }
 
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_wloc0"]
@@ -36,27 +36,25 @@ _data = {
 &"RESET": SubResource("Animation_wloc0")
 }
 
-[node name="LinePivot" type="Node2D"]
+[node name="LinePivot" type="Node2D" unique_id=1616160498]
 
-[node name="LineBase" type="Node2D" parent="."]
-position = Vector2(15, 0)
+[node name="LineBase" type="Node2D" parent="." unique_id=684269536]
+position = Vector2(2, 0)
 
-[node name="Border" type="Line2D" parent="LineBase"]
-position = Vector2(40, 0)
+[node name="Border" type="Line2D" parent="LineBase" unique_id=1642738165]
+position = Vector2(5, 0)
 points = PackedVector2Array(0, 0, 10, 0)
-width = 6.0
+width = 3.0
 default_color = Color(0.15775654, 0.29308277, 0.6518259, 0.4117647)
 begin_cap_mode = 2
 end_cap_mode = 2
 
-[node name="Line" type="Line2D" parent="LineBase/Border"]
+[node name="Line" type="Line2D" parent="LineBase/Border" unique_id=1933913138]
 points = PackedVector2Array(0, 0, 10, 0)
-width = 2.0
+width = 1.0
 default_color = Color(0.10980392, 0.8235294, 1, 1)
 begin_cap_mode = 2
 end_cap_mode = 2
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {
-&"": SubResource("AnimationLibrary_wloc0")
-}
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1134349962]
+libraries/ = SubResource("AnimationLibrary_wloc0")

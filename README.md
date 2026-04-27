@@ -31,6 +31,52 @@ This project is based on Johnny Rouddro's Third Person Controller tutorial ([You
   * Basic damage systems for player and enemy
   * Simple choose of weapon and re-fill
 
+---
+
+## 🎯 Combat System
+
+### Skeleton Hitbox & Damage Zones
+
+Damage is resolved against the character's **physical ragdoll skeleton** (`PhysicalBoneSimulator3D`). Each `PhysicalBone3D` acts as an independent collider, so the hit location on the body determines the damage multiplier applied to the base weapon damage.
+
+| Body Zone | Bones | Damage Multiplier |
+|:----------|:------|:-----------------:|
+| **Head / Neck** | `neck_01` | **4.0×** |
+| **Upper Torso** | `spine_03`, `clavicle_l`, `clavicle_r` | 1.0× |
+| **Mid / Lower Torso** | `spine_02`, `spine_01`, `pelvis` | 0.75× |
+| **Arms** | `upperarm_l/r`, `lowerarm_l/r`, `hand_l/r` | 0.75× |
+| **Legs** | `thigh_l/r`, `calf_l/r`, `foot_l/r` | 0.5× |
+
+The hitbox colliders are the same bones that drive the ragdoll on death — no separate invisible hit-mesh is needed.
+
+### Headshot Detection
+
+A hit is classified as a **headshot** when the colliding bone is `Physical Bone neck_01`. This single bone covers both the neck capsule and the head sphere in the ragdoll setup.
+
+```
+hit bone == "Physical Bone neck_01"  →  headshot = true  →  4× damage
+```
+
+Headshot detection lives in `Health.takeDamage()` and is bone-name driven, so it works identically for both player and enemy characters.
+
+### Kill Notifications (EventBus)
+
+When any character's health reaches zero, `Health` emits a unified payload to the **EventBus** singleton:
+
+```
+EventBus.characterEliminated(attackerName, victimName, weaponName, headshot)
+```
+
+The player HUD (`CharacterHUD`) subscribes to this signal in `_ready()` and displays a 3-second notification:
+
+| Situation | Example message |
+|:----------|:----------------|
+| Body shot kill | `Enemy Eliminated [Pistol] - Eliminated` |
+| Headshot kill | `Enemy Eliminated [Pistol] - Headshot` |
+| Player killed | `Player Eliminated [Rifile] - Eliminated` |
+
+Character display names are configured via the `displayName` export property on each `Health` node. If left blank, the owning node's scene name is used as a fallback.
+
 > **Note:** This is an experimental codebase. You may encounter "crunch-time" bugs or unstable animations. It is provided as-is for educational purposes.
 
 ---

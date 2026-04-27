@@ -17,10 +17,9 @@ signals = [
 ]
 properties = [
     spread,
-	movement_spread,
-	aim_spread,
-	crouch_spread,
-	jump_spread,
+	bloom_per_shot,
+	bloom_decay_speed,
+	bloom_max,
 	reload_speed,
 	switch_speed,
 	fire_rate,

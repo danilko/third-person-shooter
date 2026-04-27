@@ -36,17 +36,25 @@ properties = [
 	attack_range,
 	patrol_radius,
 	ammo_refill,
+	hit_chance,
+	reaction_time,
+	aim_scatter_radius,
+	strafe_change_duration,
+	suppression_duration,
 	max_air_jump,
 	jump_states,
 	stances,
 	combat_states,
 	roll_state,
 	weapon_controller,
+	camera_root_path,
 	aim_target_path,
-	aim_ray_path
+	aim_ray_path,
+	physical_bone_simulator_path
 ]
 functions = [
     _ready,
+	on_enemy_damaged,
 	on_died,
 	_physics_process,
 	completed_roll

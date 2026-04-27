@@ -1,14 +1,11 @@
 // THIS FILE IS GENERATED! DO NOT EDIT OR DELETE IT. EDIT OR DELETE THE ASSOCIATED SOURCE CODE FILE INSTEAD
 // Note: You can however freely move this file inside your godot project if you want. Keep in mind however, that if you rename the originating source code file, this file will be deleted and regenerated as a new file instead of being updated! Other modifications to the source file however, will result in this file being updated.
 
-registeredName = Player
-fqName = com.character.Player
-baseType = CharacterBody3D
+registeredName = EnemyCameraController
+fqName = com.character.EnemyCameraController
+baseType = Node3D
 supertypes = [
-    com.character.Character,
-	godot.api.CharacterBody3D,
-	godot.api.PhysicsBody3D,
-	godot.api.CollisionObject3D,
+    com.character.CameraController,
 	godot.api.Node3D,
 	godot.api.Node,
 	godot.api.Object,
@@ -17,34 +14,25 @@ supertypes = [
 	godot.common.interop.NativePointer
 ]
 signals = [
-    pressed_jump,
-	pressed_roll,
-	changed_stance,
-	fire_weapon,
-	not_fire_weapon,
-	changed_movement_state,
-	changed_movement_direction,
-	changed_combat_state,
-	changed_weapon,
-	reload_weapon
+    set_cam_rotation
 ]
 properties = [
-    hud_path,
-	max_air_jump,
-	jump_states,
-	stances,
-	combat_states,
-	roll_state,
-	weapon_controller,
-	camera_root_path,
-	aim_target_path,
-	aim_ray_path,
-	physical_bone_simulator_path
+    player,
+	yaw_sensitivity,
+	pitch_sensitivity,
+	yaw_acceleration,
+	pitch_acceleration,
+	pitch_max,
+	pitch_min,
+	shoulder_offset_lerp_speed,
+	follow_lerp_speed,
+	fov_tween_duration,
+	recoil_recovery_speed
 ]
 functions = [
     _ready,
-	on_died,
-	on_player_damaged,
 	_physics_process,
-	completed_roll
+	on_set_combat_state,
+	on_set_movement_state,
+	on_set_stance
 ]

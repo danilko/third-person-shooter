@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://jvsaup8qx28"]
 
 [ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
-[ext_resource type="Resource" uid="uid://drollstate01" path="res://src/main/resources/com/character/rollstates/Roll.tres" id="2_hbo2n"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
 [ext_resource type="Script" uid="uid://b722ufsi6a0p5" path="res://gdj/com/environment/AmmoRefil.gdj" id="4_kj2pm"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
@@ -60,8 +59,7 @@ size = Vector3(2, 0.1, 2)
 [node name="World" type="Node3D" unique_id=822990337]
 
 [node name="Player" parent="." unique_id=131388266 instance=ExtResource("2_lj72b")]
-transform = Transform3D(0.2888312, 0, 0.9573802, 0, 1, 0, -0.9573802, 0, 0.2888312, 0, 0.7612269, 4.1552534)
-roll_state = ExtResource("2_hbo2n")
+transform = Transform3D(-4.3711392e-08, 0, -1.0000001, 0, 1, 0, 1.0000001, 0, -4.3711392e-08, 0, 0.7612269, 4.1552534)
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="." unique_id=689824235]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.031542182, 0, 0.004375696)
@@ -191,6 +189,10 @@ font_size = 60
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0.75, -5)
 script = ExtResource("7_lagp7")
 player = NodePath("../Player")
+aim_pitch_min = -55.0
+aim_pitch_max = 75.0
+attack_range = 15.0
+patrol_radius = 8.0
 ammo_refill = NodePath("../AmmoRefill")
 
 [node name="PauseMenu" parent="." unique_id=1764356925 instance=ExtResource("7_pmenu")]

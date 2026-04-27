@@ -5,6 +5,7 @@ import godot.annotation.RegisterSignal;
 import godot.api.Node;
 import godot.core.Signal0;
 import godot.core.Signal1;
+import godot.core.Signal4;
 import godot.core.StringName;
 
 /**
@@ -38,4 +39,12 @@ public class EventBus extends Node {
     /** Emitted by AmmoRefill.onBodyEntered(). Payload: weapon index that was refilled. */
     @RegisterSignal
     public final Signal1<Integer> ammoPickedUp = new Signal1<>(this, new StringName("ammo_picked_up"));
+
+    /**
+     * Emitted by Health when any character is eliminated.
+     * Payload: attackerName, victimName, weaponName, headshot.
+     */
+    @RegisterSignal
+    public final Signal4<String, String, String, Boolean> characterEliminated =
+            new Signal4<>(this, new StringName("character_eliminated"));
 }

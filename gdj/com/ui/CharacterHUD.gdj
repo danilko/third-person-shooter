@@ -23,6 +23,8 @@ properties = [
 ]
 functions = [
     _ready,
+	_process,
 	on_ammo_changed,
-	on_health_changed
+	on_health_changed,
+	on_character_eliminated
 ]

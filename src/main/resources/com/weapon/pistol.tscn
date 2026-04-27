@@ -9,10 +9,10 @@
 transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
 visible = false
 script = ExtResource("1_1wcjt")
-spread = 25.0
-movement_spread = 3.5
-crouch_spread = -5.0
-jump_spread = 10.0
+spread = 0.5
+bloom_per_shot = 0.2
+bloom_decay_speed = 6.0
+bloom_max = 6.0
 switch_speed = 1.5
 fire_rate = 6.0
 auto = false

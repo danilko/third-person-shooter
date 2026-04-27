@@ -5,13 +5,13 @@ import godot.api.*;
 import godot.core.NodePath;
 import godot.core.Signal1;
 import godot.core.StringName;
+import godot.core.Vector2;
 import godot.core.Vector3;
 import godot.global.GD;
 
 @RegisterClass(className = "CameraController")
 public class CameraController extends Node3D {
 
-  // Define the Signal
   @RegisterSignal
   public Signal1<Double> setCamRotation = new Signal1<>(this, new StringName("set_cam_rotation"));
 
@@ -19,13 +19,13 @@ public class CameraController extends Node3D {
   @RegisterProperty
   public CharacterBody3D player;
 
-  private int shoulderDirection = 1;
+  protected int shoulderDirection = 1;
 
-  private Node3D yawNode;
-  private Node3D pitchNode;
-  private Node3D pivotNode;
-  private SpringArm3D springArm;
-  private Camera3D camera;
+  protected Node3D yawNode;
+  protected Node3D pitchNode;
+  protected Node3D pivotNode;
+  protected SpringArm3D springArm;
+  protected Camera3D camera;
 
   @Export
   @RegisterProperty
@@ -63,8 +63,8 @@ public class CameraController extends Node3D {
   @RegisterProperty
   public double fovTweenDuration = 0.5;
 
-  private double yaw = 0.0;
-  private double pitch = 0.0;
+  protected double yaw = 0.0;
+  protected double pitch = 0.0;
 
   private Vector3 positionOffset = new Vector3(0, 0.8, 0);
   private Vector3 positionOffsetTarget = new Vector3(0, 0.8, 0);
@@ -73,16 +73,22 @@ public class CameraController extends Node3D {
 
   private double movementFov = 0.0;
   private double cameraFov = 0.0;
-  private boolean combat = false;
+  protected boolean combat = false;
+
+  // Recoil offsets added per shot, decaying toward zero each frame.
+  // Kept separate from pitch/yaw (mouse intent) so recovery never fights mouse aim.
+  private double recoilPitch = 0.0;
+  private double recoilYaw   = 0.0;
+
+  @Export
+  @RegisterProperty
+  public double recoilRecoverySpeed = 8.0;
 
   private Tween tween;
 
   @RegisterFunction
   @Override
   public void _ready() {
-    Input.setMouseMode(Input.MouseMode.CAPTURED);
-
-    // Handling @onready assignments
     yawNode = (Node3D) getNode(new NodePath("Yaw"));
     pitchNode = (Node3D) getNode(new NodePath("Yaw/Pitch"));
     pivotNode = (Node3D) getNode(new NodePath("Yaw/Pitch/Pivot"));
@@ -96,62 +102,68 @@ public class CameraController extends Node3D {
     setAsTopLevel(true);
   }
 
-  @RegisterFunction
-  @Override
-  public void _input(InputEvent event) {
-    if (event instanceof InputEventMouseMotion) {
-      InputEventMouseMotion mouseMotion = (InputEventMouseMotion) event;
-      yaw += -mouseMotion.getRelative().getX() * yawSensitivity;
-      pitch += mouseMotion.getRelative().getY() * pitchSensitivity;
-    }
-
-    if(event.isActionPressed("shoulder")) {
-      changeShoulderDirection();
-    }
+  /**
+   * Returns the look-input delta for this frame as (deltaYawDeg, deltaPitchDeg).
+   * Subclasses provide the input source: mouse for the player, AI facing for enemies.
+   */
+  protected Vector2 gatherLookInput(double delta) {
+    return Vector2.Companion.getZERO();
   }
 
   public void changeShoulderDirection() {
     shoulderDirection = shoulderDirection * -1;
-
     positionOffsetTarget.setX(positionOffsetTarget.getX() * shoulderDirection);
-
     setCameraFov();
   }
 
   @RegisterFunction
   @Override
   public void _physicsProcess(double delta) {
+    Vector2 lookDelta = gatherLookInput(delta);
+    yaw   += lookDelta.getX();
+    pitch += lookDelta.getY();
+
     // Position interpolation
     positionOffset = positionOffset.lerp(positionOffsetTarget, shoulderOffsetLerpSpeed * delta);
 
     // Apply shoulder offset along yaw's right vector (camera-relative), not world X.
-    // This ensures the shoulder offset stays on the correct side regardless of player facing direction.
     Vector3 playerBase = player.getGlobalPosition().plus(new Vector3(0, positionOffset.getY(), 0));
-    Vector3 yawRight = yawNode.getGlobalTransform().getBasis().getX();
-    Vector3 targetPos = playerBase.plus(yawRight.times(positionOffset.getX()));
+    Vector3 yawRight   = yawNode.getGlobalTransform().getBasis().getX();
+    Vector3 targetPos  = playerBase.plus(yawRight.times(positionOffset.getX()));
 
-    // In combat/aim mode, tighten follow speed so the SpringArm origin stays close to
-    // the player. A slow-following pivot causes the SpringArm to cast from the wrong
-    // position during lateral movement, making the camera flip to the wrong side.
+    // Tighten follow speed in combat to prevent SpringArm casting from wrong position.
     float followSpeedWeight = combat ? 1 : (float) (followLerpSpeed * delta);
     setGlobalPosition(getGlobalPosition().lerp(targetPos, followSpeedWeight));
 
     springArm.setLength(GD.lerp(springArm.getLength(), springArmLengthTarget, followSpeedWeight));
 
-    // Clamp pitch
+    // Clamp clean mouse-intent pitch
     pitch = GD.clamp(pitch, pitchMin, pitchMax);
+
+    // Decay recoil offsets toward zero each frame
+    recoilPitch = GD.lerp(recoilPitch, 0.0, recoilRecoverySpeed * delta);
+    recoilYaw   = GD.lerp(recoilYaw,   0.0, recoilRecoverySpeed * delta);
+
+    // Display values: mouse aim + per-shot kick, pitch clamped
+    double displayPitch = GD.clamp(pitch + recoilPitch, pitchMin, pitchMax);
+    double displayYaw   = yaw + recoilYaw;
 
     // Rotation interpolation
     Vector3 yawRot = yawNode.getRotationDegrees();
-    yawRot.setY(GD.lerp(yawRot.getY(), yaw, yawAcceleration * delta));
+    yawRot.setY(GD.lerp(yawRot.getY(), displayYaw, yawAcceleration * delta));
     yawNode.setRotationDegrees(yawRot);
 
     Vector3 pitchRot = pitchNode.getRotationDegrees();
-    pitchRot.setX(GD.lerp(pitchRot.getX(), pitch, pitchAcceleration * delta));
+    pitchRot.setX(GD.lerp(pitchRot.getX(), displayPitch, pitchAcceleration * delta));
     pitchNode.setRotationDegrees(pitchRot);
 
-    // Emit signal
     setCamRotation.emit(yawNode.getRotation().getY());
+  }
+
+  /** Adds a per-shot kick (degrees) that decays back to zero at recoilRecoverySpeed. */
+  public void applyRecoil(double pitchKick, double yawKick) {
+    recoilPitch += pitchKick;
+    recoilYaw   += yawKick;
   }
 
   @RegisterFunction
@@ -160,7 +172,6 @@ public class CameraController extends Node3D {
     cameraFov = combatState.cameraFov;
     positionOffsetTarget.setX(combatState.cameraShoulderOffset * shoulderDirection);
     springArmLengthTarget = (float) combatState.cameraDistance;
-
     setCameraFov();
   }
 
@@ -175,11 +186,7 @@ public class CameraController extends Node3D {
       tween.kill();
     }
 
-    double targetFov = movementFov;
-    // move to combat
-    if(combat) {
-      targetFov = cameraFov;
-    }
+    double targetFov = combat ? cameraFov : movementFov;
 
     tween = createTween();
     tween.tweenProperty(camera, "fov", targetFov, fovTweenDuration)
@@ -189,7 +196,6 @@ public class CameraController extends Node3D {
 
   @RegisterFunction
   public void onSetStance(Stance stance) {
-    double height = stance.getCameraHeight();
-    positionOffsetTarget.setY(height);
+    positionOffsetTarget.setY(stance.getCameraHeight());
   }
 }

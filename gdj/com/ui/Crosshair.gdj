@@ -17,7 +17,8 @@ signals = [
     
 ]
 properties = [
-    crosshair_lerp_speed
+    crosshair_expand_speed,
+	crosshair_contract_speed
 ]
 functions = [
     _ready,

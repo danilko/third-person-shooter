@@ -2,6 +2,7 @@ package com.character;
 import com.util.ObjectPool;
 import godot.annotation.*;
 import godot.api.*;
+import godot.api.CharacterBody3D;
 import godot.api.Object;
 import godot.core.NodePath;
 import godot.core.Signal1;
@@ -22,7 +23,7 @@ public class WeaponController extends Node {
 
   @RegisterProperty
   @Export
-  public NodePath rayCastPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/RayCast3D");
+  public NodePath aimRayPath = new NodePath("CameraRoot/Yaw/Pitch/Pivot/SpringArm/Camera/AimRay");
 
   @RegisterProperty
   @Export
@@ -30,7 +31,7 @@ public class WeaponController extends Node {
 
   @RegisterProperty
   @Export
-  public NodePath recoilPitchPath = new NodePath("CameraRoot/Yaw/Pitch");
+  public NodePath cameraControllerPath = new NodePath("CameraRoot");
 
 
   @RegisterProperty
@@ -44,6 +45,7 @@ public class WeaponController extends Node {
   /** Emitted whenever magazine or backup ammo count changes (mag, ammoBackup). */
   @RegisterSignal
   public final Signal2<Integer, Integer> ammoChanged = new Signal2<>(this, new StringName("ammo_changed"));
+
 
   @RegisterProperty
   @Export
@@ -61,7 +63,7 @@ public class WeaponController extends Node {
   private Timer fireTimer;
   private Timer reloadTimer;
 
-  private RayCast3D rayCast3D;
+  private RayCast3D aimRay3D;
 
   // Round-robin VFX pool: acquire → position → emit → release immediately.
   // Particles continue emitting independently; the pool just tracks order.
@@ -83,6 +85,54 @@ public class WeaponController extends Node {
   private int pendingWeapon = 0;
   private boolean isWeaponFired = false;
 
+  // Bloom: accumulated per shot, decays toward 0 while not firing.
+  // Rates and cap are per-weapon (stored in WeaponStats).
+  private float currentBloom = 0.0f;
+
+  // Spread increase per m/s of character velocity (applied before stance multiplier).
+  private static final float MOVEMENT_SPREAD_PER_MPS = 0.12f;
+
+  // Stance spread multipliers: proportion of (base + movement + bloom) that lands.
+  private static final float CROUCH_SPREAD_MULT = 0.7f;
+  private static final float CRAWL_SPREAD_MULT  = 0.5f;
+  private static final float JUMP_SPREAD_MULT   = 2.0f;
+
+  private StanceName currentStance = StanceName.UPRIGHT;
+
+  @RegisterFunction
+  @Override
+  public void _physicsProcess(double delta) {
+    if (!weapons.isEmpty()) {
+      currentBloom = Math.max(0f, currentBloom - getCurrentWeaponStats().getBloomDecaySpeed() * (float) delta);
+    }
+  }
+
+  /**
+   * Current total spread in degrees: (base + movement + bloom) × stance multiplier.
+   * Used by WeaponController for ballistics and by MovementController for the crosshair.
+   */
+  public float getCurrentSpreadDeg() {
+    if (weapons.isEmpty()) return 0f;
+    WeaponStats stats = getCurrentWeaponStats();
+    float speed = (float) ((CharacterBody3D) getOwner()).getVelocity().length();
+    float raw  = stats.getSpread() + speed * MOVEMENT_SPREAD_PER_MPS + currentBloom;
+    return Math.max(0f, raw * stanceMultiplier());
+  }
+
+  private float stanceMultiplier() {
+    if (!((CharacterBody3D) getOwner()).isOnFloor()) return JUMP_SPREAD_MULT;
+    return switch (currentStance) {
+      case CROUCH -> CROUCH_SPREAD_MULT;
+      case CRAWL  -> CRAWL_SPREAD_MULT;
+      default     -> 1.0f;
+    };
+  }
+
+  @RegisterFunction
+  public void onSetStance(Stance stance) {
+    currentStance = StanceName.fromKey(String.valueOf(stance.getName()));
+  }
+
   @RegisterFunction
   @Override
   public void _ready(){
@@ -102,8 +152,8 @@ public class WeaponController extends Node {
     // Hide the muzzle flash by playing once as a workaround
     muzzleFlashAnimationPlayer.play("MuzzleFlash");
 
-    if (getOwner().hasNode(rayCastPath)) {
-      rayCast3D = (RayCast3D) getOwner().getNode(rayCastPath);
+    if (getOwner().hasNode(aimRayPath)) {
+      aimRay3D = (RayCast3D) getOwner().getNode(aimRayPath);
     }
 
     ArrayList<GPUParticles3D> splatterNodes = new ArrayList<>();
@@ -160,32 +210,57 @@ public class WeaponController extends Node {
     weaponAudio.play();
 
 
-    if (getOwner().hasNode(recoilPitchPath)) {
-      ((Node3D) getOwner().getNode(recoilPitchPath)).rotateX((float) GD.degToRad(getCurrentWeaponStats().getRecoil()));
+    // Route recoil through CameraController so it accumulates and recovers properly
+    if (getOwner().hasNode(cameraControllerPath)) {
+      Node camNode = getOwner().getNode(cameraControllerPath);
+      if (camNode instanceof CameraController cam) {
+        float recoil = getCurrentWeaponStats().getRecoil();
+        float horizRecoil = (float) GD.randfRange(-recoil * 0.3f, recoil * 0.3f);
+        cam.applyRecoil(recoil, horizRecoil);
+      }
     }
 
-    // Apply spread and check for collision
-    if(rayCast3D != null) {
-      Vector3 currentRotationDegree = rayCast3D.getRotationDegrees();
-      float spread = getCurrentWeaponStats().getSpread();
-      rayCast3D.setRotationDegrees(new Vector3(currentRotationDegree.getX(), 0.5 * GD.randfRange(-spread, spread), 0.5 * GD.randfRange(-spread, spread)));
-    }
+    // Accumulate per-shot bloom (per-weapon rate and cap)
+    WeaponStats stats = getCurrentWeaponStats();
+    currentBloom = Math.min(currentBloom + stats.getBloomPerShot(), stats.getBloomMax());
 
-    // final check for collision point
-    if(rayCast3D != null && rayCast3D.isColliding() &&  (rayCast3D.getCollisionPoint().minus(rayCast3D.getGlobalTransform().getOrigin())).length() > 0.1) {
-      // Apply damage if the hit body has a Health node
-      Object collider = rayCast3D.getCollider();
-      if (collider instanceof godot.api.Node) {
-        godot.api.Node hitNode = (godot.api.Node) collider;
-        if (hitNode.hasNode(new NodePath("Health"))) {
-          ((Health) hitNode.getNode(new NodePath("Health"))).takeDamage(getCurrentWeaponStats().damage);
-        }
+    if (aimRay3D != null) {
+      // Player: apply angular spread + force update. Enemy: snapAimRay already
+      // positioned the ray (with scatter baked in) and called forceRaycastUpdate —
+      // rotating it again would override that carefully placed aim.
+      boolean applySpread = getOwner() instanceof Character
+          && ((Character) getOwner()).useWeaponSpread;
+
+      Vector3 savedRot = null;
+      if (applySpread) {
+        savedRot = aimRay3D.getRotationDegrees();
+        float halfSpread = getCurrentSpreadDeg() * 0.5f;
+        float pitchOff = (float) GD.randfRange(-halfSpread, halfSpread);
+        float yawOff   = (float) GD.randfRange(-halfSpread, halfSpread);
+        aimRay3D.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
+        aimRay3D.forceRaycastUpdate();
       }
 
-      GPUParticles3D splatter = splatterPool.acquire();
-      splatter.setGlobalPosition(rayCast3D.getCollisionPoint());
-      splatter.setEmitting(true);
-      splatterPool.release(splatter); // immediately back; particle keeps emitting
+      if (aimRay3D.isColliding() &&
+          (aimRay3D.getCollisionPoint().minus(aimRay3D.getGlobalTransform().getOrigin())).length() > 0.1) {
+        Object collider = aimRay3D.getCollider();
+        if (collider instanceof godot.api.Node hitNode) {
+          if (hitNode.getOwner().hasNode(new NodePath("Health"))) {
+            Health health = (Health) hitNode.getOwner().getNode(new NodePath("Health"));
+            String weaponName = getCurrentWeaponStats().getName().toString();
+            String attackerName = getOwner().getName().toString();
+            health.takeDamage(hitNode, getCurrentWeaponStats().damage, weaponName, attackerName);
+          }
+        }
+        GPUParticles3D splatter = splatterPool.acquire();
+        splatter.setGlobalPosition(aimRay3D.getCollisionPoint());
+        splatter.setEmitting(true);
+        splatterPool.release(splatter);
+      }
+
+      if (savedRot != null) {
+        aimRay3D.setRotationDegrees(savedRot);
+      }
     }
   }
 
@@ -219,6 +294,11 @@ public class WeaponController extends Node {
 
  public boolean isWeaponReloading(){
     return reloadTimer.getTimeLeft() > 0;
+  }
+
+  /** True while a weapon-switch animation is in flight (transitionTimer hasn't fired yet). */
+  public boolean isWeaponTransitioning() {
+    return transitionTimer.getTimeLeft() > 0;
   }
 
   public boolean hasAmmoForWeapon(int index) {
