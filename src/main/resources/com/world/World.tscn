@@ -2,7 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://cjnj1vweebmy5" path="res://addons/kenney_prototype_textures/orange/texture_01.png" id="1_umubf"]
 [ext_resource type="PackedScene" uid="uid://bwxj3ecw2ta4k" path="res://src/main/resources/com/character/Player.tscn" id="2_lj72b"]
-[ext_resource type="Script" uid="uid://b722ufsi6a0p5" path="res://gdj/com/environment/AmmoRefil.gdj" id="4_kj2pm"]
+[ext_resource type="Script" uid="uid://bsd1d5cijxeiu" path="res://gdj/com/environment/AmmoRefill.gdj" id="3_m0gj3"]
 [ext_resource type="FontFile" uid="uid://bbh4cx46cc0tw" path="res://assets/ui/Aldrich-Regular.ttf" id="5_uecv0"]
 [ext_resource type="PackedScene" uid="uid://dbnx63f3e5s88" path="res://src/main/resources/com/character/Enemy.tscn" id="6_enemy"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/ui/PauseMenu.tscn" id="7_pmenu"]
@@ -188,7 +188,8 @@ light_energy = 0.03
 
 [node name="AmmoRefill" type="Area3D" parent="." unique_id=671726989]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75007653, 0)
-script = ExtResource("4_kj2pm")
+collision_mask = 11
+script = ExtResource("3_m0gj3")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="AmmoRefill" unique_id=872433639]
 mesh = SubResource("BoxMesh_kj2pm")
