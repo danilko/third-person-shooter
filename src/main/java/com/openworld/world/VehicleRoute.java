@@ -110,12 +110,12 @@ public class VehicleRoute extends Node3D implements Lane {
 
     public VehicleRoute() { super(); }
 
-    // Registered with the WorldZoneManager route registry (register-with-AutoLoad idiom, like
+    // Registered with the ZoneManager route registry (register-with-AutoLoad idiom, like
     // Character ↔ SpatialEntityGrid) so every lane lookup is a map read, not a scene-tree walk.
     @Register
     @Override
     public void _ready() {
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (mgr != null) mgr.registerRoute(this);
     }
 
@@ -123,7 +123,7 @@ public class VehicleRoute extends Node3D implements Lane {
     @Override
     public void _exitTree() {
         cachedEntry = null;   // global positions are per scene-instance
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (mgr != null) mgr.unregisterRoute(this);
     }
 
@@ -151,7 +151,7 @@ public class VehicleRoute extends Node3D implements Lane {
     private Vector3 cachedEntry;
 
     /** {@link #startPoint()} cached for the lifetime of this tree entry — the spawn-time prefix
-     *  query ({@code WorldZoneManager.findRoute}) distance-filters every registered lane, so it must
+     *  query ({@code ZoneManager.findRoute}) distance-filters every registered lane, so it must
      *  not re-walk marker children (JVM-bridge calls) per candidate. Lanes are static content. */
     @Override
     public Vector3 entryPoint() {
@@ -301,13 +301,13 @@ public class VehicleRoute extends Node3D implements Lane {
 
     /**
      * Resolve a sibling lane by node name (used by {@link #nextRoutes} / {@link #returnRoute}) — a
-     * {@code WorldZoneManager} registry read; falls back to a scene-tree scan only when the AutoLoad
+     * {@code ZoneManager} registry read; falls back to a scene-tree scan only when the AutoLoad
      * is absent (test scenes).
      */
     public VehicleRoute resolveRoute(String name) {
         if (name == null || name.isBlank()) return null;
         String nm = name.trim();
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (mgr != null) {
             // The registry is Lane-typed (a PathLaneRoute can register too), but VehicleRoute's
             // own explicit nextRoutes/returnRoute chaining only ever makes sense VehicleRoute ->

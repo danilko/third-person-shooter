@@ -158,7 +158,7 @@ LANDMARKS = [
 
 # Every zone is wired (up front) to a PREDICTABLE piece path so a district piece authored/baked
 # later goes live with no master re-bake (WorldZone.geometryPath, resolved lazily at stream time).
-PIECE_DIR  = "res://src/main/resources/com/openworld/world/districts/"
+PIECE_DIR  = "res://src/main/resources/com/openworld/world/pieces/"
 
 
 def piece_path(gx, gy):

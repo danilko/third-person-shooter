@@ -24,7 +24,7 @@ public interface Lane {
 
     /**
      * {@link #startPoint()}, cached for the lifetime of this lane's tree entry (static content,
-     * never re-derived). {@code WorldZoneManager.findRoute}'s spawn-time prefix scan distance-
+     * never re-derived). {@code ZoneManager.findRoute}'s spawn-time prefix scan distance-
      * filters every registered lane against this, so it must not re-walk the underlying
      * representation (a {@code VehicleRoute}'s marker children, a {@code PathLaneRoute}'s baked
      * curve) per candidate — a plain {@code pointAtLength(0)} would NOT do, since it returns the

@@ -135,6 +135,11 @@ MATS = {
     "line_y":   ("M_LineY",    (0.86, 0.74, 0.20, 1)),   # yellow lane line
     "line_w":   ("M_LineW",    (0.90, 0.90, 0.90, 1)),   # white lane line
     "dirt":     ("M_Dirt",     (0.40, 0.34, 0.26, 1)),   # ground fill
+    # SEE-THROUGH ON PURPOSE. The sea plate has a seabed under it now (`build_island_v3
+    # .build_seabed`), and an opaque plate would turn the water into a lid: walk off the shore and
+    # you are standing on real ground in the dark, under a ceiling. The alpha is what makes the
+    # floor readable from above and the shallows readable from in them.
+    "water":    ("M_Water",    (0.09, 0.30, 0.42, 0.45)),  # sea / bay surface, translucent
     "rail":     ("M_Rail",     (0.40, 0.40, 0.44, 1)),   # rail steel
     "col":      ("M_Collision", (0.90, 0.20, 0.55, 0.25)),  # debug proxy tint
     # --- Tokyo urban set ---
@@ -144,6 +149,12 @@ MATS = {
     "glasscurtain":("M_GlassCurtain", (0.42, 0.58, 0.70, 1)),  # tinted curtain wall
     "steel":       ("M_Steel",       (0.58, 0.60, 0.64, 1)),   # train / structure steel
     "shink":       ("M_Shink",       (0.92, 0.93, 0.96, 1)),   # shinkansen white body
+    # --- road kit (road_kit_authoring). Here rather than in `point_build` so the roads share ONE
+    # material registry with every other builder in the repo: a road's asphalt is the same
+    # datablock as a car park's, and `line_w`/`line_y` above -- which existed for lane lines from
+    # the beginning and had no user until the road kit started painting them -- are now theirs.
+    "median":      ("M_Median",      (0.20, 0.30, 0.16, 1)),   # planted median island
+    "barrier":     ("M_Barrier",     (0.68, 0.67, 0.64, 1)),   # parapet / jersey barrier
 }
 
 # emissive keys -> emission strength
@@ -159,6 +170,17 @@ def get_mat(name, rgba):
         bsdf = mat.node_tree.nodes.get("Principled BSDF")
         if bsdf:
             bsdf.inputs["Base Color"].default_value = rgba
+            if rgba[3] < 1.0:
+                # ALPHA IS NOT PART OF BASE COLOR. Principled reads it from its own `Alpha` input;
+                # writing an RGBA into Base Color sets a colour and nothing else, which is how a
+                # "translucent" material stays solid. The render method is set by whichever name
+                # this Blender uses (4.2+ renamed `blend_method`), so the viewport agrees with the
+                # export instead of only the export being right.
+                bsdf.inputs["Alpha"].default_value = rgba[3]
+                if hasattr(mat, "surface_render_method"):
+                    mat.surface_render_method = 'BLENDED'
+                elif hasattr(mat, "blend_method"):
+                    mat.blend_method = 'BLEND'
             if name == "M_Glass":
                 bsdf.inputs["Roughness"].default_value = 0.05
                 if "Transmission Weight" in bsdf.inputs:
@@ -226,12 +248,88 @@ def get_tiled_mat(name, rgba1, rgba2, tile_size):
     return m
 
 
-def mat(key):
+# ------------------------------------------------- the material library lives in `assets/`
+# A MATERIAL COMES FROM THE ASSET KIT, NOT FROM THIS FILE'S CONSTANTS (2026-09-05, user-asked:
+# "default materials assignment to assets from assets rather than assign different ones").
+#
+# WHAT WAS WRONG. `mat()` get-or-CREATED every material from the tables above, in whichever
+# `.blend` happened to be building — so the look of the world was defined in Python, in a builder,
+# and an artist who wanted a different asphalt had to edit code. Worse, it was not even ONE
+# datablock: `road_kit.blend`'s profile sections carry their own `M_Concrete` (they were built by
+# this same function, in that file), so a district that links a kerb section ends up with the
+# kit's `M_Concrete` on the kerb and a locally-created `M_Concrete` on the deck beside it —
+# identical, and two materials in the exported scene. Two owners of one fact, the shape this
+# codebase keeps paying for.
+#
+# THE RULE NOW, and it is ONE lookup with a bootstrap, not a second registry:
+#
+#   1. a datablock of that name already in the file wins — a hand-edited local material, or the
+#      library material already linked by an earlier call, both survive a rebuild exactly as
+#      before (`bpy.data.materials.get` prefers a LOCAL datablock over a linked one, measured);
+#   2. otherwise LINK it from the asset kit — so editing `road_kit.blend` restyles every road,
+#      wall and building in the world, which is what an asset library is for;
+#   3. otherwise build it from the tables above. That is the BOOTSTRAP — it is how
+#      `build_road_kit.py` authors the library in the first place, and it is what keeps every
+#      builder working in a checkout where the kit has not been built yet.
+#
+# Linked and not appended, for the same reason the profile sections are (`RKA_OT_link_road_kit`):
+# an appended copy drifts, a linked one does not. A linked material IS writable from Python in a
+# background export process (measured), so `export_world.py`'s base-colour flattening is
+# unaffected.
+_KIT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.realpath(__file__)))), "assets", "world_source", "kit")
+
+#: The one asset file every material is linked from. It also holds the road kit's profile
+#: sections (`ROAD_KIT`) — one kit file, one link, one resolver.
+MATERIAL_LIBRARY = os.path.join(_KIT_DIR, "road_kit.blend")
+
+#: `build_road_kit.py` clears this: the tool that AUTHORS the library must not consult it.
+USE_MATERIAL_LIBRARY = True
+
+_library_tried = False
+
+
+def material_name(key):
+    """The datablock name a material key resolves to — one owner of the key -> name mapping."""
     if key in TILED_MATS:
-        name, c1, c2, tile_size = TILED_MATS[key]
+        return TILED_MATS[key][0]
+    return MATS[key][0]
+
+
+def link_material_library(path=None):
+    """Link every material the asset kit ships, once per session. Returns True if it linked."""
+    global _library_tried
+    if path is None:
+        if _library_tried:
+            return False
+        _library_tried = True
+        path = MATERIAL_LIBRARY
+    if not os.path.exists(path):
+        return False
+    have = {m.name for m in bpy.data.materials}
+    with bpy.data.libraries.load(path, link=True) as (src, dst):
+        # Only what this file does not already have, and only the kit's own `M_*` set — a stray
+        # `Material` left over from a default startup file is not a material anyone asked for.
+        dst.materials = [n for n in src.materials if n.startswith("M_") and n not in have]
+    return True
+
+
+def mat(key):
+    """The material for `key` — from the asset kit if it ships one, else built from the tables.
+
+    See "the material library lives in `assets/`" above for why the kit wins."""
+    name = material_name(key)
+    m = bpy.data.materials.get(name)
+    if m is not None:
+        return m
+    if USE_MATERIAL_LIBRARY and link_material_library():
+        m = bpy.data.materials.get(name)
+        if m is not None:
+            return m
+    if key in TILED_MATS:
+        _n, c1, c2, tile_size = TILED_MATS[key]
         return get_tiled_mat(name, c1, c2, tile_size)
-    n, c = MATS[key]
-    return get_mat(n, c)
+    return get_mat(name, MATS[key][1])
 
 
 def set_mod_input(mod, socket_id, value):

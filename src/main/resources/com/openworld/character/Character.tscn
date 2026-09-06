@@ -200,7 +200,8 @@ shape = SubResource("SphereShape3D_cam")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3841858e-07, 0)
 doppler_tracking = 1
 fov = 65.0
-far = 8192.0
+near = 0.1
+far = 100000.0
 
 [node name="AimRay" type="RayCast3D" parent="ActiveCamera" unique_id=847198473]
 target_position = Vector3(0, 0, -2000)

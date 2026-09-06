@@ -1,0 +1,1169 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="jvm://WorldZoneMarker.gdj" id="1_efcfu"]
+[ext_resource type="Script" path="jvm://NamedCharacterConfig.gdj" id="2_ee5se"]
+[ext_resource type="Script" path="jvm://RegionConfig.gdj" id="3_kjpsg"]
+[ext_resource type="Script" path="jvm://WorldZone.gdj" id="4_mb3dd"]
+[ext_resource type="Script" path="jvm://SpawnConfig.gdj" id="5_5eqlj"]
+[ext_resource type="Script" path="jvm://VehicleSpawnConfig.gdj" id="6_nfd68"]
+
+[sub_resource type="Resource" id="Resource_p4w2e"]
+script = ExtResource("3_kjpsg")
+region_name = "Harbor"
+ambient_ai_density = 0.6
+vehicle_density = 0.7
+ai_lod_bias = 0.9
+light_temperature = 6500.0
+fog_density = 0.01
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_mdvqy"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_0_0"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_0.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_0_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_p4w2e")
+
+[sub_resource type="Resource" id="Resource_e7d3p"]
+script = ExtResource("3_kjpsg")
+region_name = "Residential"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 5200.0
+fog_density = 0.006
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_nsea3"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_0_1"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_1.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_1_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_e7d3p")
+
+[sub_resource type="Resource" id="Resource_aj2hy"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_qved4"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_0_2"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_2.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_2_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_aj2hy")
+
+[sub_resource type="Resource" id="Resource_ol0hv"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_ieg12"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_0_3"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_3.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_3_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_ol0hv")
+
+[sub_resource type="Resource" id="Resource_3emdh"]
+script = ExtResource("3_kjpsg")
+region_name = "Mountain"
+ambient_ai_density = 0.3
+vehicle_density = 0.2
+ai_lod_bias = 0.7
+light_temperature = 6000.0
+fog_density = 0.014
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_wo6jn"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_0_4"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_4.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_4_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_3emdh")
+
+[sub_resource type="Resource" id="Resource_gatp2"]
+script = ExtResource("3_kjpsg")
+region_name = "Snow"
+ambient_ai_density = 0.2
+vehicle_density = 0.1
+ai_lod_bias = 0.6
+light_temperature = 7000.0
+fog_density = 0.02
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_gcjw0"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_0_5"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_5.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_0_5_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_gatp2")
+
+[sub_resource type="Resource" id="Resource_8jdwf"]
+script = ExtResource("3_kjpsg")
+region_name = "Harbor"
+ambient_ai_density = 0.6
+vehicle_density = 0.7
+ai_lod_bias = 0.9
+light_temperature = 6500.0
+fog_density = 0.01
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_t45qt"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_1_0"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_0.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_0_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_8jdwf")
+
+[sub_resource type="Resource" id="Resource_2c55f"]
+script = ExtResource("3_kjpsg")
+region_name = "NeonCity"
+ambient_ai_density = 1.4
+vehicle_density = 1.5
+ai_lod_bias = 1.2
+light_temperature = 4200.0
+fog_density = 0.004
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_hvm05"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_1_1"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_1.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_1_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_2c55f")
+
+[sub_resource type="Resource" id="Resource_6bnwd"]
+script = ExtResource("3_kjpsg")
+region_name = "Residential"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 5200.0
+fog_density = 0.006
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_je8nj"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_1_2"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_2.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_2_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_6bnwd")
+
+[sub_resource type="Resource" id="Resource_24trp"]
+script = ExtResource("3_kjpsg")
+region_name = "Residential"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 5200.0
+fog_density = 0.006
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_i1dvx"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_1_3"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_3.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_3_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_24trp")
+
+[sub_resource type="Resource" id="Resource_nquw4"]
+script = ExtResource("3_kjpsg")
+region_name = "Mountain"
+ambient_ai_density = 0.3
+vehicle_density = 0.2
+ai_lod_bias = 0.7
+light_temperature = 6000.0
+fog_density = 0.014
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_xkx5j"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_1_4"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_4.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_4_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_nquw4")
+
+[sub_resource type="Resource" id="Resource_y6knt"]
+script = ExtResource("3_kjpsg")
+region_name = "Mountain"
+ambient_ai_density = 0.3
+vehicle_density = 0.2
+ai_lod_bias = 0.7
+light_temperature = 6000.0
+fog_density = 0.014
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_mlonc"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_1_5"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_5.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_1_5_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_y6knt")
+
+[sub_resource type="Resource" id="Resource_jlgmo"]
+script = ExtResource("3_kjpsg")
+region_name = "Harbor"
+ambient_ai_density = 0.6
+vehicle_density = 0.7
+ai_lod_bias = 0.9
+light_temperature = 6500.0
+fog_density = 0.01
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_v62xl"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_2_0"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_0.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_0_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_jlgmo")
+
+[sub_resource type="Resource" id="Resource_62skp"]
+script = ExtResource("3_kjpsg")
+region_name = "NeonCity"
+ambient_ai_density = 1.4
+vehicle_density = 1.5
+ai_lod_bias = 1.2
+light_temperature = 4200.0
+fog_density = 0.004
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_5q7xf"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_2_1"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_1.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_1_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_62skp")
+
+[sub_resource type="Resource" id="Resource_5pelg"]
+script = ExtResource("3_kjpsg")
+region_name = "NeonCity"
+ambient_ai_density = 1.4
+vehicle_density = 1.5
+ai_lod_bias = 1.2
+light_temperature = 4200.0
+fog_density = 0.004
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_4html"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_2_2"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_2.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_2_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_5pelg")
+
+[sub_resource type="Resource" id="Resource_rhyfk"]
+script = ExtResource("3_kjpsg")
+region_name = "NeonCity"
+ambient_ai_density = 1.4
+vehicle_density = 1.5
+ai_lod_bias = 1.2
+light_temperature = 4200.0
+fog_density = 0.004
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_8r1ay"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_2_3"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_3.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_3_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_rhyfk")
+
+[sub_resource type="Resource" id="Resource_oq5gj"]
+script = ExtResource("3_kjpsg")
+region_name = "Piece_2_3_b"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 0.0
+fog_density = 0.0
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_s8fc1"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_2_3_b"
+size = Vector3(1100.0065, 127.95577, 1699.4258)
+load_radius = 1149.7129
+unload_radius = 1449.7129
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_3_b.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_3_b_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_oq5gj")
+
+[sub_resource type="Resource" id="Resource_drmsk"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_278ck"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_2_4"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_4.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_4_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_drmsk")
+
+[sub_resource type="Resource" id="Resource_50rci"]
+script = ExtResource("3_kjpsg")
+region_name = "Mountain"
+ambient_ai_density = 0.3
+vehicle_density = 0.2
+ai_lod_bias = 0.7
+light_temperature = 6000.0
+fog_density = 0.014
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_qmpsc"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_2_5"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_5.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_2_5_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_50rci")
+
+[sub_resource type="Resource" id="Resource_y0v7m"]
+script = ExtResource("3_kjpsg")
+region_name = "Harbor"
+ambient_ai_density = 0.6
+vehicle_density = 0.7
+ai_lod_bias = 0.9
+light_temperature = 6500.0
+fog_density = 0.01
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_wbt84"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_3_0"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_0.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_0_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_y0v7m")
+
+[sub_resource type="Resource" id="Resource_ekb4y"]
+script = ExtResource("3_kjpsg")
+region_name = "NeonCity"
+ambient_ai_density = 1.4
+vehicle_density = 1.5
+ai_lod_bias = 1.2
+light_temperature = 4200.0
+fog_density = 0.004
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_6gy2k"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_3_1"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_1.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_1_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_ekb4y")
+
+[sub_resource type="Resource" id="Resource_qxfgj"]
+script = ExtResource("3_kjpsg")
+region_name = "NeonCity"
+ambient_ai_density = 1.4
+vehicle_density = 1.5
+ai_lod_bias = 1.2
+light_temperature = 4200.0
+fog_density = 0.004
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_oompd"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_3_2"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_2.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_2_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_qxfgj")
+
+[sub_resource type="Resource" id="Resource_wvrck"]
+script = ExtResource("3_kjpsg")
+region_name = "NeonCity"
+ambient_ai_density = 1.4
+vehicle_density = 1.5
+ai_lod_bias = 1.2
+light_temperature = 4200.0
+fog_density = 0.004
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_7lefh"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_3_3"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_3.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_3_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_wvrck")
+
+[sub_resource type="Resource" id="Resource_lkvnr"]
+script = ExtResource("3_kjpsg")
+region_name = "Residential"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 5200.0
+fog_density = 0.006
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_5pwx1"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_3_4"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_4.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_4_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_lkvnr")
+
+[sub_resource type="Resource" id="Resource_cno7m"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_cu6bd"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_3_5"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_5.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_3_5_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_cno7m")
+
+[sub_resource type="Resource" id="Resource_bplep"]
+script = ExtResource("3_kjpsg")
+region_name = "Harbor"
+ambient_ai_density = 0.6
+vehicle_density = 0.7
+ai_lod_bias = 0.9
+light_temperature = 6500.0
+fog_density = 0.01
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_2x23f"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_4_0"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_0.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_0_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_bplep")
+
+[sub_resource type="Resource" id="Resource_ea3en"]
+script = ExtResource("3_kjpsg")
+region_name = "Residential"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 5200.0
+fog_density = 0.006
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_2ctyk"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_4_1"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_1.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_1_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_ea3en")
+
+[sub_resource type="Resource" id="Resource_i63vw"]
+script = ExtResource("3_kjpsg")
+region_name = "Industrial"
+ambient_ai_density = 0.4
+vehicle_density = 1.3
+ai_lod_bias = 0.9
+light_temperature = 4500.0
+fog_density = 0.012
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_pk3cj"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_4_2"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_2.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_2_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_i63vw")
+
+[sub_resource type="Resource" id="Resource_jicko"]
+script = ExtResource("3_kjpsg")
+region_name = "Residential"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 5200.0
+fog_density = 0.006
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_xye4r"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_4_3"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_3.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_3_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_jicko")
+
+[sub_resource type="Resource" id="Resource_gy0ml"]
+script = ExtResource("3_kjpsg")
+region_name = "Residential"
+ambient_ai_density = 1.0
+vehicle_density = 1.0
+ai_lod_bias = 1.0
+light_temperature = 5200.0
+fog_density = 0.006
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_8q2go"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_4_4"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_4.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_4_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_gy0ml")
+
+[sub_resource type="Resource" id="Resource_8hqdh"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_jqoy1"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_4_5"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_5.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_4_5_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_8hqdh")
+
+[sub_resource type="Resource" id="Resource_1n18d"]
+script = ExtResource("3_kjpsg")
+region_name = "Harbor"
+ambient_ai_density = 0.6
+vehicle_density = 0.7
+ai_lod_bias = 0.9
+light_temperature = 6500.0
+fog_density = 0.01
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_uk0ff"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_5_0"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_0.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_0_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_1n18d")
+
+[sub_resource type="Resource" id="Resource_xsqe0"]
+script = ExtResource("3_kjpsg")
+region_name = "Industrial"
+ambient_ai_density = 0.4
+vehicle_density = 1.3
+ai_lod_bias = 0.9
+light_temperature = 4500.0
+fog_density = 0.012
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_vk7kb"]
+script = ExtResource("6_nfd68")
+faction = "neutral"
+count = 6
+vehicle_scene_path = "res://src/main/resources/com/openworld/vehicle/Vehicle.tscn"
+cruise_throttle = 0.4
+route_name = "Piece_5_1"
+
+[sub_resource type="Resource" id="Resource_d37rn"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_5_1"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_1.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_1_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([SubResource("Resource_vk7kb")])
+region_config = SubResource("Resource_xsqe0")
+
+[sub_resource type="Resource" id="Resource_g2gjb"]
+script = ExtResource("3_kjpsg")
+region_name = "Harbor"
+ambient_ai_density = 0.6
+vehicle_density = 0.7
+ai_lod_bias = 0.9
+light_temperature = 6500.0
+fog_density = 0.01
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_dd76p"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_5_2"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_2.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_2_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_g2gjb")
+
+[sub_resource type="Resource" id="Resource_r5o2f"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_1i4al"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_5_3"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_3.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_3_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_r5o2f")
+
+[sub_resource type="Resource" id="Resource_5tpdo"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_u31x4"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_5_4"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_4.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_4_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_5tpdo")
+
+[sub_resource type="Resource" id="Resource_17qa0"]
+script = ExtResource("3_kjpsg")
+region_name = "Rural"
+ambient_ai_density = 0.5
+vehicle_density = 0.4
+ai_lod_bias = 0.8
+light_temperature = 5800.0
+fog_density = 0.008
+ambient_music_bus = ""
+
+[sub_resource type="Resource" id="Resource_t5luy"]
+script = ExtResource("4_mb3dd")
+zone_id = "Piece_5_5"
+size = Vector3(504, 40, 504)
+load_radius = 402.0
+unload_radius = 552.0
+geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_5.tscn"
+lod_low_geometry_path = "res://src/main/resources/com/openworld/world/districts/Piece_5_5_LOD_LOW.tscn"
+spawn_configs = Array[ExtResource("5_5eqlj")]([])
+named_characters = Array[ExtResource("2_ee5se")]([])
+vehicle_spawn_configs = Array[ExtResource("6_nfd68")]([])
+region_config = SubResource("Resource_17qa0")
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_88mxh"]
+size = Vector3(3024, 4, 1108)
+
+[node name="World_master" type="Node3D" unique_id=1756743414]
+
+[node name="slot_akihabara" type="Node3D" parent="." unique_id=1409347639]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 3, -252)
+metadata/extras = {
+"asset_path": null,
+"district_piece": "Piece_3_3.tscn",
+"footprint_m": 28.0,
+"landmark": "akihabara"
+}
+
+[node name="slot_dotonbori" type="Node3D" parent="." unique_id=684481890]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 1, 1260)
+metadata/extras = {
+"asset_path": null,
+"district_piece": "Piece_3_0.tscn",
+"footprint_m": 42.0,
+"landmark": "dotonbori"
+}
+
+[node name="slot_haneda" type="Node3D" parent="." unique_id=100577350]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 189, 1, 2438.75)
+metadata/extras = {
+"asset_path": null,
+"footprint_m": 1134.0,
+"landmark": "haneda"
+}
+
+[node name="slot_imperialpalace" type="Node3D" parent="." unique_id=492919749]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 3, -252)
+metadata/extras = {
+"asset_path": null,
+"district_piece": "Piece_2_3.tscn",
+"footprint_m": 42.0,
+"landmark": "imperialpalace"
+}
+
+[node name="slot_rainbowbridge" type="Node3D" parent="." unique_id=364229795]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 189, 11, 2700)
+metadata/extras = {
+"asset_path": null,
+"landmark": "rainbowbridge"
+}
+
+[node name="slot_shibuya" type="Node3D" parent="." unique_id=1688439345]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756, 3, 756)
+metadata/extras = {
+"asset_path": null,
+"district_piece": "Piece_1_1.tscn",
+"footprint_m": 35.0,
+"landmark": "shibuya"
+}
+
+[node name="slot_tokyostation" type="Node3D" parent="." unique_id=823198296]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 3, 252)
+metadata/extras = {
+"asset_path": null,
+"district_piece": "Piece_2_2.tscn",
+"footprint_m": 42.0,
+"landmark": "tokyostation"
+}
+
+[node name="slot_tokyotower" type="Node3D" parent="." unique_id=723529361]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 3, 252)
+metadata/extras = {
+"asset_path": null,
+"district_piece": "Piece_3_2.tscn",
+"footprint_m": 42.0,
+"landmark": "tokyotower"
+}
+
+[node name="ZoneMarker_Piece_0_0" type="Node3D" parent="." unique_id=1931012376]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260, 0, 1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_mdvqy")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_0_1" type="Node3D" parent="." unique_id=1593095703]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260, 4, 756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_nsea3")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_0_2" type="Node3D" parent="." unique_id=354839111]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260, 10, 252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_qved4")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_0_3" type="Node3D" parent="." unique_id=1480401134]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260, 10, -252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_ieg12")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_0_4" type="Node3D" parent="." unique_id=1051454120]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260, 40, -756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_wo6jn")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_0_5" type="Node3D" parent="." unique_id=154218164]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1260, 90, -1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_gcjw0")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_1_0" type="Node3D" parent="." unique_id=2079916376]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756, 0, 1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_t45qt")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_1_1" type="Node3D" parent="." unique_id=143408521]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756, 2, 756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_hvm05")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_1_2" type="Node3D" parent="." unique_id=675158017]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756, 4, 252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_je8nj")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_1_3" type="Node3D" parent="." unique_id=2146663234]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756, 4, -252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_i1dvx")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_1_4" type="Node3D" parent="." unique_id=836615343]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756, 40, -756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_xkx5j")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_1_5" type="Node3D" parent="." unique_id=1850941936]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -756, 40, -1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_mlonc")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_2_0" type="Node3D" parent="." unique_id=1212034141]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 0, 1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_v62xl")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_2_1" type="Node3D" parent="." unique_id=1954503502]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 2, 756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_5q7xf")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_2_2" type="Node3D" parent="." unique_id=431070726]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 2, 252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_4html")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_2_3" type="Node3D" parent="." unique_id=484795182]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 2, -252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_8r1ay")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_2_3_b" type="Node3D" parent="." unique_id=1049339093]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -322.13257, 63.891865, -80.46573)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_s8fc1")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_2_4" type="Node3D" parent="." unique_id=197754865]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 10, -756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_278ck")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_2_5" type="Node3D" parent="." unique_id=708334897]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -252, 40, -1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_qmpsc")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_3_0" type="Node3D" parent="." unique_id=2117899673]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 0, 1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_wbt84")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_3_1" type="Node3D" parent="." unique_id=352171321]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 2, 756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_6gy2k")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_3_2" type="Node3D" parent="." unique_id=407167473]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 2, 252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_oompd")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_3_3" type="Node3D" parent="." unique_id=884943852]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 2, -252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_7lefh")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_3_4" type="Node3D" parent="." unique_id=1487146064]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 4, -756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_5pwx1")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_3_5" type="Node3D" parent="." unique_id=1890210138]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 252, 10, -1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_cu6bd")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_4_0" type="Node3D" parent="." unique_id=914791579]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756, 0, 1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_2x23f")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_4_1" type="Node3D" parent="." unique_id=1642790054]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756, 4, 756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_2ctyk")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_4_2" type="Node3D" parent="." unique_id=83708346]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756, 0, 252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_pk3cj")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_4_3" type="Node3D" parent="." unique_id=43082962]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756, 4, -252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_xye4r")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_4_4" type="Node3D" parent="." unique_id=1350654054]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756, 4, -756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_8q2go")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_4_5" type="Node3D" parent="." unique_id=1614933084]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 756, 10, -1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_jqoy1")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_5_0" type="Node3D" parent="." unique_id=1935752254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260, 0, 1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_uk0ff")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_5_1" type="Node3D" parent="." unique_id=486988785]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260, 0, 756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_d37rn")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_5_2" type="Node3D" parent="." unique_id=1850839221]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260, 0, 252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_dd76p")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_5_3" type="Node3D" parent="." unique_id=1221104011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260, 10, -252)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_1i4al")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_5_4" type="Node3D" parent="." unique_id=140849435]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260, 10, -756)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_u31x4")
+show_debug_volume = true
+
+[node name="ZoneMarker_Piece_5_5" type="Node3D" parent="." unique_id=1749810275]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1260, 10, -1260)
+script = ExtResource("1_efcfu")
+zone = SubResource("Resource_t5luy")
+show_debug_volume = true
+
+[node name="Water_bay" type="Area3D" parent="." unique_id=2144497282 groups=["water"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 2066)
+
+[node name="@CollisionShape3D@113" type="CollisionShape3D" parent="Water_bay" unique_id=363175437]
+shape = SubResource("BoxShape3D_88mxh")

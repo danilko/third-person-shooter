@@ -79,41 +79,48 @@ public class VehicleCameraController extends Node3D {
     @Export public NodePath fpsCameraMountPath = new NodePath("FPSCameraMount");
 
     // ── Speed feel (racing-game sense of speed) ───────────────────────────────
-    // Perceived speed in racing games is mostly camera FOV widening with speed (the
-    // single biggest trick), reinforced by a peripheral speed-line overlay. Both are
-    // driven here, from the vehicle's real velocity, and only while this camera is
-    // current — 60–80 km/h reads "fast" because the world stretches, not because the
-    // car actually moves faster.
+    // OFF BY DEFAULT SINCE 2026-08-31, on a walk-test report: the previous package — an 18 deg
+    // FOV widening plus a 5 deg throttle surge, a 6 deg NOS kick, a 2 m spring-arm pull-back and a
+    // full-screen peripheral speed-line shader — was "too much... impact the real driving
+    // visual/hard to see road". The overlay is DELETED outright (scene nodes and
+    // `SpeedLines.gdshader` are gone, not merely hidden, so nothing can switch it back on by
+    // accident); the camera terms below are kept as knobs and shipped at 0, because a camera that
+    // cannot react to speed at all is a decision to take deliberately rather than by deletion.
+    //
+    // The previous values are recorded in each field so the old feel is one edit away:
+    // fovSpeedBoost 18, fovAccelBoost 5, fovNosBoost 6, armSpeedExtend 2.
+    //
+    // The replacement is planned to be WORLD-SPACE rather than screen-space — a trail light or a
+    // wheel/exhaust effect that sits on the car and never covers the road. Nothing here is in its
+    // way; it belongs on the vehicle, not on the camera.
 
-    /** Extra FOV (degrees) added at fovReferenceSpeed. 0 disables the FOV kick. */
-    @Export public double fovSpeedBoost     = 18.0;
+    /** Extra FOV (degrees) added at fovReferenceSpeed. 0 disables the FOV kick. Was 18. */
+    @Export public double fovSpeedBoost     = 0.0;
 
-    /** Speed (m/s) at which the full FOV boost and full speed-line intensity are reached. */
+    /** Speed (m/s) at which the full FOV boost is reached. */
     @Export public double fovReferenceSpeed = 30.0;
 
     /** Lerp speed for FOV changes (also eases back down when slowing/exiting). */
     @Export public double fovLerpSpeed      = 4.0;
 
-    /** Fraction of fovReferenceSpeed where the speed-line overlay starts fading in. */
-    @Export public double speedLinesStartRatio = 0.35;
-
     /**
      * Extra FOV (degrees) at full forward acceleration — the launch/overtake "surge" every
      * arcade racer plays on throttle. Decays as acceleration flattens, independent of speed.
+     * Was 5.
      */
-    @Export public double fovAccelBoost     = 5.0;
+    @Export public double fovAccelBoost     = 0.0;
 
     /** Forward acceleration (m/s²) at which the full fovAccelBoost is reached. */
     @Export public double accelReference    = 7.0;
 
-    /** Extra FOV (degrees) while NOS is active (on top of the speed/accel terms). */
-    @Export public double fovNosBoost       = 6.0;
+    /** Extra FOV (degrees) while NOS is active (on top of the speed/accel terms). Was 6. */
+    @Export public double fovNosBoost       = 0.0;
 
     /**
      * Metres the TPS spring arm extends at fovReferenceSpeed — the car shrinks in frame and
-     * the world flows past faster (the GTA/Horizon speed pull-back). 0 disables.
+     * the world flows past faster (the GTA/Horizon speed pull-back). 0 disables. Was 2.
      */
-    @Export public double armSpeedExtend    = 2.0;
+    @Export public double armSpeedExtend    = 0.0;
 
     // ── Node refs ─────────────────────────────────────────────────────────────
 
@@ -134,9 +141,6 @@ public class VehicleCameraController extends Node3D {
     private double         baseSpringLength = 0.0;
     private double         lastSpeed        = 0.0;
     private double         smoothedAccel    = 0.0;
-    private CanvasLayer    speedFxLayer;
-    private ShaderMaterial speedLinesMaterial;
-    private static final godot.core.StringName SPEED_LINES_INTENSITY = new godot.core.StringName("intensity");
 
     // ── State ─────────────────────────────────────────────────────────────────
 
@@ -177,17 +181,6 @@ public class VehicleCameraController extends Node3D {
 
         if (activeCamera != null) baseFov = activeCamera.getFov();
         if (tpsSpringArm != null) baseSpringLength = tpsSpringArm.getLength();
-        // Optional sibling speed-line overlay (SpeedFX CanvasLayer > SpeedLines ColorRect
-        // with the SpeedLines.gdshader material) — degrade gracefully when absent.
-        Node fx = getParent().getNodeOrNull("SpeedFX");
-        if (fx instanceof CanvasLayer layer) {
-            speedFxLayer = layer;
-            Node rect = layer.getNodeOrNull("SpeedLines");
-            if (rect instanceof ColorRect cr && cr.getMaterial() instanceof ShaderMaterial sm) {
-                speedLinesMaterial = sm;
-            }
-        }
-
         if (target instanceof CollisionObject3D co) {
             if (tpsSpringArm != null) tpsSpringArm.addExcludedObject(co.getRid());
             if (aimRay != null)       aimRay.addException(co);
@@ -331,13 +324,13 @@ public class VehicleCameraController extends Node3D {
     }
 
     /**
-     * Speed-scaled FOV kick + acceleration surge + NOS kick + spring-arm pull-back +
-     * peripheral speed-line overlay. FOV uses a smoothstep ease so the effect is already
-     * felt at city speeds (the old quadratic was nearly flat in the 40–90 km/h band —
-     * exactly where "same km/h feels slower than GTA/NFS" lived); the acceleration surge
-     * plays the launch shove independent of absolute speed. The overlay layer is hidden
-     * outright whenever this camera is not current, so per-vehicle overlays cost nothing
-     * and never draw for puppet/AI cars.
+     * Speed-scaled FOV kick + acceleration surge + NOS kick + spring-arm pull-back. FOV uses a
+     * smoothstep ease so the effect is felt through the city-speed band rather than only at the
+     * top end; the acceleration surge plays the launch shove independent of absolute speed.
+     *
+     * <p>Every term ships at 0 (see the field block above), so this is inert until someone turns a
+     * knob back on — the whole method still runs, and the FOV lerp still eases an already-boosted
+     * camera back to rest, which is what makes turning one on mid-session behave.
      */
     private void applySpeedFeel(double delta) {
         if (activeCamera == null) return;
@@ -370,15 +363,6 @@ public class VehicleCameraController extends Node3D {
                     Math.min(1.0, fovLerpSpeed * delta)));
         }
 
-        if (speedFxLayer == null) return;
-        double start = GD.clamp(speedLinesStartRatio, 0.0, 0.95);
-        double intensity = current
-                ? GD.clamp((t - start) / Math.max(1e-3, 1.0 - start), 0.0, 1.0) : 0.0;
-        boolean show = intensity > 0.01;
-        if (speedFxLayer.isVisible() != show) speedFxLayer.setVisible(show);
-        if (show && speedLinesMaterial != null) {
-            speedLinesMaterial.setShaderParameter(SPEED_LINES_INTENSITY, intensity);
-        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

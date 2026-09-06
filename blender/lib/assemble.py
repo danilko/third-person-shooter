@@ -984,6 +984,15 @@ def add_camera_sun(coll, target, cam_loc, lens=24):
     tgt = bpy.data.objects.new("AIM", None); coll.objects.link(tgt); tgt.location = target
     cam_d = bpy.data.cameras.new("Cam"); cam = bpy.data.objects.new("Cam", cam_d)
     coll.objects.link(cam); cam_d.lens = lens; cam_d.clip_end = kc.VIEW_CLIP_END
+    # A DEPTH BUFFER'S PRECISION IS THE RATIO clip_end/clip_start, NOT clip_end.
+    #
+    # 100 km far against Blender's default 10 cm near is a 10^6 range, and at that ratio two
+    # surfaces 0.6 m apart 4 km from the camera fall inside one depth quantum. On the 4032 m island
+    # that drew the sea straight THROUGH the ground in even horizontal bands — which reads exactly
+    # like rows of missing terrain, and was chased as one until an exact per-object raycast found
+    # 0 holes in 17 263 on-land samples. A preview camera never stands closer than a few metres to
+    # anything, so 1/10000 of the far plane costs nothing and buys back four orders of magnitude.
+    cam_d.clip_start = max(0.1, kc.VIEW_CLIP_END / 10000.0)
     cam.location = cam_loc
     con = cam.constraints.new("TRACK_TO"); con.target = tgt
     con.track_axis = "TRACK_NEGATIVE_Z"; con.up_axis = "UP_Y"

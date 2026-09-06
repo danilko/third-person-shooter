@@ -1,8 +1,8 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/District_city_1_1.tscn" id="1_1orfa"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/District_harbor_0_0.tscn" id="2_rj6cx"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/District_industry_5_1.tscn" id="3_1u5r5"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/pieces/District_city_1_1.tscn" id="1_1orfa"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/pieces/District_harbor_0_0.tscn" id="2_rj6cx"]
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/pieces/District_industry_5_1.tscn" id="3_1u5r5"]
 
 [node name="WorldPreview" type="Node3D" unique_id=29643195]
 

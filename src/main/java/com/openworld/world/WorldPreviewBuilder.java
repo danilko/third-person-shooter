@@ -21,9 +21,9 @@ import java.util.Set;
 /**
  * P6.10 (road_blender_godot.md Phase 6) — offline `@Tool` batch utility (same
  * {@code bakeOnReady}/{@code quitWhenDone} host-scene idiom as {@link WorldBaker}/{@link NavBaker}/
- * {@link DistrictBinaryConverter}) that assembles a STATIC, non-streamed preview scene from a
+ * {@link PieceBinaryConverter}) that assembles a STATIC, non-streamed preview scene from a
  * chosen SET of already-built districts, each placed at the exact world position its own
- * {@link WorldZoneMarker} in the real master carries — answers "can't see districts assembled
+ * {@link ZoneMarker} in the real master carries — answers "can't see districts assembled
  * together in the Godot editor" (confirmed real: {@code hosts/WorldMaster.tscn} has zero static
  * {@code District_*} references; every district is 100% runtime-streamed, so simply opening that
  * scene in the editor shows nothing but region markers).
@@ -36,15 +36,15 @@ import java.util.Set;
  *
  * <p><b>Positions are read from the real baked master, never recomputed</b> — {@link
  * #masterScenePath} (default {@code World_master.tscn}, already built by {@code
- * tools/build_world.sh}) is instantiated once, its {@link WorldZoneMarker} children give
+ * tools/build_world.sh}) is instantiated once, its {@link ZoneMarker} children give
  * {@code (zoneId, geometryPath, globalPosition)} directly (the exact same numbers
- * {@link WorldZoneManager} streams districts at in the real game — zero risk of a hand-rederived
+ * {@link ZoneManager} streams districts at in the real game — zero risk of a hand-rederived
  * position drifting from {@code lib/world_grid.py}'s own math, since none is rederived here).
  *
  * <p>Each selected district's own already-baked {@code .tscn} (full detail — buildings, roads,
  * collision, the same file that streams in-game) is instanced as a PLAIN child at that position —
- * no {@link WorldZoneMarker}/{@link WorldZone} wrapper, no streaming machinery, nothing that would
- * make {@link WorldZoneManager} try to load/unload it. Genuinely static: open the output scene in
+ * no {@link ZoneMarker}/{@link Zone} wrapper, no streaming machinery, nothing that would
+ * make {@link ZoneManager} try to load/unload it. Genuinely static: open the output scene in
  * the editor and the districts are just there.
  *
  * <p>Run with:
@@ -115,7 +115,7 @@ public class WorldPreviewBuilder extends Node {
             }
         }
 
-        List<WorldZoneMarker> markers = new ArrayList<>();
+        List<ZoneMarker> markers = new ArrayList<>();
         collectZoneMarkers(masterRoot, markers);
         markers.sort(java.util.Comparator.comparing(m -> m.zone != null ? m.zone.zoneId : ""));
 
@@ -124,8 +124,8 @@ public class WorldPreviewBuilder extends Node {
         host.addChild(previewRoot);   // in-tree BEFORE any setGlobalPosition() call below, same
                                         // reason WorldBaker keeps its own root in-tree throughout
         int included = 0, skippedMissing = 0, skippedFilter = 0;
-        for (WorldZoneMarker marker : markers) {
-            WorldZone zone = marker.zone;
+        for (ZoneMarker marker : markers) {
+            Zone zone = marker.zone;
             if (zone == null || zone.zoneId == null || zone.zoneId.isEmpty()) continue;
             if (!allow.isEmpty() && !allow.contains(zone.zoneId)) { skippedFilter++; continue; }
             if (zone.geometryPath == null || zone.geometryPath.isEmpty()) { skippedMissing++; continue; }
@@ -175,8 +175,8 @@ public class WorldPreviewBuilder extends Node {
         masterRoot.queueFree();
     }
 
-    private static void collectZoneMarkers(Node node, List<WorldZoneMarker> out) {
-        if (node instanceof WorldZoneMarker marker) out.add(marker);
+    private static void collectZoneMarkers(Node node, List<ZoneMarker> out) {
+        if (node instanceof ZoneMarker marker) out.add(marker);
         for (Node child : node.getChildren()) collectZoneMarkers(child, out);
     }
 }

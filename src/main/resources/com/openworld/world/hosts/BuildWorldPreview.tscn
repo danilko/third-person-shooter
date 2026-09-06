@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b6worldpreview01"]
 
 ; Assembles a STATIC, non-streamed preview scene from a chosen set of already-built districts,
-; each placed at the exact world position its own WorldZoneMarker carries in the real master
+; each placed at the exact world position its own ZoneMarker carries in the real master
 ; (World_master.tscn) -- P6.10 (road_blender_godot.md Phase 6): "can't see districts assembled
 ; together in the Godot editor" (every district is 100% runtime-streamed otherwise). Deliberately
 ; selective, not "load all 36 at once" -- set district_stems to a comma-separated allow-list

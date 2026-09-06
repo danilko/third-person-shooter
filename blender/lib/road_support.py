@@ -36,8 +36,23 @@ KINDS = (SUPPORT_NONE, SUPPORT_FILL, SUPPORT_PIER, SUPPORT_CUT, SUPPORT_TUNNEL)
 
 AT_GRADE_TOL = 0.40          # |delta| under this = at grade, nothing underneath
 FILL_MAX = 4.00              # embankment stops being credible above this
-CUT_MAX = 3.00               # trench becomes a tunnel below this
+#: How deep a trench may be before the rule calls it a TUNNEL, in metres.
+#:
+#: TWO OWNERS, AND THEY DISAGREED BY 8x. This was 3.00 while `island_v3_terrain.MAX_BENCH` -- the
+#: depth a BENCHED road is deliberately allowed to cut into a hillside -- is 25.0, and the shrine
+#: touge measures 8.1 m of cut. So the one road in the world that is genuinely dug in was
+#: classified TUNNEL, `support_profile` gave it no batter and no toe, and nothing builds a tunnel:
+#: it stood 8.71 m under its own hillside with a green gate (`WORLD_REBUILD_PLAN.md` `W13`).
+#: A benched road is a CUT by construction -- that is what a bench IS -- so the number that decides
+#: where a cut stops has to cover what the bench rule is allowed to dig. `island_v3_terrain` reads
+#: this value for `MAX_BENCH` rather than restating it.
+CUT_MAX = 25.00              # trench becomes a tunnel below this
 FILL_SLOPE = 1.5             # 1:1.5 earth batter (run per unit of rise)
+#: 1:1 batter on a CUT face. STEEPER THAN THE FILL, and that is the real rule rather than a tuning
+#: choice: a fill is placed earth standing on its own angle of repose, while a cut face is
+#: undisturbed ground that already has the cohesion to stand -- highway practice puts a soil cut
+#: near 1:1 and a fill near 1:1.5. Same units as `FILL_SLOPE` (run per unit of rise).
+CUT_SLOPE = 1.0
 PIER_SPACING = 30.0          # Shuto viaduct bent spacing, 30-40 m typical
 PIER_SECTION = 2.20          # square column side
 DECK_THICK = 1.60            # structural depth under the driving surface
@@ -71,6 +86,25 @@ def fill_footprint(surface_z, ground_z, half_width):
     if d <= AT_GRADE_TOL or d > FILL_MAX:
         return half_width
     return half_width + d * FILL_SLOPE
+
+
+def cut_footprint(surface_z, ground_z, half_width):
+    """Half-width of the CUT at ground level -- how much ground a trenched road actually eats.
+
+    `fill_footprint` for the other sign of `delta`, and the piece that was missing: `road_support`
+    grew an embankment toe for FILL and columns for PIER and, for CUT, nothing at all. The ground
+    cut was a VERTICAL prism over the road's own footprint (`point_build.cut_ground`), so a benched
+    road came out in a vertical-walled slot -- visible the moment `island_v3_terrain.bench_profile`
+    made the shrine touge cut into the hillside instead of standing over it on piers
+    (`WORLD_REBUILD_PLAN.md` `W13`).
+
+    Capped at `CUT_MAX`, past which the rule is a TUNNEL and a trench that deep is not battered
+    back, it is bored. Returns `half_width` unchanged when there is no cut, so a caller may use it
+    unconditionally -- the same contract `fill_footprint` has."""
+    d = surface_z - ground_z
+    if d >= -AT_GRADE_TOL:
+        return half_width
+    return half_width + min(-d, CUT_MAX) * CUT_SLOPE
 
 
 def _frange(a, b, step):
@@ -130,14 +164,20 @@ def support_profile(surface_z, ground_z, half_width, deck_thickness=DECK_THICK):
         "kind": kind,
         "delta": d,
         "half_width": half_width,
-        "toe_half_width": fill_footprint(surface_z, ground_z, half_width),
+        # ONE number for "how much ground does this station eat", whichever side of grade it is
+        # on -- an embankment toe below, a cut batter above. A caller asking for the footprint
+        # must not have to know which.
+        "toe_half_width": (cut_footprint(surface_z, ground_z, half_width)
+                           if kind in (SUPPORT_CUT, SUPPORT_TUNNEL)
+                           else fill_footprint(surface_z, ground_z, half_width)),
         # A deck exists only where the road is genuinely off the ground. A FILL carries the
         # surface on earth, so it has no soffit -- giving it one is what puts a slab inside an
         # embankment.
         "deck_thickness": deck_thickness if kind == SUPPORT_PIER else 0.0,
         "pier_height": max(0.0, d - deck_thickness) if kind == SUPPORT_PIER else 0.0,
         "wall_height": (-d) if kind in (SUPPORT_CUT, SUPPORT_TUNNEL) else 0.0,
-        "batter_slope": FILL_SLOPE if kind == SUPPORT_FILL else 0.0,
+        "batter_slope": (FILL_SLOPE if kind == SUPPORT_FILL
+                         else CUT_SLOPE if kind == SUPPORT_CUT else 0.0),
     }
 
 
@@ -168,7 +208,9 @@ def self_test():
     assert support_kind(4.0, 0.0) == SUPPORT_FILL, "FILL_MAX is inclusive"
     assert support_kind(12.0, 0.0) == SUPPORT_PIER
     assert support_kind(-1.0, 0.0) == SUPPORT_CUT
-    assert support_kind(-9.0, 0.0) == SUPPORT_TUNNEL
+    assert support_kind(-9.0, 0.0) == SUPPORT_CUT, \
+        "9 m is a mountain BENCH, not a tunnel -- CUT_MAX covers what island_v3_terrain digs"
+    assert support_kind(-(CUT_MAX + 1.0), 0.0) == SUPPORT_TUNNEL
     # The same ROAD at three heights, no other edit -- 9 of the plan's verification list.
     assert [support_kind(z, 0.0) for z in (0.0, 2.0, 12.0)] == \
         [SUPPORT_NONE, SUPPORT_FILL, SUPPORT_PIER]
@@ -184,6 +226,20 @@ def self_test():
     assert p["deck_thickness"] == 0.0, "an embankment has no soffit slab inside it"
     assert abs(p["toe_half_width"] - 6.75) < 1e-9
     print("OK: FILL is a battered trapezoid -- toe 6.75 m under a 2.25 m half-width, no deck")
+    ok += 1
+
+    # ---- and the other sign of delta: a CUT is battered too -------------------------------------
+    assert cut_footprint(0.0, 0.0, 5.0) == 5.0, "at grade eats nothing extra"
+    assert cut_footprint(2.0, 0.0, 5.0) == 5.0, "a FILL is not a cut"
+    assert abs(cut_footprint(-2.0, 0.0, 5.0) - (5.0 + 2.0 * CUT_SLOPE)) < 1e-9
+    # Past CUT_MAX the rule is a tunnel, and a tunnel is bored rather than battered back.
+    assert abs(cut_footprint(-(CUT_MAX + 6.0), 0.0, 5.0) - (5.0 + CUT_MAX * CUT_SLOPE)) < 1e-9
+    c = support_profile(-2.0, 0.0, 5.0)
+    assert c["kind"] == SUPPORT_CUT and abs(c["batter_slope"] - CUT_SLOPE) < 1e-9
+    assert abs(c["toe_half_width"] - 7.0) < 1e-9, c["toe_half_width"]
+    assert c["deck_thickness"] == 0.0 and c["pier_height"] == 0.0, "a trench has no deck"
+    print("OK: CUT is battered too -- a 2 m dig opens 7.0 m from a 5.0 m half-width, capped at "
+          "CUT_MAX")
     ok += 1
 
     p = support_profile(12.0, 0.0, 8.0)

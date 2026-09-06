@@ -48,7 +48,7 @@ This project is based on:
 	* Three-tier AI LOD (ACTIVE / PASSIVE / FROZEN by distance) skips pathfinding and animation-tree updates for AI far from every player.
 	* Data-driven faction relationship matrix (`FactionManager`/`FactionTable`), with runtime relationship flips (e.g. a betrayal turning an ally hostile) that replicate to all peers.
 * **Open-World Simulation:**
-	* Zones (`WorldZoneManager`) stream AI population, geometry, and ambient traffic in/out as players move, host-authoritative and replicated.
+	* Zones (`ZoneManager`) stream AI population, geometry, and ambient traffic in/out as players move, host-authoritative and replicated.
 	* AI spatial perception (`StimulusManager`) — gunshots/explosions/crashes post an audible event AI poll for, so out-of-sight enemies investigate noise instead of only reacting to line-of-sight.
 	* Squad awareness (`AISquad`) — one AI spotting a target alerts nearby squadmates instantly instead of each AI waking on its own scan.
 	* Per-region ambience (`RegionConfig`) — density, AI/vehicle population multipliers, lighting colour temperature, and fog shift as players cross into a different named region.
@@ -97,10 +97,10 @@ CharacterBody3D (Character.tscn)   ← shared ragdoll, health, weapon controller
 
 ### Open-World Zones (E1)
 
-`WorldZoneManager` streams an AI population (and optional cosmetic `geometry`) in and out as
-players move. A zone is a `WorldZoneMarker` placed in the level with a `WorldZone` `.tres`:
+`ZoneManager` streams an AI population (and optional cosmetic `geometry`) in and out as
+players move. A zone is a `ZoneMarker` placed in the level with a `Zone` `.tres`:
 
-- **Marker position = zone center.** `WorldZone.size` is the spawn box (AI spawn at random XZ
+- **Marker position = zone center.** `Zone.size` is the spawn box (AI spawn at random XZ
   points inside it).
 - **`loadRadius` / `unloadRadius` are center-relative hysteresis triggers**, measured from the
   marker and **independent of `size`**. A zone loads when a player is within `loadRadius` of the

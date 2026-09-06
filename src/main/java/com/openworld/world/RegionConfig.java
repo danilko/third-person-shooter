@@ -6,14 +6,14 @@ import godot.api.Resource;
 import com.openworld.character.FactionTable;
 
 /**
- * Per-region ambience + simulation tuning (PLAN.md I4). A {@link WorldZone} optionally carries one;
+ * Per-region ambience + simulation tuning (PLAN.md I4). A {@link Zone} optionally carries one;
  * when that zone becomes the player's <b>active region</b> (the nearest loaded zone that has a
- * RegionConfig), {@code WorldZoneManager.applyRegion} pushes these values into the global systems —
+ * RegionConfig), {@code ZoneManager.applyRegion} pushes these values into the global systems —
  * faction relationships, AI level-of-detail range, and the scene environment — so walking from a
  * dense city zone into a quiet mountain zone visibly shifts faction rules, traffic/AI density, and
  * lighting/fog.
  *
- * <p>Two scopes (see WorldZoneManager):
+ * <p>Two scopes (see ZoneManager):
  * <ul>
  *   <li><b>Per-zone</b> — {@link #ambientAIDensity} / {@link #vehicleDensity} scale that zone's own
  *       spawn counts as it loads (each loaded zone applies its own).</li>

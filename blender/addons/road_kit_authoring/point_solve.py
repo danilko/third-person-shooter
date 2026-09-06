@@ -52,6 +52,18 @@ DECK_Z_BIAS = -0.02
 #: How far flush-with-the-road paint is lifted clear of the asphalt. Same reasoning, other sign.
 PAINT_Z_BIAS = 0.01
 
+#: A painted line's width, in metres. One number, because every marking in this model is the same
+#: stripe in a different colour and pattern -- the type says WHICH line, never how wide.
+MARK_WIDTH = 0.15
+
+#: A `DOUBLE_Y` is two stripes this far apart, centre to centre.
+MARK_DOUBLE_GAP = 0.30
+
+#: Dash geometry, in metres: painted length and the gap after it. The road-marking standard is
+#: roughly 1:2 at urban speeds.
+MARK_DASH_ON = 3.0
+MARK_DASH_OFF = 6.0
+
 #: Kerb thickness as a fraction of its height -- a taller kerb reads as a heavier one.
 KERB_THICKNESS = 0.5
 
@@ -118,6 +130,15 @@ CARRIER_ATTRS = (
     Attr("rka_wall_c",  "m", 0.0, "barrier centre, signed lateral offset from the kerb line"),
     Attr("rka_wall_hw", "m", 0.0, "barrier half-thickness"),
     Attr("rka_wall_z",  "m", 0.0, "barrier TOP level above the carrier polyline"),
+    # ...and its FOOT. The parametric barrier is a bar hung DOWN from its top, so the top is the
+    # number it needs; a profile ASSET is drawn standing on its base, so the foot is. Two names
+    # for one wall rather than one name meaning different ends to different layers.
+    Attr("rka_wall_foot", "m", 0.0, "barrier FOOT level -- where a profile asset stands"),
+    # THE PAINT. `lane_profile.marking_runs` has computed every painted boundary's type and its
+    # per-station offset since the profile model landed, and nothing ever swept one -- so the road
+    # kit built kerbs, footways, walls, pads and gores, and not one lane line. This is the width of
+    # the stripe on a `__marks` carrier, whose polyline IS the line.
+    Attr("rka_mark_w",  "m", 0.0, "lane marking half-width"),
 )
 
 ATTR_NAMES = tuple(a.name for a in CARRIER_ATTRS)
@@ -143,7 +164,15 @@ def _norm2(a):
     return (a[0] / n, a[1] / n) if n > 1e-12 else (1.0, 0.0)
 
 
-def bezier_through(p0, d0, p1, d1, n=9):
+#: Samples along a turn connector's polyline. The connector's `curve` block is EXACT (its two
+#: handles are emitted directly, nothing is fitted), so this only sets how finely the `points`
+#: array approximates it -- and `points` is what a v1 consumer drives and what the preview draws
+#: in `Lane polyline` mode. At n=9 a 90 deg turn's polyline sat 0.22 m inside its own curve, which
+#: then read as the WORST "path off road" number on a whole district while nothing was wrong.
+CONNECTOR_SAMPLES = 18
+
+
+def bezier_through(p0, d0, p1, d1, n=CONNECTOR_SAMPLES):
     """A cubic from `p0` along `d0` to `p1` along `d1` -- sampled points plus its two control
     handles. Handle length is a third of the chord, the standard choice that keeps a 90 deg turn
     looking like a turn rather than a corner.
@@ -235,6 +264,129 @@ def _lateral(pos, normal, off):
     return (pos[0] + normal[0] * off, pos[1] + normal[1] * off, pos[2] + normal[2] * off)
 
 
+class MarkRun(object):
+    """One painted boundary along one run: where it is, what it is, and how long it lives.
+
+    A marking is a SLOT PROPERTY (`lane_profile.Slot.mark_left`, the line along that slot's low-s
+    edge), so a line that appears when a lane opens, moves outward as a median widens, or stops
+    when a ramp departs is the same mechanism as the lane itself -- no counting, no inference from
+    `lanes_fwd`. `lane_profile.marking_runs` has computed all of this since the profile model
+    landed; until now nothing swept the result."""
+
+    __slots__ = ("slot_id", "mark", "points", "dashed", "yellow", "double")
+
+    def __init__(self, slot_id, mark, points):
+        self.slot_id, self.mark, self.points = slot_id, mark, points
+        self.dashed = mark in (lp.MARK_DASH_W, lp.MARK_DASH_Y)
+        self.yellow = mark in (lp.MARK_SOLID_Y, lp.MARK_DASH_Y, lp.MARK_DOUBLE_Y)
+        self.double = mark == lp.MARK_DOUBLE_Y
+
+    def __repr__(self):
+        return "MarkRun(%s %s %d pts)" % (self.slot_id, self.mark, len(self.points))
+
+
+def solve_marks(solve):
+    """`[MarkRun]` for one run -- every painted lane boundary, as world polylines.
+
+    ON THE CENTRELINE'S FRAME, NOT THE OUTLINE. This is the one piece of road furniture that
+    genuinely belongs on the centreline: a lane marking is an INTERNAL boundary of a carriageway
+    that is continuous by construction, so it needs none of `point_edges.open_runs`' machinery --
+    and `marking_runs`' own presence rule ("something must exist on both sides, or it is the road's
+    outer edge") already ends a line exactly where the lane it divides ends.
+
+    A `DOUBLE_Y` comes back as TWO runs, `MARK_DOUBLE_GAP` apart. One wide yellow band is not a
+    double line, and at any distance you can tell.
+
+    A DASHED line comes back as one `MarkRun` PER DASH, cut here in Python. PYTHON OWNS THE CURVE
+    AND GN ONLY SWEEPS -- the rule this whole addon is built on -- and a dash is a shorter curve,
+    not a shading trick: this project has no image textures at all, so there is no alpha to cut it
+    with, and geometry survives the glTF bake and reads back correctly. (Doing it in Geometry
+    Nodes means resample-and-delete-alternate-spans, which is a node graph guessing at exactly the
+    arithmetic that is three lines here.)"""
+    if not getattr(solve.road, "markings", True):
+        return []
+    pset = lp.ProfileSet(solve.profiles)
+    runs = lp.marking_runs(pset, len(solve.samples))
+    out = []
+    for r in runs:
+        i0, i1 = r["i0"], r["i1"]
+        if i1 <= i0:
+            continue
+        offsets = r["offsets"]
+        shifts = ((-MARK_DOUBLE_GAP / 2.0, MARK_DOUBLE_GAP / 2.0)
+                  if r["mark"] == lp.MARK_DOUBLE_Y else (0.0,))
+        for shift in shifts:
+            pts, svals = [], []
+            for i in range(i0, i1 + 1):
+                sm = solve.samples[i]
+                pts.append(_lateral(sm.pos, sm.normal, offsets[i] + shift))
+                # The CENTRELINE arclength at this sample -- the run's one clock, so every
+                # boundary's dashes break at the same cross-sections. See `_dashes`.
+                svals.append(sm.s)
+            if len(pts) < 2:
+                continue
+            mark = r["mark"]
+            if mark in (lp.MARK_DASH_W, lp.MARK_DASH_Y):
+                out += [MarkRun(r["slot_id"], mark, d) for d in _dashes(pts, svals)]
+            else:
+                out.append(MarkRun(r["slot_id"], mark, pts))
+    return out
+
+
+def _dashes(pts, svals, on=None, off=None):
+    """A boundary cut into painted dashes, laid out on the RUN'S OWN CLOCK.
+
+    `svals[k]` is the centreline arclength at `pts[k]`, and the dash grid is cut in THAT domain --
+    every boundary on a run therefore breaks at the same cross-sections, whatever sample it starts
+    at and whatever its own length is.
+
+    THE CLOCK IS SHARED OR THE PAINT IS WRONG. Walking each boundary from its own first point
+    restarts the grid wherever that boundary happens to open, so a lane that appears mid-run is
+    out of phase with the lines either side of it for its whole length: measured on the testbed,
+    an auxiliary lane opening 4.00 m into a run came out 4.00 m off a 9.00 m period -- very nearly
+    a half-period, which reads as the dashes on that lane being wrong rather than merely offset.
+    Anchoring on the centreline `s` also keeps them aligned through a bend, where the outer line's
+    own arclength runs ahead of the inner one's; the dashes then vary a few percent in length
+    across the carriageway, which is exactly what setting out from stations does on a real road.
+
+    Whole dashes only -- a stub of paint at the end of a lane reads as a mistake, so a final
+    partial dash is dropped rather than drawn short."""
+    on = MARK_DASH_ON if on is None else on
+    off = MARK_DASH_OFF if off is None else off
+    period = on + off
+    if period <= 1e-6 or len(pts) < 2:
+        return [pts]
+
+    def at(target):
+        """The point at centreline arclength `target`, interpolated between samples."""
+        if target <= svals[0]:
+            return pts[0]
+        if target >= svals[-1]:
+            return pts[-1]
+        i = 0
+        while i + 2 < len(svals) and svals[i + 1] < target:
+            i += 1
+        span = svals[i + 1] - svals[i]
+        t = 0.0 if span <= 1e-9 else (target - svals[i]) / span
+        a, b = pts[i], pts[i + 1]
+        return tuple(a[k] + (b[k] - a[k]) * t for k in range(len(a)))
+
+    out = []
+    # Start at the first whole dash of the SHARED grid that this boundary actually covers.
+    first = math.floor(svals[0] / period) * period
+    s0 = first
+    while s0 < svals[-1] - 1e-9:
+        s1 = s0 + on
+        if s0 >= svals[0] - 1e-9 and s1 <= svals[-1] + 1e-9:
+            seg = [at(s0)]
+            seg += [pts[k] for k in range(len(pts)) if s0 < svals[k] < s1]
+            seg.append(at(s1))
+            if len(seg) >= 2:
+                out.append(seg)
+        s0 += period
+    return out
+
+
 def solve_road(net, road, uids=None, ground_fn=None):
     """One run -> a `RoadSolve`. `uids` defaults to the road's whole chain (use `road_runs` to
     split it first -- see that function for why a junction gap is not carriageway).
@@ -249,7 +401,10 @@ def solve_road(net, road, uids=None, ground_fn=None):
         return None
     points = [net.resolved(u) for u in uids]
     is_loop = bool(road.is_loop) and len(uids) == len(road.points)
-    stations = pp.stations(points, is_loop)
+    # A RUN'S END IS CUT ON THE CHAIN'S DIRECTION, not on the run's own last chord -- otherwise the
+    # carriageway meets the pad on a different plane from the cap (`point_profile.run_end_axes`).
+    stations = pp.stations(points, is_loop,
+                           end_axes=(None if is_loop else pp.run_end_axes(net, points)))
     samples = rp.resample(stations, is_loop)
     if not samples:
         return None
@@ -281,8 +436,25 @@ def solve_road(net, road, uids=None, ground_fn=None):
         v["rka_curb_hl"], v["rka_curb_hr"] = kh_l, kh_r
         v["rka_curb_tl"] = kh_l * KERB_THICKNESS
         v["rka_curb_tr"] = kh_r * KERB_THICKNESS
-        v["rka_med_h"] = med_w / 2.0
-        v["rka_med_z"] = kh_l if med_w > 0.0 else 0.0
+        # WHAT THE DIVIDE IS, from `RoadData.median_style` -- authored once per road, because the
+        # divide's material is one material for the whole run. `median_width` still varies per
+        # station, so an island that widens, narrows and vanishes is authored exactly as before.
+        #   NONE   -- no divide geometry at all, whatever the width says
+        #   PAINT  -- double yellow: a flush stripe pair, no island (width is the PAIR's span)
+        #   RAISED -- the island, its top at kerb height (what this always built)
+        #   WALL   -- RAISED, and a barrier stands on it
+        style = getattr(road, "median_style", pm.MED_RAISED)
+        if style == pm.MED_NONE:
+            v["rka_med_h"] = 0.0
+            v["rka_med_z"] = 0.0
+        elif style == pm.MED_PAINT:
+            # Flush paint, and NARROW: the authored width is the gap between the two lines, not a
+            # band of yellow. Half of it either side of the divide is the pair.
+            v["rka_med_h"] = min(med_w, MARK_WIDTH * 2.0) / 2.0 if med_w > 0.0 else 0.0
+            v["rka_med_z"] = 0.0
+        else:
+            v["rka_med_h"] = med_w / 2.0
+            v["rka_med_z"] = kh_l if med_w > 0.0 else 0.0
 
         # ---- the footways, read off their own slots so a walk that tapers away tapers here too
         for sid, cw, hw, zk, sign in (("SW_L", "rka_walk_cl", "rka_walk_hl", "rka_walk_zl", 1),
@@ -326,6 +498,9 @@ def solve_road(net, road, uids=None, ground_fn=None):
                            if (not road.ped_access or sp["kind"] == rs.SUPPORT_PIER
                                or sp["delta"] >= BARRIER_MIN_DELTA)
                            else 0.0)
+        # The foot is derived from the same two numbers and never authored separately, so the two
+        # ends of one wall cannot disagree. `rka_wall_z` is filled in by `edge_run_values`, which
+        # is where the wall's height above the footway is known; the foot follows it there.
 
         values.append(v)
         left.append(_lateral(sm.pos, sm.normal, p_pos))
@@ -1625,6 +1800,131 @@ def solve_gores(net, solves, **kw):
 
 # ------------------------------------------------------------------------------- auto setback
 
+#: How shallow two arms may meet before the corner-clearance term is written off as degenerate,
+#: in degrees. Below this the two carriageways are effectively the same road and the corner runs
+#: away to infinity; the pad is not the thing to fix there, the crossing is.
+MIN_CORNER_ANGLE_DEG = 12.0
+
+
+def corner_clearance(half_a, half_b, angle_deg):
+    """The shortest setback at which two adjacent arms' CAPS stay in ring order, in metres.
+
+    THE CONSTRAINT `recommended_tail_length` DOES NOT SEE. That search grows the tail until every
+    turn MOVEMENT fits inside the pad -- a statement about the paths cars drive. It says nothing
+    about the arms' own caps, and at a shallow crossing that is what folds the pad: two 29 m
+    arterials meeting at 56 deg have their cap corners cross while the turns are perfectly happy,
+    so the ring runs backwards between them (`pad_not_star_shaped`, 21.65 m past the centroid on
+    Chuo x Rinkai -- and `Auto Setback`, the remedy the finding names, answered "moved 0").
+
+    The ring walks the caps by bearing, so it stays in order exactly while the left corner of one
+    arm sits at a smaller bearing than the right corner of the next:
+
+        atan(half_a / d) + atan(half_b / d)  <=  angle between them
+
+    Both terms shrink as `d` grows, so the smallest legal `d` is found by bisection. With equal
+    half-widths it is the familiar `h / tan(theta/2)` -- 14.5 m at a square crossing, 27.2 m at 56
+    degrees, which is the whole story of why a shallow junction has to be a big one.
+
+    NOT "where the outer EDGES cross" (`(h_b + h_a cos t)/sin t`), which is the other natural
+    reading and over-demands by half: the fillet is allowed to bulge past that point, and asking
+    for it grows every square junction from 14.5 m to 20.5 for a fold that is not there.
+    """
+    t = math.radians(abs(((angle_deg + 180.0) % 360.0) - 180.0))
+    if math.degrees(t) < MIN_CORNER_ANGLE_DEG or math.degrees(t) > 180.0 - MIN_CORNER_ANGLE_DEG:
+        return 0.0
+    lo, hi = 1e-3, 1000.0
+
+    def fits(d):
+        return math.atan(half_a / d) + math.atan(half_b / d) <= t
+
+    if fits(lo):
+        return lo
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        if fits(mid):
+            hi = mid
+        else:
+            lo = mid
+    return hi
+
+
+def corner_setback(mouths):
+    """The longest corner clearance over every ADJACENT pair of a clique, in metres.
+
+    Adjacent by BEARING, because a corner is between two arms with nothing between them -- the
+    opposite arm of a through road is not a corner, it is the other end of the same street, and
+    including it would demand a setback for a corner that does not exist.
+
+    Each side takes `max(half_in, half_out)`: which of a road's two half-widths faces a given
+    neighbour depends on the sense of the crossing, and over-reaching by the asymmetry of one road
+    costs a metre of pad where getting it backwards costs a folded one.
+
+    THE HALF-WIDTH IS THE DECK'S, NOT THE CARRIAGEWAY'S -- a footway is pavement, and a corner has
+    to have room for the one that turns through it. `corner_clearance`'s own docstring quotes
+    "14.5 m at a square crossing", which is a T2 road's DECK half (4 lanes + median + two 4 m
+    footways = 29.0 m); the code passed `half_in`/`half_out`, which are `lane_profile
+    .paved_extents` -- the carriageway alone, 10.5 m. The two were indistinguishable for as long as
+    the footway width never reached the solve (`WORLD_REBUILD_PLAN.md` `W3`), and the moment it
+    did, the pads were revealed to be sized for a 21 m road that is 29 m wide.
+
+    What that costs is a corner with no room to turn in. Measured at Yamate x Hama, a 95/85
+    crossing set back 14 m: at the 85 deg corner the two arms' cap points are **3.31 m** apart, so
+    the kerb turns 95 deg in 3.3 m (a ~2 m radius against an authored `fillet_radius` of 6) and a
+    4 m footway swept round that radius folds through itself -- the user report was "2 angles seem
+    correct, but 2 other angles seem more square... the sidewalk is not align edge but kind of
+    overlap each sidewalk". With the deck half-width the same corner asks 15.9 m and the caps come
+    out 8.6 m apart, which is a corner.
+    """
+    if len(mouths) < 2:
+        return 0.0
+    ring = sorted(mouths, key=lambda m: m.bearing)
+    worst = 0.0
+    for a, b in zip(ring, ring[1:] + ring[:1]):
+        ha = max(a.half_in + 2.0 * a.walk_in, a.half_out + 2.0 * a.walk_out)
+        hb = max(b.half_in + 2.0 * b.walk_in, b.half_out + 2.0 * b.walk_out)
+        worst = max(worst, corner_clearance(ha, hb, b.bearing - a.bearing))
+    return worst
+
+
+def solved_setback(mouths, kerb_radius, start=0.0, margin=2.0):
+    """The stop-line distance a pad of these arms needs, in metres. ONE OWNER.
+
+    Two constraints, and the answer is whichever binds: `recommended_tail_length` grows the tail
+    until every turn MOVEMENT fits inside the pad, and `corner_setback` asks whether the arms' own
+    CAPS stay in ring order (the one that binds at a shallow crossing -- see its docstring).
+
+    IT IS A FUNCTION OF THE ARMS ALONE, which is the whole reason it is out here rather than
+    inline in `auto_setback`. Anything that has to know where a mouth will END UP before the mouth
+    exists -- `seed_district_roads`, which must prune the stations a pad will swallow -- can ask
+    it with planned arms and get the same number `Auto Setback` will solve later. Two owners of
+    "how far back is the stop line" is exactly how the island ended up with an ordinary station
+    0.19 m from a mouth: the seeder placed every mouth at a provisional 14 m, pruned the stations
+    inside that window, and `Auto Setback` then moved the mouth out to 17.9-35.5 m, over the top
+    of a station that had survived the prune by being outside a window computed from the wrong
+    number.
+
+    `mouths` needs only the attributes `Mouth` and any planned stand-in share: `uid`, `bearing`,
+    `half_in`/`half_out`, `walk_in`/`walk_out`, `lane_width`, `lanes_in`/`lanes_out`."""
+    if not mouths:
+        return 0.0
+    # THE SEARCH NEEDS ARMS WHOSE CAPS CAN MOVE. `solve_junction`'s arms pin `tail_pos` at the
+    # authored mouth -- which is the whole point of the model, and exactly wrong here: with
+    # `tail_pos` set, `Arm.tail_center` ignores `tail_length` entirely, so growing it moves
+    # nothing and `recommended_tail_length` returns its start value unchanged (a silent no-op,
+    # measured on the 15 degree case). So the solve runs on a parallel set of arms that sit on
+    # their own angle rays, and the answer is then written back onto the authored points.
+    probe = [_PadArm(m.uid, m.bearing, m.half_in, m.half_out,
+                     lane_width=m.lane_width, lanes=max(m.lanes_in, 1),
+                     lanes_out=max(m.lanes_out, 1), traffic_side='LEFT')
+             for m in mouths]
+    tail = ik.recommended_tail_length(probe, kerb_radius, start=start, margin=margin)
+    # ...AND THE ARMS' OWN ASPHALT HAS TO CLEAR. The search above is about the paths cars drive;
+    # this is about where the carriageways themselves cross, which is the binding constraint at a
+    # shallow crossing and the one that folds the pad. `margin` applies to both for the same
+    # reason -- a corner that lands exactly on the cap is a corner that rounds to the wrong side.
+    return max(tail, corner_setback(mouths) + margin)
+
+
 def auto_setback(net, uids, margin=2.0):
     """Move a clique's UNLOCKED mouths out to a solved stop-line distance. Whole-clique,
     idempotent, non-destructive.
@@ -1645,20 +1945,12 @@ def auto_setback(net, uids, margin=2.0):
     j = solve_junction(net, uids)
     if j is None:
         return []
-    cx, cy, _cz = j.centre
-    # THE SEARCH NEEDS ARMS WHOSE CAPS CAN MOVE. `solve_junction`'s arms pin `tail_pos` at the
-    # authored mouth -- which is the whole point of the model, and exactly wrong here: with
-    # `tail_pos` set, `Arm.tail_center` ignores `tail_length` entirely, so growing it moves
-    # nothing and `recommended_tail_length` returns its start value unchanged (a silent no-op,
-    # measured on the 15 degree case). So the solve runs on a parallel set of arms that sit on
-    # their own angle rays, and the answer is then written back onto the authored points.
-    probe = []
-    for m in j.mouths:
-        probe.append(_PadArm(m.uid, m.bearing, m.half_in, m.half_out,
-                             lane_width=m.lane_width, lanes=max(m.lanes_in, 1),
-                             lanes_out=max(m.lanes_out, 1), traffic_side='LEFT'))
+    cx, cy = j.centre[0], j.centre[1]
+    # The distance itself is `solved_setback`'s -- shared with the seeder, which has to know it
+    # before these mouths exist. `start` is the widest mouth we already have, so the search only
+    # ever grows a pad.
     start = max(_len2((m.pos[0] - cx, m.pos[1] - cy)) for m in j.mouths)
-    tail = ik.recommended_tail_length(probe, j.kerb_radius, start=start, margin=margin)
+    tail = solved_setback(j.mouths, j.kerb_radius, start=start, margin=margin)
     moved = []
     for m in j.mouths:
         old = _len2((m.pos[0] - cx, m.pos[1] - cy))
@@ -1666,9 +1958,33 @@ def auto_setback(net, uids, margin=2.0):
         pt.setback_solved = float(tail)
         if pt.setback_locked:
             continue
-        if abs(old - tail) < 1e-4:
+        # A MOUTH SLIDES ALONG ITS OWN ROAD. IT DOES NOT MOVE SIDEWAYS OFF IT.
+        #
+        # `centre + out_dir * tail` puts every mouth on a ray from the pad CENTROID, and the
+        # centroid is not on any of the roads: on a 5-arm pad it sits 12 m off the crossing, so a
+        # mouth set back from there lands metres to the SIDE of its own centreline. The next
+        # station along is still where the road is, so the road's own first span comes out at a
+        # bogus angle -- measured on the island's port junction, port_road's approach left the pad
+        # on a bearing 40 deg from its own alignment, ending up 3.5 deg from Chuo-dori's arm: two
+        # carriageways leaving on top of each other, with the pavement drawn as a 90 m spike. It
+        # was invisible for as long as every pad was a symmetric X, where the centroid IS the
+        # crossing.
+        #
+        # So the centre is projected onto this mouth's own axis first. The mouth then sits `tail`
+        # along its road from the point of that road nearest the pad centre, which is the same
+        # place `seed_district_roads` measures from, and it can never leave the centreline. The
+        # distance to the centroid comes out `hypot(tail, offset)` -- never less than `tail`, so
+        # every corner still clears.
+        foot = (cx - m.pos[0]) * m.out_dir[0] + (cy - m.pos[1]) * m.out_dir[1]
+        ax, ay = m.pos[0] + m.out_dir[0] * foot, m.pos[1] + m.out_dir[1] * foot
+        want = (ax + m.out_dir[0] * tail, ay + m.out_dir[1] * tail, m.pos[2])
+        # THE NO-MOVE TEST IS ON THE POSITION, not on a distance. `old` is measured to the
+        # centroid and `tail` along the arm, and once those stopped being the same number a mouth
+        # that was already exactly right still reported as moved -- which is how a settled solve
+        # reads as a drifting one.
+        if _len2((want[0] - m.pos[0], want[1] - m.pos[1])) < 1e-4:
             continue
-        pt.pos = (cx + m.out_dir[0] * tail, cy + m.out_dir[1] * tail, m.pos[2])
+        pt.pos = want
         moved.append((m.uid, old, tail))
     return moved
 
@@ -1682,6 +1998,20 @@ def self_test():
         import point_validate as pv
     ok = 0
     net, mp, cp, rr = pv.build_testbed()
+
+    # ---- a shallow crossing needs a BIG pad, and the turn search does not know it -------------
+    # Two 29 m arterials meeting at 56 deg: `recommended_tail_length` is happy at 18.2 m because
+    # every turn movement fits, and the ring then runs backwards between the caps
+    # (`pad_not_star_shaped`, 21.65 m past the centroid on the island's Chuo x Rinkai). The cap
+    # order is the constraint that binds, and at equal half-widths it is `h / tan(theta/2)`.
+    for ang, want in ((56.2, 27.16), (90.0, 14.5), (120.0, 8.37)):
+        got = corner_clearance(14.5, 14.5, ang)
+        assert abs(got - want) < 0.02, (ang, got, want)
+    # a corner belongs to BOTH arms, so it cannot depend on which one is asked first
+    assert abs(corner_clearance(14.5, 8.0, 56.2) - corner_clearance(8.0, 14.5, 56.2)) < 1e-9
+    # ...and two arms that are effectively the same road have no corner to clear
+    assert corner_clearance(14.5, 14.5, 4.0) == 0.0 and corner_clearance(14.5, 14.5, 178.0) == 0.0
+    ok += 1
 
     # ---- runs: the chain IS broken at the junction gap ---------------------------------------
     runs = road_runs(net, net.roads["road_main"])
@@ -2009,6 +2339,40 @@ def self_test():
     assert side7 < 0 and want7[1] < 0.0, (side7, want7)
     face7 = ramp_facing(net7, m7, r7)
     assert face7[0] * ax7[0] + face7[1] * ax7[1] < 0, (face7, ax7)
+    ok += 1
+
+    # ---- the paint: ONE dash clock per run ----------------------------------------------------
+    # Every boundary of a run must break at the same cross-sections, whatever sample it opens at.
+    # Walking each from its own first point put an auxiliary lane that opens 4.00 m into the run
+    # 4.00 m out of phase on a 9.00 m period -- half a period, which reads as the dashes on that
+    # lane being wrong rather than merely offset.
+    period = MARK_DASH_ON + MARK_DASH_OFF
+    checked = 0
+    for road in net.roads.values():
+        for uids in road_runs(net, road):
+            sol = solve_road(net, road, uids)
+            if sol is None:
+                continue
+            grids = {}
+            for m in solve_marks(sol):
+                if not m.dashed:
+                    continue
+                # The dash's own start, in the run's clock: nearest sample is enough here because
+                # the assertion is about the PHASE, and the grid is 9 m against a 4 m sampling.
+                s0 = min(sol.samples, key=lambda sm: math.dist(sm.pos, m.points[0])).s
+                grids.setdefault(m.slot_id, set()).add(round(s0 / period) * period)
+            if len(grids) < 2:
+                continue
+            # Every boundary's dashes sit on the SAME grid -- the ones that open late simply start
+            # further along it. So each grid is a subset of the longest, never an offset copy.
+            widest = max(grids.values(), key=len)
+            for sid, g in grids.items():
+                assert g <= widest, "%s/%s is on its own dash grid: %s not in %s" % (
+                    road.name, sid, sorted(g - widest)[:4], sorted(widest)[:4])
+            checked += 1
+    assert checked, "the testbed must have a run with two dashed boundaries"
+    print("OK: one dash clock per run -- every boundary breaks on the same grid (%d run(s))"
+          % checked)
     ok += 1
 
     print("point_solve.py: %d checks PASS" % ok)

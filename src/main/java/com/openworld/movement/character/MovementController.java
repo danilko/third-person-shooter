@@ -1,11 +1,13 @@
 package com.openworld.movement.character;
 
 import godot.api.CharacterBody3D;
+import godot.api.KinematicCollision3D;
 import godot.api.Node;
 import godot.api.Node3D;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.core.Transform3D;
 import godot.core.Vector3;
 import godot.global.GD;
 import static java.lang.Math.atan2;
@@ -30,6 +32,36 @@ public class MovementController extends Node {
 
   @Export
   public double fallGravity = 45.0;
+
+  /**
+   * Tallest ledge the character walks straight up, in metres. 0 disables stepping.
+   *
+   * `CharacterBody3D` has no step-up of its own: a vertical face is a wall whatever its height, and
+   * `floor_block_on_wall` (on, correctly — it is what stops the body climbing steep slopes) kills
+   * the upward part of the slide. So the 0.15 m kerb the road kit builds — a real kerb, the height
+   * a real kerb is — stopped the player dead at the edge of every footway on the island. That is a
+   * character-controller gap, not a world defect: lowering the kerb or ramping it would be
+   * authoring around a missing feature, and stairs and low ruins want the same thing.
+   *
+   * 0.35 m is a touch over the 0.30 m an interior building step is usually capped at, which is the
+   * range GTA/PUBG-class third-person characters step without an animation. It is deliberately
+   * under the capsule radius' usable range and well under `jumpHeight` — anything taller should
+   * cost a vaultment or a jump, not be free.
+   */
+  @Export
+  public double stepHeight = 0.35;
+
+  /**
+   * How far forward the step probe reaches, in metres — at least far enough to put the body's
+   * CENTRE over the ledge top.
+   *
+   * It cannot just be this frame's motion. Contact means the capsule's SURFACE is against the kerb
+   * face, so the centre is still a radius (0.35 m) short of it; advancing only the 7 cm a walk
+   * covers in a frame would drop the body back onto the kerb's top EDGE, whose contact normal is
+   * not walkable, and the step would be rejected every frame while the character juddered.
+   */
+  @Export
+  public double stepReach = 0.45;
 
   private double jumpGravity = fallGravity;
   private Vector3 direction = new Vector3();
@@ -222,6 +254,7 @@ public class MovementController extends Node {
     player.setVelocity(new Vector3(newX, newY, newZ));
     float appliedVelocityY = (float) newY;
     player.moveAndSlide();
+    if (!swimming && stepUpLedge(newX, newZ, delta)) velocity.setY(0.0);
 
     // Fall damage: compare velocity just before landing to the configured threshold.
     // Skipped while swimming — water cushions the entry/landing.
@@ -243,7 +276,13 @@ public class MovementController extends Node {
     // is the rotation needed to flip from +Z to -Z facing convention.
     double targetRotation;
     if (combat) {
-      targetRotation = camRotation;
+      // Face where the shot actually goes, not where the camera looks. The TPS camera sits off the
+      // shoulder, so its yaw and the body->aim-point yaw differ by several degrees at close range —
+      // enough for the visible body and gun to be square to a wall while the shot slipped past it.
+      // Aiming the body at the same point the spine IK and the bullet converge on
+      // (Character.getAimTargetPosition, the AimRay's world hit point) keeps all three honest, which
+      // is what makes FirearmItem's muzzle trace read as fair rather than arbitrary.
+      targetRotation = aimYaw() - playerInitRotation;
     } else if (direction.lengthSquared() > 0.001) {
       // Face movement direction (only when actually moving)
       targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
@@ -259,6 +298,74 @@ public class MovementController extends Node {
 
   }
 
+
+  /**
+   * Walk up a ledge no taller than {@link #stepHeight} — a kerb, a stair tread, a low ruin.
+   * Returns true when the body was actually lifted onto one.
+   *
+   * UP, FORWARD, DOWN, and revert if the landing is not walkable. Run AFTER `moveAndSlide`, and
+   * only when it reported both a floor and a wall: that pair is the whole trigger, so the probe
+   * costs three physics queries at a kerb edge and nothing at all the rest of the time. A failed
+   * attempt restores the exact transform it started from, so the worst case is the behaviour that
+   * was there before.
+   *
+   * The DOWN leg is what makes it safe, and it is why this is not just "raise the body when
+   * blocked": the body settles onto whatever is really there, and a landing whose normal is not
+   * walkable — the sloped face of a wall, the rounded top edge of something too narrow to stand on
+   * — is refused. Without it the character would climb anything it could touch.
+   *
+   * Not run while swimming: a wall met in water is a wall.
+   */
+  private boolean stepUpLedge(double vx, double vz, double delta) {
+    if (stepHeight <= 0.0 || player == null) return false;
+    if (!player.isOnFloor() || !player.isOnWall()) return false;
+
+    double len = Math.sqrt(vx * vx + vz * vz);
+    if (len < 1e-3) return false;                       // standing still: nothing to step onto
+    double reach = Math.max(len * delta, stepReach);
+    Vector3 ahead = new Vector3(vx / len * reach, 0.0, vz / len * reach);
+    Vector3 lift = new Vector3(0.0, stepHeight, 0.0);
+
+    Transform3D start = player.getGlobalTransform();
+    // Blocked down here but clear one step up — that is a LEDGE. A wall is blocked at both heights,
+    // and testing it first is what keeps the character from climbing buildings.
+    if (!player.testMove(start, ahead)) return false;
+    if (player.testMove(start.translated(lift), ahead)) return false;
+
+    player.setGlobalTransform(start.translated(lift));
+    player.moveAndCollide(ahead);
+    KinematicCollision3D landed = player.moveAndCollide(new Vector3(0.0, -(stepHeight + 0.02), 0.0));
+    if (landed == null || landed.getNormal().getY() < floorNormalMin()) {
+      player.setGlobalTransform(start);
+      return false;
+    }
+    return true;
+  }
+
+  /** The cosine of the body's own `floor_max_angle` — one owner, so a steeper body steps steeper. */
+  private double floorNormalMin() {
+    return Math.cos(player.getFloorMaxAngle());
+  }
+
+  /** Horizontal distance (squared, m^2) below which an aim point is too close/underfoot to yaw toward. */
+  private static final double AIM_FACING_MIN_DIST_SQ = 0.25;
+
+  /**
+   * World-space yaw from the body toward its current aim point. Falls back to the raw camera yaw
+   * when there is no usable point — a non-Character body, or a point directly overhead/underfoot.
+   */
+  private double aimYaw() {
+    if (!(player instanceof Character c)) return camRotation;
+    Vector3 aim = c.getAimTargetPosition();
+    Vector3 pos = player.getGlobalPosition();
+    double dx = aim.getX() - pos.getX();
+    double dz = aim.getZ() - pos.getZ();
+    if (dx * dx + dz * dz < AIM_FACING_MIN_DIST_SQ) return camRotation;
+    // Same -Z-forward mapping as the movement branch: camRotation is this very expression evaluated
+    // on the camera's own forward vector, so the two agree when the aim point is straight down the
+    // camera line and diverge only by the shoulder offset's parallax.
+    return atan2(-dx, -dz);
+  }
 
   @Register
   public void jump(JumpState jumpState) {

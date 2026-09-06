@@ -6,8 +6,8 @@ import com.openworld.character.Player;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.game.WaypointStore;
 import com.openworld.world.SpatialEntityGrid;
-import com.openworld.world.WorldZoneManager;
-import com.openworld.world.WorldZoneMarker;
+import com.openworld.world.ZoneManager;
+import com.openworld.world.ZoneMarker;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -30,7 +30,7 @@ import java.util.Map;
  * draws, north-up and centred on the local player: nearby Characters/Vehicles from {@link SpatialEntityGrid}
  * (D1) as faction-coloured blips ({@link NameplateTarget#getNameplateColor()}), the local player as a
  * heading triangle (facing = the viewport camera's forward, correct on foot and in a vehicle), zone/region
- * outlines from {@link WorldZoneManager}, and GPS waypoints from {@link WaypointStore} (local + teammates,
+ * outlines from {@link ZoneManager}, and GPS waypoints from {@link WaypointStore} (local + teammates,
  * clamped to the rim so the destination is always visible). Pure display — no input, no game-state writes.
  *
  * <p>Wired by {@code HUDManager.wirePlayer} (ownership-gated) like {@code WeaponProgress}; not table-managed.
@@ -82,9 +82,9 @@ public class MinimapController extends Control {
         Vector3 origin = player.getGlobalPosition();
 
         // Region outlines (zone load rings) within view.
-        WorldZoneManager wzm = WorldZoneManager.get();
+        ZoneManager wzm = ZoneManager.get();
         if (wzm != null) {
-            for (WorldZoneMarker m : wzm.getMarkers()) {
+            for (ZoneMarker m : wzm.getMarkers()) {
                 if (m == null || !godot.global.GD.isInstanceValid(m) || m.zone == null) continue;
                 Vector2 c = worldToScreen(m.getGlobalPosition(), origin, center, scale);
                 float rr = m.zone.loadRadius * scale;

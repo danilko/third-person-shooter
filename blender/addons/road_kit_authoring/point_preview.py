@@ -61,10 +61,40 @@ COL_LINK = (1.00, 1.00, 1.00, 0.45)
 COL_BROKEN = (1.00, 0.18, 0.12, 1.00)
 COL_UNREACHED = (1.00, 0.25, 0.90, 1.00)
 COL_CAR = (1.00, 0.95, 0.80, 1.00)
+#: The Path3D drawn OVER its lane in `BOTH` mode -- deliberately colourless, so the lane keeps its
+#: own meaning (ramp/merge/connector) underneath and the white line reads as "and here is what
+#: actually ships".
+COL_PATH = (1.00, 1.00, 1.00, 0.95)
+#: The gap between the two, and any lane whose Path3D wanders further than `PATH_DEVIATION_WARN`.
+COL_DEVIATION = (1.00, 0.55, 0.05, 1.00)
+
+#: What `Preview > Geometry` draws. The default is the EXPORT, because that is the object this
+#: whole panel exists to show -- drawing the polyline by default is how a 22.57 m error survived.
+GEO_POLY, GEO_PATH, GEO_BOTH = 'POLY', 'PATH', 'BOTH'
+
+
+def _geometry(scene):
+    return getattr(scene, "rka_preview_geometry", GEO_PATH) if scene is not None else GEO_PATH
 
 #: How far above the asphalt the flow ribbon floats. Enough to clear a kerb, small enough that it
 #: still reads as belonging to the lane under it.
 LIFT = 0.25
+
+#: Rungs drawn between the lane and its Path3D in `BOTH` mode. Fixed per lane rather than per
+#: metre: the reading is "do these two part, and where", which a short ramp needs as much as a
+#: kilometre of arterial.
+DEVIATION_RUNGS = 24
+
+#: A rung is only drawn where the two geometries part by more than this. NOT the export's own fit
+#: tolerance: since the fit converges to 0.05 m everywhere, keying on that draws a rung on every
+#: lane in the world and the picture says nothing. Half the warn threshold is "this one is heading
+#: for a finding", which is what a rung should mean.
+DEVIATION_VISIBLE = 0.25
+
+#: Cubic samples per span when DRAWING. The fit measures at `point_export.FIT_SAMPLES` because it
+#: is bounding an error; the draw only has to look smooth, and 24 per span put 697 points on one
+#: ramp lane -- five times the polyline it is drawn beside.
+DRAW_SAMPLES = 8
 
 #: Chevron spacing along a lane, in metres.
 CHEVRON_EVERY = 22.0
@@ -82,7 +112,8 @@ MAX_CARS = 400
 # ------------------------------------------------------------------------------- the document
 
 #: The exported doc, its derived per-lane geometry, and the revision it was built at.
-_cache = {"stamp": -2, "doc": None, "lanes": {}, "report": None}
+_cache = {"stamp": -2, "doc": None, "lanes": {}, "alt": {}, "dev": {},
+          "report": None}
 
 #: Bumped by `refresh()`; also compared against `point_overlay`'s revision so an edit invalidates
 #: the preview exactly when it invalidates the overlay.
@@ -95,7 +126,9 @@ def invalidate():
 
 
 def _stamp():
-    return (ov._rev[0], _rev[0])
+    # The geometry mode is part of the stamp: switching it changes what every `LaneGeo` IS, so it
+    # has to invalidate the cache exactly the way an edit does.
+    return (ov._rev[0], _rev[0], _geometry(bpy.context.scene if bpy.context else None))
 
 
 class LaneGeo(object):
@@ -245,6 +278,10 @@ def flow_report(doc):
     return {"lanes": len(lanes), "junctions": len(doc.get("junctions", ())),
             "broken": broken, "open_end": open_end, "misjoined": misjoined,
             "unreached": unreached, "ramp_orphans": ramp_orphans,
+            # THE PATH IS NOT THE LANE. Every other line here is about reachability, which is a
+            # property of the graph; this one is about the geometry that graph is drawn on, and it
+            # is the only line that can catch a car driving somewhere the road is not.
+            "path_off_road": pe.deviating_lanes(doc),
             "spawnable": sum(1 for l in doc.get("lanes", ()) if l.get("spawnable"))}
 
 
@@ -263,20 +300,55 @@ def document(scene=None, force=False):
         _cache["doc"] = None
         return None
     road_class = {r["name"]: r.get("road_class", "") for r in doc.get("roads", ())}
-    geo = {}
+    mode = _geometry(scene if scene is not None else (bpy.context.scene if bpy.context else None))
+    geo, alt, dev = {}, {}, {}
     for l in doc["lanes"]:
-        pts = [Vector(pe.blender(p)) + Vector((0.0, 0.0, LIFT)) for p in l["points"]]
-        if len(pts) < 2:
+        # THE PATH3D IS THE DEFAULT, and the cars walk it. Every other panel here shows the
+        # authoring; this one shows what Godot receives -- and `WorldBaker` builds each `Curve3D`
+        # from the `curve` block, not from `points`. Drawing the polyline while shipping the curve
+        # is how a lane 22.57 m off the road previewed as perfect.
+        drive = _lane_points(l, mode != GEO_POLY)
+        if len(drive) < 2:
             continue
         cum, run = [0.0], 0.0
-        for a, b in zip(pts, pts[1:]):
+        for a, b in zip(drive, drive[1:]):
             run += (b - a).length
             cum.append(run)
         colour, kind = _lane_colour(l, road_class)
-        geo[l["id"]] = LaneGeo(l["id"], pts, cum, colour, kind, l)
-    _cache.update(stamp=stamp, doc=doc, lanes=geo, report=flow_report(doc))
+        d = pe.path_deviation(l)
+        dev[l["id"]] = d
+        if d > pe.PATH_DEVIATION_WARN:
+            colour = COL_DEVIATION
+        geo[l["id"]] = LaneGeo(l["id"], drive, cum, colour, kind, l)
+        if mode == GEO_BOTH:
+            alt[l["id"]] = _lane_points(l, False)
+    _cache.update(stamp=stamp, doc=doc, lanes=geo, alt=alt, dev=dev, report=flow_report(doc))
     _reseed()
     return doc
+
+
+def _nearest_on(poly, p):
+    """The closest point to `p` anywhere on a polyline."""
+    best, bd = poly[0], float("inf")
+    for a, b in zip(poly, poly[1:]):
+        d = b - a
+        L = d.length_squared
+        t = 0.0 if L < 1e-12 else max(0.0, min(1.0, (p - a).dot(d) / L))
+        q = a + d * t
+        if (q - p).length_squared < bd:
+            best, bd = q, (q - p).length_squared
+    return best
+
+
+def _lane_points(lane, as_path):
+    """The lane as Blender-space points -- either the exported Path3D or the sampled polyline.
+
+    ONE conversion site, and it goes through `point_export.curve_polyline` for the Path3D so the
+    preview, the gate and the export's own self-test all evaluate the shipped curve with the same
+    function. A picture drawn by a second implementation is a picture that can be wrong on its
+    own."""
+    src = pe.curve_polyline(lane, DRAW_SAMPLES) if as_path else (lane.get("points") or ())
+    return [Vector(pe.blender(p)) + Vector((0.0, 0.0, LIFT)) for p in src]
 
 
 def report(scene=None):
@@ -429,12 +501,36 @@ def flow_batches(scene=None):
     unreached = set(rep.get("unreached", ())) | set(rep.get("ramp_orphans", ()))
 
     out = {c: [] for c in (COL_THROUGH, COL_CONNECTOR, COL_RAMP, COL_MERGE,
-                           COL_LINK, COL_BROKEN, COL_UNREACHED)}
+                           COL_LINK, COL_PATH, COL_DEVIATION, COL_BROKEN, COL_UNREACHED)}
+    # `BOTH`: the lane polyline underneath in its own colour, the shipped Path3D in white over it,
+    # and a rung between them wherever they part by more than the export's own fit tolerance. The
+    # rungs are the reading -- two lines a metre apart look like one line from any distance a whole
+    # junction fits into.
+    for lid, poly in (_cache.get("alt") or {}).items():
+        g = geo.get(lid)
+        if g is None or len(poly) < 2:
+            continue
+        col = g.colour if g.colour in out else COL_THROUGH
+        for a, b in zip(poly, poly[1:]):
+            out[col] += [a, b]
+        for k in range(DEVIATION_RUNGS + 1):
+            # Take the rung's foot at a fraction of the PATH's own arclength and drop it onto the
+            # NEAREST point of the lane -- never the polyline's sample at the same index. The two
+            # are sampled differently (4 m on the lane, per-span on the curve), so equal-index
+            # pairs are metres apart along the road even where the two curves coincide exactly:
+            # measured 926 rungs on a network whose worst real gap was 0.0988 m.
+            b, _t = g.at(g.length * k / float(DEVIATION_RUNGS))
+            a = _nearest_on(poly, b)
+            if (a - b).length > DEVIATION_VISIBLE:
+                out[COL_DEVIATION] += [a, b]
+    both = bool(_cache.get("alt"))
     for g in geo.values():
         col = g.colour if g.colour in out else COL_THROUGH
+        # In `BOTH` the lane already drew in its own colour, so the Path3D is the white one.
+        line = COL_PATH if both and g.colour is not COL_DEVIATION else col
         for a, b in zip(g.pts, g.pts[1:]):
-            out[col] += [a, b]
-        _chevrons(g, out[col])
+            out[line] += [a, b]
+        _chevrons(g, out[line])
         tail = g.pts[-1]
         for nxt in g.lane.get("next") or ():
             n = geo.get(nxt)
@@ -470,8 +566,10 @@ def flow_batches(scene=None):
 
 #: Line width per batch. Widest LAST, so a defect is the thing you see.
 _WIDTH = {COL_THROUGH: 2.0, COL_CONNECTOR: 2.0, COL_RAMP: 2.4, COL_MERGE: 2.0,
-          COL_LINK: 1.2, COL_UNREACHED: 2.4, COL_BROKEN: 3.0}
-_ORDER = (COL_THROUGH, COL_CONNECTOR, COL_MERGE, COL_RAMP, COL_LINK, COL_UNREACHED, COL_BROKEN)
+          COL_LINK: 1.2, COL_PATH: 1.8, COL_DEVIATION: 3.0,
+          COL_UNREACHED: 2.4, COL_BROKEN: 3.0}
+_ORDER = (COL_THROUGH, COL_CONNECTOR, COL_MERGE, COL_RAMP, COL_LINK, COL_PATH,
+          COL_UNREACHED, COL_BROKEN, COL_DEVIATION)
 
 
 def _draw_3d():
@@ -618,6 +716,11 @@ class RKA_OT_preview_report(bpy.types.Operator):
                 print("  UNREACHED  %s has no predecessor" % lane)
         for lane, _n in rep["open_end"]:
             print("  open end   %s (runs off the edge of the network)" % lane)
+        # NOT a reachability defect -- the one geometry line in a reachability report, because the
+        # graph can be perfect while the curve it is drawn on is not the road.
+        for lane, dev in rep.get("path_off_road") or ():
+            print("  PATH       %s: the exported Path3D is %.2f m off the lane it represents"
+                  % (lane, dev))
         # The severities are ordered so the ERROR line is the last thing in the status bar.
         for lane in rep["ramp_orphans"][:3]:
             self.report({'WARNING'}, "%s: a ramp lane nothing leads to -- check the AUX link and "
@@ -627,6 +730,9 @@ class RKA_OT_preview_report(bpy.types.Operator):
         for lane, nxt, d in rep["misjoined"][:3]:
             self.report({'WARNING'}, "%s -> %s: the successor's head is %.0f m away" % (
                 lane, nxt, d))
+        for lane, dev in (rep.get("path_off_road") or ())[:3]:
+            self.report({'ERROR' if dev > pe.PATH_DEVIATION_ERROR else 'WARNING'},
+                        "%s: the exported Path3D is %.2f m off the lane" % (lane, dev))
         self.report({'INFO'}, "%d lane(s): %d broken, %d misjoined, %d unreached, %d open end -- "
                               "full list in the console"
                     % (rep["lanes"], len(rep["broken"]), len(rep["misjoined"]),
@@ -652,6 +758,15 @@ def register():
         name="Cars", default=False, update=_on_toggle,
         description="Run agents along the exported graph, choosing successors by the exported "
                     "weights. A ramp no car enters is a missing edge")
+    bpy.types.Scene.rka_preview_geometry = bpy.props.EnumProperty(
+        name="Geometry", default=GEO_PATH, update=_on_toggle,
+        items=[(GEO_PATH, "Path3D (export)", "The bezier Godot will build each Curve3D from -- "
+                                             "what the cars actually drive", 0),
+               (GEO_POLY, "Lane polyline", "The sampled lane centreline -- where the asphalt is",
+                1),
+               (GEO_BOTH, "Both", "Lane polyline in its own colour, the exported Path3D in white "
+                                  "over it, and the gap between them in orange", 2)],
+        description="Which geometry the flow preview draws. These are NOT the same object")
     bpy.types.Scene.rka_preview_labels = bpy.props.BoolProperty(
         name="Lane Ids", default=False,
         description="Label each lane with the id Godot will see")
@@ -678,9 +793,9 @@ def unregister():
         bpy.app.timers.unregister(_tick)
     _timer_on[0] = False
     del _cars[:]
-    _cache.update(stamp=-2, doc=None, lanes={}, report=None)
+    _cache.update(stamp=-2, doc=None, lanes={}, alt={}, dev={}, report=None)
     for n in ("rka_preview_flow", "rka_preview_cars", "rka_preview_labels",
-              "rka_preview_density", "rka_preview_speed"):
+              "rka_preview_density", "rka_preview_speed", "rka_preview_geometry"):
         if hasattr(bpy.types.Scene, n):
             delattr(bpy.types.Scene, n)
     for c in reversed(CLASSES):

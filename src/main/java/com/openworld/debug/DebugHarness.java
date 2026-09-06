@@ -16,9 +16,9 @@ import com.openworld.ai.vehicle.VehicleAIController;
 import com.openworld.carrier.vehicle.Vehicle;
 import com.openworld.world.SpawnConfig;
 import com.openworld.world.VehicleRoute;
-import com.openworld.world.WorldZone;
-import com.openworld.world.WorldZoneManager;
-import com.openworld.world.WorldZoneMarker;
+import com.openworld.world.Zone;
+import com.openworld.world.ZoneManager;
+import com.openworld.world.ZoneMarker;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.BoxShape3D;
@@ -76,7 +76,7 @@ import godot.api.OS;
  *       (PLAN.md Part G). F7 — joinServer("127.0.0.1", DEBUG_PORT): connects as a
  *       client to a host on the same machine. Edit DEBUG_HOST for a real LAN peer.
  * F1  — teleportToNextZone(): jumps the local player to the next registered
- *       WorldZoneMarker (cycles through every district at world scale), so testing
+ *       ZoneMarker (cycles through every district at world scale), so testing
  *       across districts doesn't require walking/driving the whole map.
  * F2  — dropWeaponHere(): spawns an AR4 pickup at the player's feet — the companion to F1
  *       for testing weapon pickup flow in whichever district you've just teleported to.
@@ -166,7 +166,7 @@ public class DebugHarness extends Node {
     /**
      * Shift+F5 — hot-reload the district the player is standing in: after an external
      * {@code tools/build_piece.sh} rebake, re-streams the zone from disk (cache-bypassing) so the
-     * change shows up without restarting the game. See {@link WorldZoneManager#reloadZone}.
+     * change shows up without restarting the game. See {@link ZoneManager#reloadZone}.
      */
     /** Shift+F3 — toggle the engine perf-monitor HUD. Lazily built (CanvasLayer renders from
      * anywhere in the tree, so no scene wiring is needed — available in every DebugHarness scene). */
@@ -195,9 +195,9 @@ public class DebugHarness extends Node {
     }
 
     private void reloadNearestZone() {
-        WorldZoneManager mgr = WorldZoneManager.get();
-        if (mgr == null) { GD.print("DebugHarness: no WorldZoneManager — nothing to reload"); return; }
-        WorldZoneMarker marker = mgr.getNearestMarker();
+        ZoneManager mgr = ZoneManager.get();
+        if (mgr == null) { GD.print("DebugHarness: no ZoneManager — nothing to reload"); return; }
+        ZoneMarker marker = mgr.getNearestMarker();
         if (marker == null) { GD.print("DebugHarness: no registered zone markers — nothing to reload"); return; }
         if (mgr.reloadZone(marker)) {
             GD.print("DebugHarness: hot-reloading zone '" + marker.zone.zoneId + "'");
@@ -345,7 +345,7 @@ public class DebugHarness extends Node {
     }
 
     /**
-     * F12 — drops a placeholder {@link WorldZoneMarker} ~60 m in front of the player (PLAN.md
+     * F12 — drops a placeholder {@link ZoneMarker} ~60 m in front of the player (PLAN.md
      * Part E / E1). Its zone (built in code so no .tres is needed) streams in five "enemy" AIs
      * when a player walks within loadRadius (40 m) and streams them back out beyond unloadRadius
      * (70 m). Walk toward the marker to load, away to unload — the E1 verify step.
@@ -368,18 +368,18 @@ public class DebugHarness extends Node {
         cfg.faction = Faction.ENEMY;
         cfg.count = 5;
 
-        WorldZone zone = new WorldZone();
+        Zone zone = new Zone();
         zone.zoneId = "debug_zone";
         zone.loadRadius = 40f;
         zone.unloadRadius = 70f;
         zone.size = new Vector3(20f, 4f, 20f);
         zone.spawnConfigs.add(cfg);
 
-        WorldZoneMarker marker = new WorldZoneMarker();
+        ZoneMarker marker = new ZoneMarker();
         marker.zone = zone;
         scene.addChild(marker);
         marker.setGlobalPosition(anchor);
-        GD.print("DebugHarness: placed debug WorldZoneMarker at " + anchor
+        GD.print("DebugHarness: placed debug ZoneMarker at " + anchor
                 + " (walk within 40 m to stream AI in, beyond 70 m to stream out)");
     }
 
@@ -447,19 +447,19 @@ public class DebugHarness extends Node {
     }
 
     /**
-     * F1 — teleports the local player to the next registered {@link WorldZoneMarker}, cycling
+     * F1 — teleports the local player to the next registered {@link ZoneMarker}, cycling
      * through every district at world scale (sorted by {@code zoneId} for a stable, predictable
-     * order — {@link WorldZoneManager#getMarkers()} is registration order, which isn't). The same
+     * order — {@link ZoneManager#getMarkers()} is registration order, which isn't). The same
      * registry the I5 minimap already reads, so no new bookkeeping — every district's marker is
      * permanently registered (part of the always-loaded master), regardless of whether that
      * district's own geometry is currently streamed in. A few metres above the marker so the
      * player doesn't spawn inside the ground; physics settles the rest on landing.
      */
     private void teleportToNextZone() {
-        WorldZoneManager mgr = WorldZoneManager.get();
-        if (mgr == null) { GD.print("DebugHarness: WorldZoneManager autoload not found"); return; }
+        ZoneManager mgr = ZoneManager.get();
+        if (mgr == null) { GD.print("DebugHarness: ZoneManager autoload not found"); return; }
 
-        java.util.List<WorldZoneMarker> markers = new java.util.ArrayList<>(mgr.getMarkers());
+        java.util.List<ZoneMarker> markers = new java.util.ArrayList<>(mgr.getMarkers());
         if (markers.isEmpty()) { GD.print("DebugHarness: no registered zone markers to teleport to"); return; }
         markers.sort(java.util.Comparator.comparing(m -> m.zone != null ? m.zone.zoneId : ""));
 
@@ -470,7 +470,7 @@ public class DebugHarness extends Node {
         if (player == null) { GD.print("DebugHarness: no player found to teleport (F1)"); return; }
 
         teleportZoneIndex = (teleportZoneIndex + 1) % markers.size();
-        WorldZoneMarker target = markers.get(teleportZoneIndex);
+        ZoneMarker target = markers.get(teleportZoneIndex);
         Vector3 pos = target.getGlobalPosition();
         player.setGlobalPosition(new Vector3((float) pos.getX(), (float) pos.getY() + 3f, (float) pos.getZ()));
         GD.print("DebugHarness: teleported to zone '" + (target.zone != null ? target.zone.zoneId : "?")
@@ -511,7 +511,7 @@ public class DebugHarness extends Node {
 
     /**
      * Headless walk-test driver: launched with {@code -- --auto-walk} (Godot user args), drags the
-     * local player through every registered {@link WorldZoneMarker} in {@code zoneId} order at
+     * local player through every registered {@link ZoneMarker} in {@code zoneId} order at
      * {@link #AUTO_WALK_SPEED}. This makes a {@code --headless} smoke actually exercise streaming —
      * without it the input-less player stands still forever and only its spawn district ever loads,
      * so streaming/traffic regressions (which show up on zone crossings) never reproduce in CI-style
@@ -553,9 +553,9 @@ public class DebugHarness extends Node {
             }
         }
         if (!autoWalk) return;
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (mgr == null) return;
-        java.util.List<WorldZoneMarker> markers = new java.util.ArrayList<>(mgr.getMarkers());
+        java.util.List<ZoneMarker> markers = new java.util.ArrayList<>(mgr.getMarkers());
         if (markers.isEmpty()) return;
         markers.sort(java.util.Comparator.comparing(m -> m.zone != null ? m.zone.zoneId : ""));
 
@@ -567,13 +567,13 @@ public class DebugHarness extends Node {
 
         if (autoWalkStartFilter != null) {
             for (int i = 0; i < markers.size(); i++) {
-                WorldZoneMarker m = markers.get(i);
+                ZoneMarker m = markers.get(i);
                 if (m.zone != null && m.zone.zoneId.contains(autoWalkStartFilter)) { autoWalkIndex = i; break; }
             }
             autoWalkStartFilter = null;
         }
         autoWalkIndex %= markers.size();
-        WorldZoneMarker target = markers.get(autoWalkIndex);
+        ZoneMarker target = markers.get(autoWalkIndex);
         Vector3 tp = target.getGlobalPosition();
         Vector3 pp = player.getGlobalPosition();
         double dx = tp.getX() - pp.getX(), dz = tp.getZ() - pp.getZ();
@@ -687,9 +687,9 @@ public class DebugHarness extends Node {
         Node scene = getTree().getCurrentScene();
         if (scene == null) { GD.print("DebugHarness: no current scene for traffic"); return; }
 
-        java.util.List<VehicleRoute> routes = new java.util.ArrayList<>();
+        java.util.List<com.openworld.world.Lane> routes = new java.util.ArrayList<>();
         collectRoutes(scene, routes);
-        if (routes.isEmpty()) { GD.print("DebugHarness: no VehicleRoute nodes found (F4)"); return; }
+        if (routes.isEmpty()) { GD.print("DebugHarness: no Lane nodes found (F4)"); return; }
 
         Object loaded = GD.load(VEHICLE_SCENE_PATH);
         if (!(loaded instanceof PackedScene vehicleScene)) {
@@ -701,28 +701,43 @@ public class DebugHarness extends Node {
         // don't drop cars on top of each other — overlapping rigid bodies shove apart sideways.
         java.util.List<Vector3> placed = new java.util.ArrayList<>();
         int spawned = 0;
-        for (VehicleRoute route : routes) {
+        for (com.openworld.world.Lane route : routes) {
             if (spawnVehicleOnRoute(vehicleScene, scene, route, spawned, placed)) spawned++;
         }
         GD.print("DebugHarness: spawned " + spawned + " AI vehicles across "
                 + routes.size() + " routes (F4)");
     }
 
-    private void collectRoutes(Node node, java.util.List<VehicleRoute> out) {
-        if (node instanceof VehicleRoute r) out.add(r);
+    /**
+     * Every {@link com.openworld.world.Lane} in the subtree — NOT every {@link VehicleRoute}.
+     *
+     * {@code Lane} exists precisely so a scene can mix a hand-authored marker route with a
+     * Blender-computed {@code PathLaneRoute}, and {@code VehicleAIController.setRoute} has always
+     * taken the interface. F4 was the straggler that still asked for the concrete class, so on a
+     * piece baked from a {@code .lanekit.json} — which emits {@code PathLaneRoute} exclusively —
+     * it reported "no routes found" over a world with 160 lanes in it. That is the whole road
+     * network of the island rebuild's base piece.
+     */
+    private void collectRoutes(Node node, java.util.List<com.openworld.world.Lane> out) {
+        if (node instanceof com.openworld.world.Lane r) out.add(r);
         for (Node child : node.getChildren()) collectRoutes(child, out);
     }
 
     /** Spawns one AI vehicle near the route's first waypoint, facing the second, bound to that route.
      *  If the spot is occupied (a shared lane start), it is nudged back along the lane so cars queue
      *  instead of overlapping. */
-    private boolean spawnVehicleOnRoute(PackedScene vehicleScene, Node scene, VehicleRoute route,
+    private boolean spawnVehicleOnRoute(PackedScene vehicleScene, Node scene,
+                                        com.openworld.world.Lane route,
                                         int idx, java.util.List<Vector3> placed) {
-        java.util.List<Vector3> pts = route.waypoints();
-        if (pts.size() < 2) return false;
-
-        Vector3 a = pts.get(0);
-        Vector3 b = pts.get(1);
+        // THE DRIVEN PATH, not the raw centreline. `pointAtLength` is the one thing both lane
+        // representations agree on and it is what the car will actually follow — a `VehicleRoute`'s
+        // `waypoints()` are its unsmoothed, un-offset markers, so a car used to be dropped on the
+        // centreline of a lane it then drove offset from.
+        double total = route.total();
+        if (total < 1.0) return false;
+        Vector3 a = route.pointAtLength(0.0);
+        Vector3 b = route.pointAtLength(Math.min(6.0, total * 0.5));
+        if (a == null || b == null) return false;
         // Unit direction of travel (XZ) and its reverse for back-offsetting.
         double dx = b.getX() - a.getX(), dz = b.getZ() - a.getZ();
         double len = Math.sqrt(dx * dx + dz * dz);

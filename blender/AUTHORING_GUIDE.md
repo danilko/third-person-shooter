@@ -12,14 +12,14 @@ change a district `.blend` and see it in-game. The decided naming/structure conv
 assets/world_source/pieces/Piece_<gx>_<gy>.blend                  ← the Blender source you edit
         │  blender/tools/export_world.py (glTF, drops Blender-only collections)
         ▼
-src/main/resources/com/openworld/world/districts/<stem>.gltf/.bin    ← throwaway intermediate
+src/main/resources/com/openworld/world/pieces/<stem>.gltf/.bin    ← throwaway intermediate
         │  WorldBaker (Java, named markers → gameplay nodes)
         ▼
 …/districts/<stem>.tscn                                              ← the streamed scene
         │  NavBaker (pedestrian navmesh from the scene's own collision)
-        │  DistrictBinaryConverter (.tscn → sibling .scn, faster stream-in parse)
+        │  PieceBinaryConverter (.tscn → sibling .scn, faster stream-in parse)
         ▼
-streamed in-game by the master's WorldZoneMarkers (predictable path — the master
+streamed in-game by the master's ZoneMarkers (predictable path — the master
 never needs re-baking when a district changes)
 ```
 
@@ -92,7 +92,7 @@ blender/tools/build_piece.sh Piece_1_1     # exports/bakes the .blend exactly as
 ```
 
 Exports → bakes → navmeshes → refreshes the `.scn` for whatever is currently saved in that
-district's `.blend` — never regenerates anything. `DistrictBinaryConverter` mtime-skips untouched
+district's `.blend` — never regenerates anything. `PieceBinaryConverter` mtime-skips untouched
 districts, so a freshly baked `.tscn` is never shadowed by a stale sibling `.scn` — nothing else
 to remember. Streaming resolves districts by predictable path, so **the master never needs
 re-baking for a district change** (`blender/tools/build_world.sh` is only for grid/theme/arterial-level
@@ -390,14 +390,14 @@ mismatch if run, but nothing currently re-syncs it automatically; fixing a stale
 edit in Blender like everything else now. A hand-written script authoring a genuinely new district
 in the future would need to compute its own seam data the same way, reusing those same
 `world_grid.py` primitives directly (they're still there — only the wrapper function is gone).
-The Godot runtime needs **no changes at all** for the void mechanism itself — `WorldZoneManager`
+The Godot runtime needs **no changes at all** for the void mechanism itself — `ZoneManager`
 has no hardcoded grid-count anywhere; a missing marker simply means nothing streams there.
 
 **No world-spanning safety floor.** `build_world.safety_floor()` (`--with-floor`) and the
 per-district `add_ground_safety_plane()` (on by default for any non-fully-DEM-covered district)
 were both removed outright — a collision-only floor sitting a meter or more below visual ground
 silently trapped `Character`/`Player` bodies with no recovery path (neither has any
-fall-out-of-world safety net, unlike vehicles, which `WorldZoneManager.maintainTraffic` reclaims
+fall-out-of-world safety net, unlike vehicles, which `ZoneManager.maintainTraffic` reclaims
 below `Y = -30`). Falling off a road, off the ArtDeck, or into a void cell now falls straight
 through — same as any other gap in authored ground, no invisible catch. If a fall-out recovery
 mechanism for `Character`/`Player` is wanted later, it belongs in Java (mirroring the vehicle
@@ -418,7 +418,7 @@ Long-span connective structures (an expressway ring, elevated rail, a shinkansen
 - **Different lifecycle.** Hand-editing a district must never touch the highway; an overlay edit
   must never force a district rebuild. Separate files = separate build loops.
 - **Different residency.** A rail/highway is visible from far away and carries its own traffic;
-  it wants a long-span, wide-radius `WorldZoneMarker` of its own (a normal streamed piece, just
+  it wants a long-span, wide-radius `ZoneMarker` of its own (a normal streamed piece, just
   with `load_radius`/`unload_radius` tuned well past its own half-extent so it never unloads
   mid-span) — not chopped to the 504 m district streaming grain.
 - **A train is not per-district content.** A vehicle that traverses the whole map needs one
@@ -431,7 +431,7 @@ not part of the 6×6 grid walk, §4's "freestanding" pieces):
 
 - Authored in **world coordinates** (like the master's own content), exported with the same
   `blender/tools/export_world.py` + WorldBaker path to its own `.tscn` under
-  `src/main/resources/com/openworld/world/districts/` — every piece bakes to the same output
+  `src/main/resources/com/openworld/world/pieces/` — every piece bakes to the same output
   directory now, grid or freestanding (`build_piece.sh` handles both uniformly).
 - Districts don't know about freestanding pieces; one touches down via its own ramp/pillar
   geometry over a district's ground (pillars carry their own `-colonly`). Author the touchdown
@@ -515,7 +515,7 @@ blender/tools/build_piece.sh Piece_2_3_b   # bake-only, after hand-editing the .
 ```
 
 **Residency:** a freestanding piece is a **normal streamed piece** — `build_world.py` emits a
-`WorldZoneMarker`/`RegionConfig` for it exactly like a grid district (no kind branch, §4's "One
+`ZoneMarker`/`RegionConfig` for it exactly like a grid district (no kind branch, §4's "One
 file for the whole world"), just with `load_radius`/`unload_radius` deliberately widened past its
 own half-extent (`half_extent + 300` / `+300` hysteresis for the bridge) so it stays loaded for
 its whole length instead of unloading mid-span. There is no permanent scene node to wire up —
@@ -754,6 +754,15 @@ Manual/on-demand by design (unlike the always-on traffic-arrow/lane-index overla
 always-regenerating version of this (`lanecl_*` curves) was removed for exactly the live-edit-churn
 cost this one-click/one-click-undo pair avoids.
 
+**Ground/road alignment ("Cut Ground Under Road") — HISTORY, twice over.** The button described
+below belonged to the *previous* addon model (`ops_placement.py`, deleted in the point-graph
+rewrite), and the automatic boolean cut that replaced it was itself deleted on 2026-09-06: the road
+now **deforms the height field** rather than cutting the mesh (`island_v3_terrain.Carve`,
+`ROAD_POINT_GRAPH.md` §8v). Nothing in the tree cuts a ground mesh any more. Kept because the
+failure it describes — a road z-fighting with terrain that already models a road-shaped bump, and
+the trap of forgetting one of several overlapping ground meshes — is still what goes wrong when
+harvested legacy geometry meets new pavement.
+
 **Ground/road alignment ("Cut Ground Under Road"):** newly authored `road_kit_authoring` pavement
 sits at a fixed/gently-sloped Z of its own and does **not** automatically know about — or cut a
 hole in — whatever ground mesh is already there, so it can visibly z-fight with/sit on top of
@@ -783,13 +792,13 @@ concave/sloped DEM topology, so review the cut visually rather than trusting it 
 **Ambient traffic + zones:** every combined lane is tagged `zone_id` (the `.blend`'s own stem by
 default, overridable per-piece via a manually-added `rka_zone_id` custom property) — a district's
 master region marker sets `traffic_route` to that exact stem, matched by
-`WorldZoneManager.findRoute`'s zone-id-equality pass (checked before its legacy name-prefix scan,
+`ZoneManager.findRoute`'s zone-id-equality pass (checked before its legacy name-prefix scan,
 which still exists only for hand-authored `VehicleRoute` content that never went through this
 pipeline). Re-run the master build (`blender/tools/build_world.py`) after a district's first
 `.lanekit.json` lands so the region marker's meta picks it up.
 
 **Debugging:** F4 (`DebugHarness`) drops one AI car on every route in the scene (works in
-`SoloPiece.tscn`); `WorldZoneManager.debugLog` prints per-zone `N cars, M moving, K routed`
+`SoloPiece.tscn`); `ZoneManager.debugLog` prints per-zone `N cars, M moving, K routed`
 (routed-but-0-moving = falling through missing ground); F3 (`RouteDebugOverlay`) renders every
 `VehicleRoute`/`PathLaneRoute` in the scene, colour-coded.
 
@@ -957,7 +966,7 @@ collision.
 ## 11. Cross-district GPS & race courses (conventions — design notes, R2 not yet implemented)
 
 The structural fact everything here follows from: **district content streams** (its
-`VehicleRoute`/`PathLaneRoute` lanes register/deregister with `WorldZoneManager` on tree
+`VehicleRoute`/`PathLaneRoute` lanes register/deregister with `ZoneManager` on tree
 enter/exit; anything baked into a district `.tscn` vanishes on unload), while the **ARTDECK
 collision deck is always resident** in the master (P6.8: the old arterial LANE backbone over
 that deck was removed — see §7 — so today the deck is collision-only; an overlay, §5, is the
@@ -997,7 +1006,7 @@ the ArtDeck-covered backbone or keep the districts it passes through loaded.
   **no** ground guarantee at all (the world-spanning safety floor that used to cover this gap was
   removed — see §4) — those districts must stay loaded for the race line to have ground under it;
   racers cluster near players so proximity streaming mostly covers it; the safety net is a small
-  `RaceDirector` → `WorldZoneManager`
+  `RaceDirector` → `ZoneManager`
   "pin these zones while the race runs" extension.
 - **The AI racing line is the same authored-curve pipeline** — a `VehicleRoute` drawn along the
   course (in the race overlay for cross-district courses), driven by `VehicleAIController`

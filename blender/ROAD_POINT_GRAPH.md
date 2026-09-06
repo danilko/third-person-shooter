@@ -611,7 +611,7 @@ a lateral offset** — it asks `slot_offset()` or the outline.
 ### 3.4 LOD
 
 `build_piece.sh` bakes a second, cheap piece from whatever is in the `STREET_LOD_LOW` collection, and
-`WorldZoneManager` shows it while a district is unloaded. The build emits a **flat, kerbless,
+`ZoneManager` shows it while a district is unloaded. The build emits a **flat, kerbless,
 asset-free** version of each road surface into that collection from the same carrier — one extra
 GN stack configuration, not a second model.
 
@@ -624,7 +624,7 @@ which is why this is promoted rather than mentioned:
 |---|---|
 | `NavBaker` (`ParsedGeometryType.STATIC_COLLIDERS`) | roads and footways contribute **nothing** to the pedestrian navmesh — on-foot AI path over whatever terrain collision happens to sit under the asphalt |
 | `ImpactManager.resolveSurfaceType` | falls through to `DEFAULT` — bullets hitting a road produce generic decals and particles; there is no asphalt or concrete surface |
-| vehicles | `WorldZoneManager.debugLog`'s own signal for this is "routed-but-0-moving = falling through missing ground" |
+| vehicles | `ZoneManager.debugLog`'s own signal for this is "routed-but-0-moving = falling through missing ground" |
 | the player | walks on terrain, not on the road they can see |
 
 So the build emits, per road and per junction:
@@ -822,19 +822,19 @@ not need re-baking when Phase 2 lands.
 
 - `WorldBaker.buildPathLaneRoute` reads `{p, in, out}` and the new fields.
 - `PathLaneRoute` gains `speedLimit`, `roadClass`, `junctionId`, `spawnable`, `grade`, `banking`;
-  `WorldZoneManager.isSpawnCandidate` tests `spawnable` instead of inferring from `turn`.
+  `ZoneManager.isSpawnCandidate` tests `spawnable` instead of inferring from `turn`.
 - `VehicleAIController` gets a real speed target per lane instead of inferring from turn letters.
 - **Separable and later:** consolidate the 924 nodes into **one `LaneNetwork`** holding the lanes as
   data, removing ~2 800 nodes from every world load. `Lane` being an interface is *not* enough to
   make this a drop-in: `LaneGraph.forScene` gates on `anyLane instanceof Node` with a live
   `getTree()`, `LaneGraph.collect` walks the scene tree for `Lane` **nodes**,
-  `WorldZoneManager.registerRoute` keys on `Node3D.getName()`, and `PathLaneRoute.resolveRoute` /
+  `ZoneManager.registerRoute` keys on `Node3D.getName()`, and `PathLaneRoute.resolveRoute` /
   `entryPoint` are node-based. A data-only lane breaks all four. Worth doing, sized as a real runtime
   refactor with a before/after node-count and load-time measurement — **after** v2 lands, never
   alongside the authoring rewrite.
 
 **Still true, and still checked by the gate:** Godot axes `(bx, bz, −by)` with exactly one conversion
-site; lane names globally unique (`WorldZoneManager.routeByName` is one flat world-wide `TreeMap`);
+site; lane names globally unique (`ZoneManager.routeByName` is one flat world-wide `TreeMap`);
 `next` / `next_weights` / `next_kinds` positionally parallel; a lane's tail within 4.5 m of its
 successor's head; `loop` emitted for a ring road. `blender/lib/lane_kit.py` `combine_pieces()`
 remains the emitter back-end — it is extended with the v2 fields, not replaced.
@@ -874,7 +874,7 @@ every lane. (`WorldBaker` already parses them into `PathLaneRoute`; nothing in t
   centre. → the explicit `spawnable` flag (§6.1).
 - **`lane_width` is dropped** — Java reads it only from a top-level `arms` array nothing emits.
   → `arms[]`, plus per-lane `lane_width`.
-- **`zone_id` is absent**, so `WorldZoneManager.findRoute` strategy 2 can never match. → emit it.
+- **`zone_id` is absent**, so `ZoneManager.findRoute` strategy 2 can never match. → emit it.
 
 ---
 
@@ -912,7 +912,7 @@ every lane. (`WorldBaker` already parses them into `PathLaneRoute`; nothing in t
 ### Godot-side changes (§6)
 
 `WorldBaker` (bezier control points + the v2 fields), `PathLaneRoute` (`speedLimit`, `roadClass`,
-`junctionId`, `spawnable`, `grade`, `banking`), `WorldZoneManager.isSpawnCandidate` (test
+`junctionId`, `spawnable`, `grade`, `banking`), `ZoneManager.isSpawnCandidate` (test
 `spawnable`), `VehicleAIController` (speed target from `speedLimit`, bend anticipation from
 `road_class`/`grade`). `LaneNetwork` is a separate, later change.
 
@@ -1381,7 +1381,7 @@ Coverage: **33 checks**, 23 operators, 6 panels, both directions still asserted.
 ### One command
 
 `blender/tools/check_roads.sh` runs the whole thing — 10 pure-Python self-tests, a fresh `.lanekit`
-v2 export through `check_lanekit_graph.py`, and 5 headless Blender smoketests. **17 checks, green.**
+v2 export through `check_lanekit_graph.py`, and 5 headless Blender smoketests. **18 checks, green.**
 `--quick` skips Blender (~2 s). The repo has no CI and the previous addon's ~3.5 kLOC of hand-run
 smoketests did not prevent this rewrite, so the point is that a hook or an Action can run it as a
 unit.
@@ -2255,6 +2255,574 @@ kerbed island and its proxy is **not** `-noped`, while every gore touching the f
 is. An all-`-noped` answer would also be produced by a constant; having both is the rule being
 `ped_access`-driven.
 
+## 8m. Too many stations, too few, and what a hand edit costs (2026-08-31)
+
+Three gestures, one question, and the question is the interesting part: *"is it okay to let points
+connect randomly because of a manual edit?"*
+
+**No, and the reason is one line in the reader.** `point_model.read_network` sorts a road's point
+objects **by name** and that order IS the chain — `road_runs`, `road_corridors`, every sweep and the
+export all read it. The LINKS are a separate fact and they are the authored one. So a hand edit that
+breaks the naming (a rename, a `Shift+D`, a point dragged into another collection) silently
+reorders the road: the links still say what is joined to what, the build follows them and is
+correct, and the file no longer reads the way it behaves. Nothing said so.
+
+- **`point_model.link_order(net, road)`** is the one owner of "what order do the links put these
+  points in". Components are maximal sets joined by `SEGMENT` or `JUNCTION` (`road_corridors`' rule
+  — a crossing does not split a street); each is walked from an end. A component whose links
+  **branch** has no linear order at all — three points on one station is a junction, not a chain —
+  so it comes back in `tangled` and is left alone, because guessing an order for it would be
+  inventing one. It is **idempotent on a correct road**: each walk starts at whichever end already
+  sorts first and components come back in the order their earliest member currently sits, which is
+  the property that makes it safe to run over everything.
+- **`Author ▸ Repair ▸ Renumber Roads`** renames to match. Links are authored, a name is derived, so
+  when they disagree the name is the one that is wrong — never the other way round.
+- **`chain_out_of_order`** (WARN) and **`chain_branched`** (WARN) are the gate saying it out loud.
+  WARN, not ERROR, because the build is not wrong: it follows the links. What is wrong is that the
+  drawing and the behaviour have parted, and the remedy is one button.
+
+**`Merge Points`** collapses a contiguous run of one road's points into one station. The first of
+the run survives with its uid, its cross-section and its facing — a merged station is a *station*,
+not an average of several — and only its position moves, to the centroid (or the active point, by
+property). Every link that **left** the run is carried onto the survivor; links inside the run are
+what is being collapsed. Two refusals, and both are the model rather than a limitation: a
+**non-contiguous** selection is "delete everything between them" wearing a friendlier name
+(`Delete Point` says that out loud), and points in **different roads** are not a merge at all — a
+crossing is a clique of `JUNCTION` links between points that each stay in their own road, and
+collapsing them would delete the junction. That gesture is `Connect Selected` / `Make Intersection`.
+
+**`Insert Point` takes one point now**, not only two. Selecting a single station and splitting the
+span *after* it is the gesture an artist actually makes; the downstream neighbour is derived from
+the `SEGMENT` link and the chain order together (`_next_in_chain`), because either alone is
+ambiguous — the link says which two points are joined and the order says which of them is
+downstream. At the tail there is no span and it refuses by name, pointing at `Extend Road`.
+
+Both renumber, like every other structural gesture, so the invariant the whole model rests on —
+name order **is** chain order — survives the edit.
+
+## 8n. A junction that was never authored is consistent with itself (2026-09-04)
+
+Every check in §8a–§8m reads the authored graph and asks whether it is **consistent**. That is the
+right question for a fact with two owners, and it is blind to a fact with none.
+
+Two roads whose end stations sit at the *identical position* with no link between them pass the
+whole gate: no link to be asymmetric (there is no link), no chain with a hole (both chains are
+whole), no clique to be incomplete (there is no clique). The only symptom is that no car can get
+from one to the other, and nothing in the model says so. It shipped: `WORLD_REBUILD_PLAN.md` `W14`
+— an 839 m road in the island's harbour whose first station is exactly on another road's last one,
+unreachable, with the gate reading **0 errors, 0 warnings**.
+
+`point_validate.check_meetings` is the missing eye. `road_end_unjoined` (WARN, like
+`chain_unlinked`, and for the same reason — the file no longer reads the way it behaves, and both
+remedies are one button) fires on a point where a road **stops** — one `SEGMENT` link or none, no
+junction or ramp business of its own — standing within `CHAIN_TOL` of a point in another road with
+no link either way. Two deliberate narrowings, both load-bearing:
+
+- **open ends only.** A road that merely passes near another one is not a defect, and a ramp mouth
+  is authored to stand beside its mainline (it is exempt as an `AUX` target).
+- **in 3D.** A street that runs *under* an expressway is separated by the deck. Measuring in plan
+  would report every underpass in the world.
+
+The general rule, for the next check: *a consistency check cannot see something that was never
+written down.* When a fact can be **absent** rather than **contradictory**, it needs a check that
+asks the geometry, not the graph.
+
+
+## 8o. A run's end is not a road's end (2026-09-04)
+
+Two user reports about the junctions, after the footway existed for the first time. Both are §8f.1
+and `W3` meeting: a **direction** with two owners, and a **width** the solve had never been given.
+
+### 8o.1 The pad's cap and the street's own end section were cut on different planes
+
+`point_model.station_axis` is the one owner of "which way does a station face", and the pad cuts
+every cap on it (§8f.1). The carriageway is swept by `road_points.chain_tangents` — which is handed
+a **RUN**, and a run stops at the mouth, so its end tangent falls back to "the single available
+chord". That fallback is right for a road that ENDS and wrong for a mouth: the road does not end
+there, it carries on across the pad, and `station_axis`'s central difference reaches the mouth on
+the other side to say so.
+
+They agree exactly while a road runs straight through a crossing, which is why every square
+junction on the island measured 0.000 and every skew one did not. At Rinkai x Kuko the cap was cut
+at 16.07 deg and the tarmac at 28.3 deg — 12.2 deg, which over a 21 m carriageway leaves the road's
+own kerb line **2.23 m** off the pad corner it has to meet.
+
+`point_profile.run_end_axes` answers the two end stations from the chain and nothing else (every
+interior station's central difference is already the same calculation on the same neighbours). The
+**Z slope stays the run's own**: `station_axis` is a plan-view frame by design, and forcing a flat
+tangent would kink the vertical profile of every graded approach. Wired into the sweep, the export
+and the overlay together, because the whole point is that they cut on one plane.
+
+### 8o.2 A pad was sized for the carriageway, and a footway is pavement too
+
+`corner_clearance`'s own docstring quotes "14.5 m at a square crossing" — a T2 road's **deck** half
+(4 lanes + median + two 4 m footways = 29.0 m). `corner_setback` passed `half_in`/`half_out`, which
+are `lane_profile.paved_extents`: the carriageway, 10.5 m. The two were indistinguishable for as
+long as no road had a footway, and the day one did, every pad stood revealed as sized for a 21 m
+road that is 29 m wide.
+
+A corner then has no room to turn in. At a 95/85 crossing set back 14 m the two cap points at the
+85 deg corner are **3.31 m** apart: the kerb turns 95 deg in 3.3 m, a ~2 m radius against an
+authored `fillet_radius` of 6, and a 4 m footway swept round a 2 m radius folds through itself. The
+95 deg corner had 6.58 m and looked right — "2 angles seem correct, but 2 other angles seem more
+square", which is what a 2:1 asymmetry in corner length looks like from the ground.
+
+Shortest corner run on the island: **3.15 m -> 14.95 m**. The pads are now the size
+`corner_clearance` has been asking for since it was written.
+
+**The rule.** A number that is derived from a section must be derived from the WHOLE section. When
+a layer is optional and has been zero everywhere, every consumer that quietly stands for "the
+road's width" is holding a value that happens to be right, and none of them will say so.
+
+
+## 8p. A stop line the seeder guessed, and a mouth that left its own road (2026-09-04)
+
+Two defects, one seam: **`seed_district_roads` and `Auto Setback` both decide where a stop line
+goes, and they were not asking the same question.** Found by comparing the island's `.blend` against
+what its own seeder produces — a hand edit had deleted two stations, and the interesting part was
+why they were there.
+
+- **The seeder guessed the setback, and the guess was always low.** Every mouth went in at a flat
+  14 m and every station within `14 + MIN_SPAN` of the crossing was pruned as belonging to the
+  junction. `Auto Setback` then solved the real distance — **17.9 to 35.5 m** over the island's ten
+  pads — and walked each mouth out over the top of whatever had survived a window computed from the
+  wrong number. `point_solve.solved_setback` is now the one owner: extracted from `auto_setback`,
+  it is a function of the ARMS alone, so the seeder can ask it with planned arms
+  (`seed_district_roads._PlannedArm`, `place_setbacks`) before a single Empty exists and prune the
+  real window.
+- **Nothing could see the result.** Both stations carry the same profile, so `check_tapers` returns
+  on `dw == 0` before it ever measures the span, and `station_coincident` only fires at 1e-6. The
+  island shipped an ordinary station **0.19 m** past Rinkai-dori's mouth at the Chuo crossing, plus
+  two more at 5.66 m and 6.87 m, with the gate reading 0/0.
+  `point_validate.check_mouth_clearance` / **`station_crowds_mouth`** is that eye: measured along
+  the RUN (a mouth's other neighbour is across the pad, which is exactly where a short gap belongs),
+  ERROR under `CHAIN_TOL` and WARN under `MIN_MOUTH_CLEAR`.
+- **A MOUTH SLIDES ALONG ITS OWN ROAD. IT DOES NOT MOVE SIDEWAYS OFF IT.** `auto_setback` wrote
+  `centre + out_dir * tail`, a ray from the pad CENTROID — and the centroid is on none of the roads.
+  On a symmetric X it is the crossing and the two are the same point, which is why this was
+  invisible for as long as every pad was one. On the island's 5-arm port junction the centroid sits
+  **12 m** off the crossing, so `port_road`'s mouth landed metres to the side of its own centreline;
+  the next station along was still where the road is, so the approach left the pad on a bearing
+  **40 deg** from its own alignment, ending up **3.54 deg** from Chuo-dori's arm — two carriageways
+  leaving on top of each other, with the pavement drawn as a 90 m spike. The centre is now projected
+  onto each mouth's own axis first, so the mouth cannot leave the centreline; the distance to the
+  centroid comes out `hypot(tail, offset)`, never less than `tail`, so every corner still clears.
+- **The no-move test has to be on the POSITION.** `abs(old - tail) < 1e-4` compared a distance to
+  the centroid against a distance along the arm. Once those stopped being the same number, a mouth
+  that was already exactly right still reported as moved — a settled solve reading as a drifting one.
+
+**Still open: `Auto Setback` is not idempotent, and its docstring says it is.** Pressing it a second
+time on the island moved 17 of 35 mouths by up to 30 m, and a fourth press by 58 — a monotonic
+runaway, because `recommended_tail_length` only ever searches UPWARD from the widest mouth it is
+given while the mouths themselves move the centroid it measures from. The fixes above bound it
+(the mouth stays on its axis, so the drift no longer compounds sideways) but do not close it: the
+centre, the mouths and the AUTO facings derived from them are one coupled system and settling it
+needs a fixed-point solve, not a single pass. It is harmless in the build, which presses the button
+exactly once — and it is a live trap for anyone who presses it twice by hand. `WORLD_REBUILD_PLAN.md`
+`W17`.
+
+## 8q. A gesture that hands out a JUNCTION link owes the whole pad (2026-09-04)
+
+Three user reports from one session of hand-editing `Island_base.blend`, and the first is the
+interesting one because the gesture was *right about the thing it was written for*.
+
+- **`Merge Points` carried the links and nothing else.** §8m gave it the rule "every link that LEFT
+  the run comes with it", which is correct and was all it did. But a pad is three facts written
+  together and `make_pad` was the only thing that had ever written them: the members form a
+  **clique**, each is typed `INTERSECTION`, and each hangs off the `JCT_*` handle. Merging a plain
+  station with the mouth beside it made the *plain station* the survivor (it is `doomed[0]`), so it
+  inherited the JUNCTION links while staying `SEGMENT` and unparented — and where two members of one
+  pad merged, the rest still pointed at a uid that no longer existed. The island's port junction came
+  out a 4-node component with **3** edges and two mouths typed `SEGMENT`: **8 gate errors from one
+  gesture**, and `Auto Setback` then solving a clique that is not one.
+  `point_ops.complete_junction_cliques` is the shared owner — it completes the clique, sets the
+  roles, and re-parents to the handle (a mouth that is not parented does not turn with the crossing
+  and `junction_centre` does not count it). `Merge Points` calls it; `Repair Links` recovers a file
+  already broken by it (measured: 8 errors → 0, 3 links written, 2 roles fixed, 2 mouths parented).
+  The coverage smoketest had a merge case already and it covered none of this, because it merges
+  **interior** stations only — the new case merges *into* a crossing and asserts all three facts.
+- **A road that ends 76 m past a junction still contributes two arms.** Four arterials meet at the
+  island's port, and the plan wrote that one place as *three* coordinates: Port road's head and
+  Nishihama-dori's tail shared `(-96, -560)`, Hama-dori's tail sat 12 m away and Chuo-dori's head
+  **76 m** away. The seeder clusters crossings within `CROSSING_NEAR` (21 m), so Chuo-dori never
+  joined the cluster: it ran *through* the pad to a dead end, and a road that passes through
+  contributes a mouth either side. The result was a 5-arm pad with a stub hanging off it. All four
+  now terminate on the one vertex, which is the plan's own rule ("terminates on another arterial,
+  never in mid-air") — one arm each, a 4-arm crossing.
+- **`resample` had no opposite number.** It lays a station every `spacing` metres so a road HAS
+  stations where it needs them; on the straight legs between two authored plan vertices those are
+  exactly collinear and cost geometry, build time and a lane control point each for nothing — the
+  island's Port road carried a station every 67 m down 232 m of dead-straight quay.
+  `seed_district_roads.simplify` is Douglas-Peucker over the 3D polyline, run twice and unioned:
+  against the ROAD at `STATION_MERGE_TOL` (0.25 m) and against the GROUND at `GROUND_MERGE_TOL`
+  (1.0 m). Two rules behind that shape:
+  - **Douglas-Peucker, never a pairwise walk.** The recursion always measures against the chord
+    between two points that are being KEPT, so the tolerance bounds the distance from the original
+    polyline outright. A local "is this station on the line between its neighbours" test measures
+    each candidate against a line that already reflects previous removals, and a long shallow curve
+    then walks off by many times the tolerance one legal step at a time.
+  - **The ground is simplified too, and looser.** A station's `ground_z` is what `road_support` sizes
+    its piers from, so a dead-straight deck over a bay must not collapse to its two shore stations —
+    the seabed between them would be read as a straight line and every pier cut to the wrong depth.
+  Mouths are protected outright: a stop line is not a shape, it is an agreement between two roads
+  about where the pad hands over.
+  Measured on the island: **433 → 184 stations (249 dropped, 57%)** for **+0.02 m** of drape error —
+  the worst road-to-ground gap on any at-grade road went 0.32 m → 0.34 m, against a
+  `MovementController.stepUpLedge` of 0.35 m. The bridges and the benched touge are unchanged
+  (17.9 m and 21.6 m are the bay and airport decks; 8.7 m is the touge's own cut/fill).
+
+## 8r. A corner is a bend, and only the JOINT has to move (2026-09-04)
+
+`W15`, closed. Where two plan arterials meet end-to-end the seeder links them SEGMENT-to-SEGMENT,
+and **a run never spans two road collections** (`point_solve.road_runs` walks one road's own
+points), so each sweeps its own carriageway to the joint at its OWN heading. Two sections cut on
+planes 98-124 deg apart agree nowhere: measured on the island, the two chains ended **24-28 m
+apart** with a link across the hole and no road built in it.
+
+**The question was whether to round the corner or use a bend station. They are the same answer.**
+The model's own answer for a road that turns is a bend station -- the Empty's rotation IS the
+gesture -- and a bend station is exactly what a rounded corner is made of. What could not stay was
+the *joint sitting in the middle of the turn*.
+
+- A **2-arm pad** was tried and rejected: `check_junctions` says in as many words that "a pad of 2
+  arms is a segment connection, not a junction", `lane_movements` wires only the innermost lane
+  across it, and every mouth comes out 40-53 deg off its pad centre.
+- **Merging the two roads into one** works geometrically and costs a street its name --
+  Nishihama-dori swept as part of Rinkai-dori, and every lane id, `traffic_route` prefix and future
+  zone reference with it.
+- **What shipped:** `seed_district_roads.fillet_corner` trims both chains back by the tangent
+  length, lays a circular arc between the tangent points, and **splits the arc at its midpoint** so
+  each road carries half the turn. At that midpoint both roads run in the same direction, which is
+  the straight-through joint this branch already built correctly. A street name changing halfway
+  round a bend is what streets do.
+
+The radius is **derived from the section**, never a constant (`W16`): `CORNER_RADIUS_FACTOR` (3.0)
+times the DECK half-width, so the inner deck edge turns through `R - half = 2 * half` -- 29 m on a
+T2 arterial, 16 m on a T3 street. The touge's `HAIRPIN_RADIUS` (12 m) is the tightest thing in the
+world and it is a mountain switchback on the narrower section; an arterial rounding a headland is
+not that. A fillet that wants more tangent than the road has is clamped to
+`CORNER_MAX_CHAIN_FRACTION` and the radius recomputed from what fits, so the arc still MEETS both
+tangents.
+
+Two things fell out of it, and both are the shape this document keeps recording:
+
+- **The geometry meeting is not the graph chaining.** With the corner rounded the flow report's
+  verdict moved from `open_end` (a lane running off the edge of the network) to **`broken`** (a tail
+  sitting on a head with no edge between them) -- the road fixed and the lane graph still silent.
+  The runtime would have recovered it, since `LaneGraph` derives a proximity edge inside
+  `JUNCTION_RADIUS`, and that is precisely the reason to emit it here instead: §8f.4's rule is that
+  reachability is not geometry and needs its own eye, and leaving the one road-to-road hand-over in
+  the world to a distance test puts it where no check can see it.
+  `point_export.wire_joints` emits the edge, matched by GEOMETRY (a lane's tail and its successor's
+  head are the same physical point) rather than by lane index, because which of the two chains runs
+  which way is an accident of how the plan was authored. `broken` **12 -> 0**.
+- **A measurement outlives the thing it measured.** `_joint_bend` took a vector from the place
+  centroid to each mouth, which is only meaningful while the two mouths stand either side of it.
+  Once the fillet made both chains END on the same point, that reading collapsed and reported a
+  confident **180 deg** on three corners whose real deflection is **7**. `_chain_bend` asks each
+  road's own chain at the shared station.
+
+Measured, all three joints: gap **25.6 -> 0.00 m**, deflection **106 / 124 / 98 -> 7.3 / 7.5 /
+7.3 deg** (one arc step of `CORNER_ARC_STEP_DEG`, i.e. the arc's own discretisation, not a corner).
+
+## 8s. A pad is a plane and the ground under it is not (2026-09-05)
+
+`W20`. A junction pad meets every approach at that approach's own elevation -- `point_solve._idw_z`
+interpolates the surface from the mouths, and that rule is right, it is what stops a junction on a
+grade from stepping. Between the mouths, though, the surface is interpolated while the **ground goes
+on doing whatever it does**. Where the ground rises inside the footprint, the pad is under it.
+
+**Why that matters is the COLLIDER, not the eye.** `point_build.cut_ground` punches a vertical prism
+through the terrain over every band, pads included, so the burial is invisible -- but the island's
+collision mesh (`Ground-colonly`) is deliberately in a collection the cut does **not** recognise as
+terrain, because continuous collision under the whole island is the base layer's whole job
+(`build_island_base`). So the player walks on ground the eye says is not there, standing above a
+road that has vanished under their feet. Measured at the island's port crossing, where four
+arterials meet on ground that falls **2.09 m** across the pad: the interior stood **0.924 m** proud
+of the pad surface -- against a `MovementController.stepUpLedge` of 0.35 m, a wall rather than a
+step. Reported by the user, who lifted the pad by hand.
+
+`seed_district_roads.pad_lifts` derives it: probe the ground on a 2 m grid over the pad's own
+footprint, take the largest amount by which it stands above `_idw_z`, and raise **every mouth of
+that pad by that one number**. Three things about the shape of it:
+
+- **A uniform offset, never per mouth.** `_idw_z` is linear in the mouth heights, so adding the same
+  number to all of them raises the whole surface by exactly that number -- one pass is exact, no
+  iteration, and the pad keeps its tilt. Raising them by different amounts would re-shape the pad to
+  fit a hummock, which is not what a junction does.
+- **Applied as a FLOOR before the grade cone** (`height_profile(..., floors=)`), so the approaches
+  grow the ramp up to the raised pad instead of stepping at the stop line. The embankment then
+  follows for free: `road_support.support_kind` reads the same `delta`. Measured, the port
+  approaches now sit up to 1.47 m proud at the mouth with a p95 of 0.58 m -- a short local ramp, not
+  a road on stilts.
+- **`PAD_BURY_TOL` is a tolerance for *exactly on*, not a margin** -- the same 5 cm and the same idea
+  as `point_edges.BURIED_TOL`. Without it every junction in the world was lifted by the full
+  `PAD_CLEARANCE` for raycast noise: measured over the island's nine pads, the eight on flat ground
+  read a raw burial of **0.000000 to 0.000122 m** and the one on a slope reads **0.924** -- four
+  orders of magnitude apart, so the trigger is not a judgement call. One pad lifts, by 1.17 m; the
+  other eight are untouched.
+
+**What this does NOT fix, and the user named it: the collider is uncut.** Lifting the pad clears
+*this* burial, but any road surface that sits below the terrain is still unreachable, because the
+cut is a visual-only operation by design. The general answer is either to cut the collider too
+(which reopens the fall-through the base layer exists to prevent) or to build the road's own
+collision proxy as the thing the player stands on and accept the terrain proxy beneath it -- a
+`-colonly` ordering question, not a road-shape one. Recorded as `W21`.
+
+## 8t. The ground cut had never cut anything (2026-09-05)
+
+Started as `W13` -- "a cut has no batter", the benched touge running in a vertical-walled slot --
+and the first measurement said something larger: **every cutter in the world was a flat sheet.**
+
+`cut_ground` built its solid with `bmesh.ops.solidify(bm, geom=[face], thickness=2*depth)`, and
+that produced no thickness at all: measured across all 32 cutters, `z_min == z_max == -40.00`. So
+every boolean was a no-op, the evaluated terrain came back with **exactly** its base vertex count
+(19477), and no road anywhere had ever had ground removed from under it. It was invisible for as
+long as every road was draped ON the terrain -- a road standing 0.16 m proud of the ground needs no
+cut to look right -- and it surfaced the moment two roads went *below* it: the user's buried
+junction pad (`W20`) and this slot are the same defect seen twice.
+
+`_cut_tube` / the lofted branch build the solid explicitly instead. Three things came out of it:
+
+- **A road is cut as a TUBE, not as one lofted outline.** `band_of` walks the left edge out and the
+  right edge back, so a road that switches back on itself produces a self-intersecting outline, and
+  the single n-gon cap across it is geometry the exact boolean declines to arrange. A tube has only
+  two small end caps.
+- **Coincident rings are welded, not emitted.** Where a stretch is at grade the cut depth is 0 and
+  the two middle rings land on the same points; a quad with two coincident corners is a degenerate
+  face and a solid built from them is not manifold -- which the boolean also answers by doing
+  nothing, silently.
+- **The reach is asymmetric on purpose.** Downward it uses the full depth, upward it stops at each
+  section's own daylight point plus `CUT_BELOW`, because ground above that is hillside the batter
+  has just run out to meet. Making the downward reach local as well was tried and measured: holes
+  fell from 57% of samples to 21% for no gain, so it stays global.
+
+**The batter itself** is `road_support.cut_footprint` + `CUT_SLOPE` -- `fill_footprint` for the
+other sign of `delta`, and steeper than the fill (1:1 against 1:1.5) because a cut face is
+undisturbed ground with the cohesion to stand while a fill is placed earth on its angle of repose.
+`support_profile` now answers `toe_half_width` and `batter_slope` for a CUT as it always did for a
+FILL.
+
+**And `CUT_MAX` had two owners that disagreed by 8x.** `road_support.CUT_MAX` said a trench deeper
+than **3 m** is a TUNNEL; `island_v3_terrain.MAX_BENCH` -- the depth a benched road is deliberately
+allowed to dig -- said **25 m**; the shrine touge measures **8.1 m** and therefore fell in the gap,
+classified as a tunnel that nothing builds. A benched road is a CUT by construction, so the number
+that decides where a cut stops has to cover what the bench rule may dig. `MAX_BENCH` reads
+`CUT_MAX` now.
+
+Measured over the island, road centrelines, ground standing proud of the road surface:
+
+| | before | after |
+|---|---|---|
+| samples with the ground cut through | 6% | **57%** |
+| roads with ground standing proud | 1 of 12 (+8.71 m) | **1 of 12 (+8.71 m)** |
+| worst proud, the other 11 roads | up to +0.42 m | **+0.00 m** |
+
+**`W13` IS NOT CLOSED, and the cause is NOT the boolean.** The shrine touge -- the one road the
+finding was written about -- is still 0% cut and still stands 8.71 m under its hillside. Two repairs
+were tried against the hairpin theory and BOTH were measured and reverted: splitting the cutter
+wherever the road has turned 150 deg (so no chunk's footprint can overlap itself) changed the touge
+not at all, and giving each cross-section a local 3 m skirt instead of the full depth (so a
+switchback's loops cannot enclose one another) changed it not at all either, while dropping
+through-holes elsewhere from 57% of samples to 21%. Neither is in the tree.
+
+**What the measurement actually says**, at the deepest station (-796.9, 775.4), road surface
+172.04:
+
+    band.surface_z   172.04      the road, as the sweep built it
+    ground_fn        169.04      the live sampler: ground 3 m BELOW the road
+    rka_delta         -8.00      the solve: road 8 m BELOW the ground
+    -> _cut_section h  0.00      so the cutter has nothing to remove, and removes nothing
+
+`ground_sampler` and the station's own stored `ground_z` disagree by **11 m** in the same place, and
+`_cut_section` asks the sampler. `scene.ray_cast` does respect modifiers, so the sampler is reading
+the terrain as already cut and punching through whatever it does not consider terrain
+(`gen_collection_names`, `is_terrain`) -- which on a mountainside, with the road's own generated
+output in the scene, is where the 11 m has to be coming from. That is a sampler question, not a
+geometry one, and it is where the next attempt should start: the hairpins are exonerated.
+
+## 8u. The sampler was reading the terrain the last build had already cut (2026-09-05)
+
+§8t ended by naming the sampler and it was right. Two defects, one in each half of the cut, and
+both of them the same shape as everything in §8f-§8t: **a fact with two owners, answering by
+returning a plausible number rather than an error.**
+
+### A ROAD'S OWN OUTPUT IS NOT TERRAIN -- AND A BOOLEAN IT HUNG ON THE TERRAIN IS ITS OUTPUT TOO
+
+`ground_sampler` already keeps that rule for MESHES: it punches through a road's own generated
+geometry rather than sampling it, because the ray otherwise lands on the surface the last build
+swept and the road walks a little further up every rebuild. It did not keep it one level down. The
+cut is a BOOLEAN MODIFIER hung on the terrain, `scene.ray_cast` evaluates modifiers, and
+`build_network` created the sampler while the previous build's 32 booleans were still on the ground
+-- so a ray aimed at a deep station went straight down the road-shaped slot the LAST build punched
+and found nothing at all. `_cut_section` reads `gz is None` as a daylight height of **0** and
+removes nothing, which re-cuts the road out of existence one press at a time: **once the slot is
+there, the hillside can never be seen again.**
+
+Measured on `Island_base`'s shrine touge, 66 stations, in the file as shipped:
+
+| | stations with NO ground under them |
+|---|---|
+| with the previous build's cuts standing | **29 of 66** |
+| after `clear_cuts` | **0 of 66** |
+
+It is invisible in the tool that builds the island, because `build_island_base.py` builds a fresh
+scene and presses Build exactly once. It bites the ARTIST, who presses it twice -- which is rule 3
+("author through the operators an artist presses") seen from the maintenance side rather than the
+authoring side.
+
+`build_network` now clears the cuts *before* it samples, and hands the ONE sampler to the solve, the
+write-back **and** the cut. Those were two samplers, created at different points in the build, so a
+station's stored `ground_z` came from a different reading of the scene than the daylight height its
+own cutter was shaped from -- two owners of "how high is the ground here", free to disagree by
+whatever the build did in between. That is the 11 m §8t measured.
+
+### A SWITCHBACK'S CUTTER SELF-INTERSECTS, AND THE EXACT SOLVER HAS TO BE TOLD
+
+With the sampler fixed the touge still stood **8.00 m** under its hillside at 18 of 225 stations,
+and the cutter looks perfect from every angle the addon can ask about it:
+
+    verts 6572, faces 6579, non-manifold edges 0, loose verts 0
+    a point at the buried station tests INSIDE by ray parity
+
+That is exactly why this survived three attempts. A hairpin stacks two loops of road metres apart
+in Z and on top of each other in plan, and `_cut_tube` reaches `depth` BELOW each section's own road
+surface (§8t: making that local was measured and cost 57% -> 21% of through-holes elsewhere), so one
+loop's solid passes clean through the next. The result is closed, manifold and **self-intersecting**
+-- and for a doubly-covered region Blender's exact solver has no defined inside, so it leaves the
+ground standing, silently. `use_self` is the flag that means precisely this.
+
+One cutter against a copy of the island's ground, the 10 deepest touge stations:
+
+| boolean | still buried | worst |
+|---|---|---|
+| EXACT, defaults | 10 / 10 | 7.99 m |
+| EXACT, `use_self` | **2 / 10** | **3.20 m** |
+| EXACT, `use_hole_tolerant` | 2 / 10 | 3.20 m |
+| FLOAT | 7 / 10 | 7.99 m |
+
+**`use_hole_tolerant` is NOT what is set**, although it gives the same numbers about 5x faster.
+This operand has no holes -- it self-intersects -- and leaning on a flag documented for the other
+condition is a fix that can evaporate on a Blender upgrade with nothing on screen to see. The whole
+island, station by station:
+
+| | before | after |
+|---|---|---|
+| stations with ground standing proud | 18 of 225 | **2 of 225** |
+| worst proud | 8.00 m | **3.20 m** |
+| roads affected | 1 of 12 (the touge) | 1 of 12 (the touge) |
+
+### What is left of `W13`: TWO HAIRPIN APEXES, AND THEY ARE TRIPLE-COVERED
+
+The residue is stations 30 and 49 of the touge, both at the apex of a hairpin, at **3.06 m** and
+**3.20 m**. The number that names them is the parity: a ray from either apex crosses the cutter's
+own surface **3** times, against 0 or 1 at every neighbour that cuts clean -- three shells of the
+same solid overlap there, not two. Reversing the cutter's faces was tried and measured (9 -> 36
+buried), so the winding is right by construction and `recalc_face_normals` is not the cause. Start
+at the triple cover.
+
+## 8v. The road deforms the ground; it no longer cuts it (2026-09-06)
+
+**THE BOOLEAN IS GONE.** `cut_ground`, `clear_cuts`, `_cut_tube`, `_cut_section`,
+`_outward_offsets` and `_self_intersects` were deleted, along with the `Cut Ground` build option and
+the exporter workaround that hid the cutters from glTF. What replaced them is
+`island_v3_terrain.Carve`: the roads are a **ceiling on the height field**, and the ground mesh is
+sampled from the field with that ceiling applied.
+
+### Why, after four rounds of fixing the boolean instead
+
+Each round found a real defect and each fix was correct; the pattern only reads as a verdict on the
+tool when they are put in a row.
+
+| round | what was wrong |
+|---|---|
+| `W22` §8t | the cutter was a zero-thickness sheet -- **no boolean had ever cut anything** |
+| §8u | the sampler raycast the terrain the PREVIOUS build had cut, so a deep station found no ground, read a daylight height of 0, and was never cut again |
+| §8u | a switchback's cutter passes through itself; the exact solver has no defined inside for a doubly-covered region and leaves the ground standing, silently |
+| -- | and it could never touch the COLLIDER, because a boolean removes material and the always-resident ground is the one layer that must never have a hole (`W21`) |
+
+The measurement that settled it: from **identical inputs** -- the same network, the same terrain,
+the same sampled `ground_z` byte for byte -- pressing Build a second time took the touge from 2
+buried stations to 9 (3.20 m to 6.92 m). That is not a bug to chase.
+
+**And it was never the industry approach.** Open-world terrain is a heightfield; a heightfield has
+no topology to cut. From Unreal's `Deform Landscape to Splines` to a Houdini road HDA, the operation
+is to write the road's elevation INTO the field, and the terrain's collision is that same field, so
+the visual and the collider cannot disagree. Manual cut-and-stitch is real but narrow: it is for
+what a 2.5D field cannot express -- tunnels, overhangs, a bridge abutment into a cliff -- where the
+practice is to punch a terrain hole and hand-model the piece that closes it.
+
+### The rule, and the two halves that make it safe
+
+    z = min(z, road_corridor_z(x, y))          # roads may DIG, never FILL
+
+**Carve-only is load-bearing, not a simplification.** Unreal's deform *sets* the height, raising and
+lowering. Copying that would be wrong twice: `road_support` already owns FILL (it derives
+NONE/FILL/PIER/CUT from `surface_z - ground_z` and builds the toes and columns), so rising ground
+would build the same embankment a second way; and it would **fill the bay**, where `W1` carries
+Hama-dori 18.20 m over open water. `min` needs no special case for a bridge, because it cannot
+raise ground. The two are on opposite signs of one number: **the terrain owns the cut and its
+batter, `road_support` owns the fill and the piers.**
+
+**One direction of derivation.** A road's profile is derived FROM the ground (`bench_profile`,
+`grade_cone`, `height_profile` all sample it), so carving the field the router reads makes the next
+pass derive a lower road, which carves deeper, forever. A `Carve` is therefore a separate VIEW
+(`carved_field`) handed only to the ground-mesh builder. Alignment against the original terrain,
+terrain deformed to the finished alignment, never back -- the order a real road is built in.
+`build_island_base` emits the ground **twice** for exactly this reason: natural, seed and solve,
+then carved.
+
+### The verge -- why a 12 m grid is enough, and subdivision is not the lever
+
+The carved FIELD can never stand above the road; a MESH can, because it samples at grid nodes and a
+cell straddling the paved edge has one corner at road level and the next up the batter, so the
+triangle between them cuts over the carriageway. Widen the flat shelf by one full cell and every
+node within the paved width -- and the first one outside it -- is capped, so no triangle spanning
+the road can have a raised corner. That is an argument, not a tuning.
+
+Measured over the whole network, **1 185 377 samples** at 0.25 m across every road and 2 m along it:
+
+| verge | samples proud | worst |
+|---|---|---|
+| 0 x cell | 450 | 3.508 m |
+| 0.5 x cell | 35 | 0.941 m |
+| **1.0 x cell** | **0** | **0.000 m** |
+
+Subdividing instead converges far too slowly to be the answer: 12 m -> 3 m cells took the worst
+intrusion only 3.508 m -> 0.647 m -- still past `MovementController.stepUpLedge` (0.35 m) -- for 16x
+the vertices, because the error scales with the batter's own 1:1 gradient. The verge removes the
+cell from the road's edge instead. (Had it not worked, the next move was **breaklines** -- the road's
+edges as triangulation constraints -- not more subdivision.)
+
+**A hairpin needs no case at all.** Two legs of a switchback both propose a cap where they overlap
+and the lower wins, which draws the cut face between them; at either leg's own centreline that
+leg's cap is the lower, so each is clear, and the nose of ground left standing between them is what
+a switchback bench looks like. The geometry that defeated the boolean four times falls out of `min`
+with nothing written for it -- which is the strongest reason to believe the operator.
+
+### What it measures, on the built island
+
+| | boolean | carve |
+|---|---|---|
+| stations with ground proud (visual) | 2 of 225, worst 3.20 m | **0**, worst **0.00 m** |
+| ...on the COLLIDER | never cut at all (`W21`) | **0**, worst **0.00 m** |
+| `Ground` vertices | 19 477 -> 30 577 (36 039 with `use_self`) | 19 477 -> **21 547** |
+| collider vs visual | different meshes by design | **identical** |
+| repeated Build | 2 -> 9 buried stations | **stable**, 0 every time |
+| terrain evaluation | 3.5 s, or 43.6 s with `use_self` everywhere | none -- there are no modifiers |
+
+28 295 samples at 4 m along and +/-6 m across every road, both sheets, all zero.
+
+### The one thing it introduced, and the eye that was put on it
+
+A ground carved to its roads is not the natural ground, and `write_ground_back` could not tell the
+difference: a second Build in the saved file sampled a surface that MEETS the road and stamped it
+back as terrain -- **195 of 225 stations, the biggest by 9.46 m**, quietly reclassifying a benched
+stretch as at-grade. No geometry changed (a CUT's batter is the terrain's now, so a CUT reading as
+NONE builds the same nothing), but it destroyed the record every support decision is made from.
+`point_build.CARVED_FLAG` is set by the carve and read by `write_ground_back`, which now refuses
+with a message. Re-measured: **0 of 225 rewritten.**
+
 ## 9. Verification
 
 **ONE COMMAND, and it exists** (`blender/tools/check_roads.sh`). The repo has no CI, and the
@@ -2263,7 +2831,7 @@ discipline is exactly what decays once a project gets boring, so a git hook or a
 the whole gate as a unit:
 
 ```bash
-blender/tools/check_roads.sh            # 17 checks: 10 self-tests + the lanekit gate + 5 smoketests
+blender/tools/check_roads.sh            # 18 checks: 11 self-tests + the lanekit gate + 5 smoketests
 blender/tools/check_roads.sh --quick    # pure-Python only, no Blender, ~2 s
 ```
 

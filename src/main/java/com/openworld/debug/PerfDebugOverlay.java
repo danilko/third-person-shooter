@@ -1,6 +1,6 @@
 package com.openworld.debug;
 
-import com.openworld.world.WorldZoneManager;
+import com.openworld.world.ZoneManager;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.CanvasLayer;
@@ -15,7 +15,7 @@ import godot.core.Vector2;
  * Debug-only HUD readout of the engine performance monitors (Shift+F3 via {@code DebugHarness}) —
  * FPS, frame/physics time, draw calls, primitives, objects drawn, video/static memory, and
  * object/node/orphan counts — plus the JVM heap (all game logic lives there; the engine's
- * MEMORY_STATIC never sees it) and {@link WorldZoneManager#debugStatsLine} (streaming is this
+ * MEMORY_STATIC never sees it) and {@link ZoneManager#debugStatsLine} (streaming is this
  * project's dominant perf variable). Builds its own {@link Label} in code, same procedural-UI
  * convention as {@code ZoneDebugOverlay} (which it stacks under at y=40).
  *
@@ -80,7 +80,7 @@ public class PerfDebugOverlay extends CanvasLayer {
         sb.append(String.format("obj %s  nodes %s  orphans %.0f",
                 compact(objCount), compact(nodeCount), orphanCount));
 
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (mgr != null) sb.append(System.lineSeparator()).append(mgr.debugStatsLine());
         return sb.toString();
     }

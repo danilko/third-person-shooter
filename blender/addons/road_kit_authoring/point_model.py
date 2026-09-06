@@ -69,6 +69,17 @@ SHARP = 'SHARP'
 MANUAL = 'MANUAL'
 TANGENT_MODES = (AUTO, SHARP, MANUAL)
 
+#: What the divide between the two carriageways IS. `median_width` says how wide; this says what.
+#:
+#: APPEND-ONLY, like every enum in this module -- a Blender `EnumProperty` is stored by ORDINAL,
+#: so inserting a value in the middle silently re-reads every saved road in every `.blend` as its
+#: neighbour, with nothing to see in any diff (8i.6).
+MED_NONE = 'NONE'
+MED_PAINT = 'PAINT_DOUBLE_Y'
+MED_RAISED = 'RAISED'
+MED_WALL = 'WALL'
+MEDIAN_STYLES = (MED_NONE, MED_PAINT, MED_RAISED, MED_WALL)
+
 #: The four fields a station may change while still INHERITing the road's base profile -- "what
 #: actually varies along a road" (1.2a). Everything else is whole-profile INHERIT or OVERRIDE,
 #: deliberately one bit rather than a 30-field mask nobody can hold in their head.
@@ -92,7 +103,10 @@ POINT_FIELDS = (
     # cross-section, measured OUTWARD from this point; the point's position is the divide -------
     ("lanes_fwd",      'i',  2),
     ("lanes_bwd",      'i',  2),
-    ("lane_width",     'f',  3.5),
+    # 4.5 m, not the 3.5 m book value: this world drives arcade-wide on purpose -- see
+    # `seed_district_roads.LANE_WIDTH` for the measurement (a 2.4 m car in a 3.25 m lane).
+    # A hand-authored road should come out the same width as a seeded one.
+    ("lane_width",     'f',  4.5),
     ("drop_side_fwd",  DROP_SIDES, KERB),
     ("drop_side_bwd",  DROP_SIDES, KERB),
     ("aux_fwd",        'i',  0),
@@ -103,7 +117,6 @@ POINT_FIELDS = (
     ("parking_left_width",   'f', 0.0),
     ("parking_right_width",  'f', 0.0),
     ("median_width",   'f',  0.0),
-    ("median_style",   's',  ""),
     ("left_kerb_height",  'f', 0.15),
     ("left_walk_width",   'f', 0.0),
     ("right_kerb_height", 'f', 0.15),
@@ -152,6 +165,45 @@ ROAD_FIELDS = (
     #: district. Dialling it down is a legitimate, and now VISIBLE, authoring decision; the
     #: default is 1.0 so the real standard is what you get unless you say otherwise.
     ("taper_factor", 'f', 1.0),
+
+    # ---- STYLE: what the road is MADE OF ---------------------------------------------------------
+    #
+    # PER ROAD, NOT PER POINT, deliberately. A cross-section change along a road is "two stations
+    # that differ" and that is the whole model; what the road is made of is not -- a stretch of the
+    # same road paved differently is a different road, and a per-point material would multiply the
+    # layer stack by the station count for a distinction nobody authors.
+    #
+    # Each slot holds a DATABLOCK NAME, blank meaning "the layer's default". Names and not
+    # pointers because `<stem>.roads.json` is the source of truth and must round-trip (rule 3) --
+    # the same reason every other authored reference here is a name. `point_style` is the one
+    # place they are resolved.
+    #
+    # `median_style` LIVES HERE and not on the point, though it was declared there (unused) from
+    # the start: it decides which geometry the divide builds, and the divide's material is one
+    # material for the whole run. `median_width` still varies per station, so an island that
+    # widens, narrows and vanishes is authored exactly as before.
+    ("median_style", MEDIAN_STYLES, MED_RAISED),
+    ("surface_mat",  's', ""),
+    ("median_mat",   's', ""),
+    ("deck_mat",     's', ""),
+    ("kerb_mat",     's', ""),
+    ("footway_mat",  's', ""),
+    ("barrier_mat",  's', ""),
+    ("mark_w_mat",   's', ""),
+    ("mark_y_mat",   's', ""),
+    # A PROFILE ASSET replaces the parametric band for its layer: the artist models the section
+    # once -- a real kerb with a chamfer, a jersey barrier, a gutter -- and the road sweeps it,
+    # continuously, so it survives any curvature. (A TILED asset, which is what the previous model
+    # used, cannot: rigid pieces round a 9 m corner sit 12.7 deg apart and open a real 7.8 cm gap
+    # at every joint. Tiling is for lamp posts and signs, and is `GN_PointAssets`' job.)
+    ("surface_asset", 's', ""),
+    ("median_asset",  's', ""),
+    ("kerb_asset",    's', ""),
+    ("footway_asset", 's', ""),
+    ("barrier_asset", 's', ""),
+    #: Paint the lane markings at all. Off for a road whose surface is a placeholder, and off for
+    #: every LOD-low bake -- stripes at 300 m are a triangle budget with nothing to show for it.
+    ("markings", 'b', True),
 )
 
 _POINT_DEFAULTS = {n: d for n, _k, d in POINT_FIELDS}
@@ -804,16 +856,38 @@ def face_matrix(obj, direction):
 ROTATED_TOL_DEG = 0.5
 
 
+def facing_local(obj):
+    """The Empty's local +Y in its PARENT's frame -- the same direction `facing_of` returns, just
+    expressed where the baseline lives. Identical to `facing_of` for an unparented point, since
+    `matrix_local` IS `matrix_world` then."""
+    v = obj.matrix_local.col[FORWARD_AXIS].to_3d()
+    return None if v.length <= 1e-9 else tuple(v.normalized())
+
+
+def to_parent_frame(obj, world_direction):
+    """A WORLD direction expressed in `obj`'s parent frame. The identity for an unparented one."""
+    d = Vector(world_direction)
+    if obj.parent is None:
+        return d.normalized() if d.length > 1e-9 else d
+    d = obj.parent.matrix_world.to_3x3().inverted() @ d
+    return d.normalized() if d.length > 1e-9 else d
+
+
 def baseline_of(obj):
-    """The facing `point_ops.sync_facings` last stamped on this point, or None if it never has."""
+    """The facing `point_ops.sync_facings` last stamped on this point, IN ITS PARENT'S FRAME, or
+    None if it never has."""
     v = Vector(obj.rka_pt.auto_tangent)
     return None if v.length <= 1e-9 else v.normalized()
 
 
 def stamp_baseline(obj, direction=None):
-    """Record the facing the TOOL is giving this point, so a later hand rotation is detectable."""
+    """Record the facing the TOOL is giving this point, so a later hand rotation is detectable.
+
+    STORED IN THE POINT'S PARENT FRAME, and compared there -- see `was_rotated`. `direction` is a
+    WORLD vector like everything else in this module; the conversion happens here, once."""
     d = Vector(direction) if direction is not None else Vector(facing_of(obj) or (0.0, 1.0, 0.0))
-    obj.rka_pt.auto_tangent = tuple(d.normalized()) if d.length > 1e-9 else (0.0, 0.0, 0.0)
+    d = to_parent_frame(obj, d)
+    obj.rka_pt.auto_tangent = tuple(d) if d.length > 1e-9 else (0.0, 0.0, 0.0)
 
 
 def was_rotated(obj):
@@ -826,9 +900,20 @@ def was_rotated(obj):
     it is to be able to tell a hand rotation apart from an arrow the tool has not re-faced yet --
     which is what the stamped baseline is for. Recomputing the chain tangent and comparing would
     promote every point the artist merely DRAGGED, because a translate changes the chain tangent
-    while leaving the rotation alone."""
+    while leaving the rotation alone.
+
+    ASKED IN THE POINT'S PARENT FRAME, because that is the frame the baseline is stored in and a
+    comparison across two frames is not a comparison. It matters for exactly one kind of point: a
+    junction mouth, which is parented to its `JCT_*`. Turning the whole crossing rotates every
+    mouth's WORLD facing, and against a world-space baseline that read as four hand rotations at
+    once -- silently baking four MANUAL facings `Follow Road (Auto)` could then never straighten,
+    and which rotating back would not undo. It is the pad's frame that moved, not the artist
+    turning that one arm; the same distinction this function already draws between a rotation and
+    a drag. For every unparented point the two frames are the same matrix, so this changes nothing
+    at all -- including for every `.blend` written before it, whose junction parents all carry the
+    identity rotation the old lock enforced."""
     base = baseline_of(obj)
-    now = facing_of(obj)
+    now = facing_local(obj)
     if base is None or now is None:
         return False
     dot = max(-1.0, min(1.0, base.dot(Vector(now))))
@@ -899,6 +984,74 @@ def road_collections(scene=None):
 
 def point_objects(coll):
     return [o for o in coll.objects if getattr(o, "rka_pt", None) is not None and o.rka_pt.is_point]
+
+
+def link_order(net, road):
+    """`(components, tangled)` -- the road's points as ITS OWN LINKS order them.
+
+    THE CHAIN ORDER IS THE OBJECT-NAME ORDER (`read_network` sorts by name, `point_ops.point_name`
+    and `_renumber` maintain it), and that is a fact about a list of strings. The LINKS are a fact
+    about the road. They are two statements of the same thing and a hand edit can put them at odds
+    -- rename a point, duplicate one, drag one between collections -- after which the build follows
+    the links while the artist reads the order, silently. `point_validate.check_chains` reports the
+    disagreement and `Author > Repair > Renumber Roads` fixes it, both from here.
+
+    A component is a maximal set joined by SEGMENT or JUNCTION links (`road_corridors`' rule: a
+    crossing does not split a street). Within one it is ordered by walking from an end. A component
+    whose links BRANCH has no linear order at all -- three points on one station is not a chain --
+    so it is returned in `tangled` and left alone; guessing an order for it would be inventing one.
+
+    IT IS IDEMPOTENT ON A CORRECT ROAD, which is the property that makes it safe to run on
+    everything: each walk starts at whichever end already sorts first, and the components come back
+    in the order their earliest member currently sits, so a road that is already right is returned
+    unchanged and the repair renames nothing.
+    """
+    uids = [u for u in road.points if u in net.points]
+    rank = {u: i for i, u in enumerate(uids)}
+    members = set(uids)
+
+    def nbrs(u):
+        p = net.points[u]
+        return sorted((l.target for l in p.links
+                       if l.target in members
+                       and l.type in (LINK_SEGMENT, LINK_JUNCTION)), key=lambda t: rank[t])
+
+    seen, comps, tangled = set(), [], []
+    for u in uids:
+        if u in seen:
+            continue
+        stack, comp = [u], []
+        seen.add(u)
+        while stack:
+            v = stack.pop()
+            comp.append(v)
+            for w in nbrs(v):
+                if w not in seen:
+                    seen.add(w)
+                    stack.append(w)
+        comp.sort(key=lambda t: rank[t])
+        deg = {v: len(nbrs(v)) for v in comp}
+        if any(d > 2 for d in deg.values()):
+            tangled.extend(comp)
+            continue
+        if len(comp) == 1:
+            comps.append(list(comp))
+            continue
+        ends = [v for v in comp if deg[v] == 1]
+        start = ends[0] if ends else comp[0]      # no end = a closed loop; start where it sorts
+        order, prev, cur = [start], None, start
+        while True:
+            nxt = [w for w in nbrs(cur) if w != prev]
+            if not nxt or nxt[0] in order:
+                break
+            prev, cur = cur, nxt[0]
+            order.append(cur)
+        if len(order) != len(comp):               # unreachable for deg<=2, but never emit a partial
+            tangled.extend(comp)
+            continue
+        comps.append(order)
+    comps.sort(key=lambda c: min(rank[u] for u in c))
+    return comps, tangled
 
 
 def road_corridors(net, road):

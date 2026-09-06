@@ -9,7 +9,7 @@ import com.openworld.ai.AIBehaviorConfig;
 import com.openworld.character.Faction;
 
 /**
- * A named story AI placed in a {@link WorldZone} (PLAN.md Part E / E1).
+ * A named story AI placed in a {@link Zone} (PLAN.md Part E / E1).
  *
  * <p>Unlike {@link SpawnConfig}'s anonymous ambient AI, a named character always spawns with a
  * <b>stable {@link #characterId}</b> so later mission code (Part F's MissionDirector) can address

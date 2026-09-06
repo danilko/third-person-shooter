@@ -11,7 +11,7 @@ import godot.global.GD;
 /**
  * One-shot throwaway host (same pattern as {@code WorldBaker}/{@code NavBaker}): loads
  * {@code scenePath}, times a single {@code PackedScene.instantiate()} + {@code addChild()} — the
- * exact pair {@code WorldZoneManager.load()} calls on a real zone stream-in, including the
+ * exact pair {@code ZoneManager.load()} calls on a real zone stream-in, including the
  * physics-server registration every {@code StaticBody3D}/{@code CollisionShape3D} does on
  * {@code _enter_tree} — then prints the elapsed ms and quits. Run once per process (not looped
  * in-process) so a queued {@code queueFree()} from a prior iteration can never contaminate the

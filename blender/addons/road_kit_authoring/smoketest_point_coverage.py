@@ -39,6 +39,8 @@ from road_kit_authoring import point_model as pm                             # n
 from road_kit_authoring import point_ops as po                               # noqa: E402
 from road_kit_authoring import point_panel as ppn                            # noqa: E402
 from road_kit_authoring import point_preview as pv3                          # noqa: E402
+from road_kit_authoring import point_export as pe3                           # noqa: E402
+from road_kit_authoring import point_style as pstyle                         # noqa: E402
 from road_kit_authoring import point_solve as ps                             # noqa: E402
 from road_kit_authoring import point_validate as pv                          # noqa: E402
 
@@ -133,6 +135,21 @@ class StubLayout(object):
             % (rna.identifier, name))
         self.log["props"].append((rna.identifier, name))
 
+    def prop_search(self, data, name, search_data, search_prop, **kw):
+        """A name-picker row. Validated on BOTH sides: the property being written and the
+        collection being searched must each exist, because a typo in either is a panel that
+        raises the moment a human opens it -- and a `prop_search` typo in the SEARCH half is the
+        quieter one, since the row still draws and simply never offers anything."""
+        rna = getattr(data, "bl_rna", None)
+        assert rna is not None, "prop_search() on a non-RNA object: %r" % (data,)
+        assert name in rna.properties, (
+            "panel draws prop_search(%s, %r) but that property does not exist"
+            % (rna.identifier, name))
+        assert hasattr(search_data, search_prop), (
+            "prop_search searches %r on %r, which has no such collection"
+            % (search_prop, search_data))
+        self.log["props"].append((rna.identifier, name))
+
     def operator_menu_enum(self, idname, prop_name, **kw):
         assert prop_name in _op_props(idname), (
             "operator_menu_enum(%r, %r): that operator has no such property" % (idname, prop_name))
@@ -193,6 +210,17 @@ def draw_panel(cls, log):
 
 # ---------------------------------------------------------------------------------- the test
 
+def _all_objects(coll, acc=None):
+    """Every object under a collection, recursively -- generated geometry is nested per road."""
+    acc = [] if acc is None else acc
+    if coll is None:
+        return acc
+    acc += list(coll.objects)
+    for child in coll.children:
+        _all_objects(child, acc)
+    return acc
+
+
 def main():
     ok = 0
     _wipe()
@@ -220,6 +248,88 @@ def main():
     mp = _pts("main")
     check("Insert Point splits a link and renumbers the chain")
     ok += 1
+
+    # -- Insert Point from ONE point, which is the gesture an artist actually makes ---------------
+    # "Put another station after this one." The downstream neighbour is derived from the SEGMENT
+    # link and the chain order together; at the tail there is no span and it must say so rather
+    # than inventing one (that is `Extend Road`'s job).
+    before = len(_pts("main"))
+    _sel(mp[1], active=mp[1])
+    run("rka.insert_point")
+    mp = _pts("main")
+    assert len(mp) == before + 1, len(mp)
+    assert all(o.name.startswith("main_p") and "." not in o.name for o in mp), [o.name for o in mp]
+    _sel(mp[-1], active=mp[-1])
+    try:                       # bpy.ops raises on an ERROR report, which is the refusal
+        run("rka.insert_point")
+        raise AssertionError("inserting past the tail must be refused")
+    except RuntimeError as exc:
+        assert "Extend Road" in str(exc), exc
+    check("Insert Point takes ONE point (splits the span after it) and refuses at the tail")
+    ok += 1
+
+    # -- Merge Points: a contiguous run becomes one station, keeping the links that left it -------
+    # `main` is a SHARED FIXTURE -- the tests after this one count its points -- so this section
+    # and the insert above hand it back at the length they found it (`before`).
+    mp = _pts("main")
+    a, b, c = mp[1], mp[2], mp[3]
+    mid = ((a.matrix_world.translation + b.matrix_world.translation
+            + c.matrix_world.translation) / 3.0).copy()
+    outer_before = mp[0], mp[4]
+    _sel(a, b, c, active=b)
+    run("rka.merge_points")
+    mp = _pts("main")
+    assert len(mp) == before + 1 - 2, len(mp)
+    keep = [o for o in mp if o.rka_pt.uid == a.rka_pt.uid]
+    assert len(keep) == 1, "the FIRST of the run survives, with its own uid"
+    keep = keep[0]
+    assert (keep.matrix_world.translation - mid).length < 1e-4, "survivor sits at the centroid"
+    joined = {l.target for l in keep.rka_pt.links}
+    assert outer_before[0] in joined and outer_before[1] in joined, \
+        "both links that LEFT the run came with it"
+    assert all(o.name.startswith("main_p") and "." not in o.name for o in mp), [o.name for o in mp]
+    # Non-contiguous, and points from two roads, are both refused -- merging p002 with p009 is
+    # "delete everything between them" wearing a friendlier name, and two points in different
+    # roads are a junction, not a station.
+    _sel(mp[0], mp[-1], active=mp[0])
+    try:
+        run("rka.merge_points")
+        raise AssertionError("a non-contiguous merge must be refused")
+    except RuntimeError as exc:
+        assert "next to each other" in str(exc), exc
+    check("Merge Points collapses a run into one, carries its outward links, renumbers")
+    ok += 1
+
+    # -- Renumber Roads: the repair for a hand edit that broke the naming -------------------------
+    # The chain order IS the object-name order (`read_network` sorts by name), so a rename silently
+    # reorders the road while the links still say what is joined to what. Rename one point out of
+    # order, assert the gate SEES it, then repair and assert it is gone -- and that a second run
+    # renames nothing, because a repair that is not idempotent cannot be run on everything.
+    mp = _pts("main")
+    victim = mp[1]
+    victim.name = "main_p900"
+    net = pm.read_network()
+    kinds = {f.code for f in pv.validate(net)}
+    assert "chain_out_of_order" in kinds, sorted(kinds)
+    run("rka.renumber_roads")
+    net = pm.read_network()
+    assert "chain_out_of_order" not in {f.code for f in pv.validate(net)}
+    names_after = [o.name for o in _pts("main")]
+    run("rka.renumber_roads")
+    assert [o.name for o in _pts("main")] == names_after, "Renumber Roads must be idempotent"
+    check("Renumber Roads re-derives the chain order from the LINKS, and is idempotent")
+    ok += 1
+
+    while len(_pts("main")) < before:                # hand the fixture back as it was found
+        mp = _pts("main")
+        # Split the LONGEST span, not the first: halving span 0 leaves the road's own lane-width
+        # taper too short for its design speed, and the next section's gate says so.
+        i = max(range(len(mp) - 1),
+                key=lambda k: (mp[k + 1].matrix_world.translation
+                               - mp[k].matrix_world.translation).length)
+        _sel(mp[i], active=mp[i])
+        run("rka.insert_point")
+    assert len(_pts("main")) == before
 
     # -- Extend Road works from the HEAD too, and prepends ----------------------------------------
     # It used to append unconditionally: the new point took the name at the FAR end of a road it
@@ -349,10 +459,14 @@ def main():
     assert len(cliques) == 1 and len(cliques[0]) == 4, cliques
     jct = mp[3].parent
     assert jct is not None and jct.name.startswith("JCT_")
-    # The JCT parent owns position, and its rotation/scale are LOCKED -- a stray R or S would
-    # otherwise rescale every mouth width at once.
-    assert all(jct.lock_rotation) and all(jct.lock_scale), (jct.lock_rotation, jct.lock_scale)
-    check("Make Intersection: one clique of 4, a locked JCT_* parent, chain unsplit")
+    # The JCT parent owns position. SCALE is locked -- a stray S would restate every mouth's lane
+    # count at once. Rotation is locked out of plane only: turning the crossing about Z is a real
+    # gesture, and the handle sits on the live centre so it turns about the intersection.
+    assert all(jct.lock_scale), jct.lock_scale
+    assert tuple(jct.lock_rotation) == (True, True, False), tuple(jct.lock_rotation)
+    assert po.junction_drift(jct) < 1e-6, "the handle is the centre, from creation onwards"
+    check("Make Intersection: one clique of 4, a JCT_* handle on the centre with scale locked "
+          "and Z free, chain unsplit")
     ok += 1
 
     _sel(mp[3])
@@ -661,7 +775,7 @@ def main():
     ok += 1
 
     # ================================================================= H. build / clear
-    run("rka.point_build", cut_ground=False)
+    run("rka.point_build")
     surfaces = [o for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_CARRIER)]
     pads = [o for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_PAD)]
     cols = [o for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_COL)]
@@ -693,7 +807,7 @@ def main():
     terrain.objects.link(plane)
     bpy.context.view_layer.update()
 
-    run("rka.point_build", cut_ground=False)
+    run("rka.point_build")
     sampled = [o for o in _pts("main") if o.rka_pt.has_ground_z]
     assert sampled, "Build sampled the terrain but the number never reached the Empties"
     assert all(abs(o.rka_pt.ground_z + 7.0) < 1e-4 for o in sampled), \
@@ -714,8 +828,8 @@ def main():
     # height, the support flips PIER -> NONE, and every rebuild lifts it further. Two builds and a
     # comparison is the whole test, and it fails loudly.
     first = {o.name: o.rka_pt.ground_z for o in _pts("main") if o.rka_pt.has_ground_z}
-    run("rka.point_build", cut_ground=False)
-    run("rka.point_build", cut_ground=False)
+    run("rka.point_build")
+    run("rka.point_build")
     third = {o.name: o.rka_pt.ground_z for o in _pts("main") if o.rka_pt.has_ground_z}
     assert first == third, ("ground drifted across rebuilds",
                             {k: (first[k], third.get(k)) for k in first
@@ -736,7 +850,7 @@ def main():
     probe.rka_pt.has_ground_z = False
     probe.rka_pt.ground_z = 0.0
     keeper = sampled[0]
-    run("rka.point_build", cut_ground=False)
+    run("rka.point_build")
     assert not probe.rka_pt.has_ground_z, "a raycast MISS was recorded as a sample"
     assert keeper.rka_pt.has_ground_z and abs(keeper.rka_pt.ground_z + 7.0) < 1e-4, \
         "a miss overwrote a station's last real ground sample"
@@ -887,7 +1001,7 @@ def main():
           "middle of a corridor -- authored by the gestures, gate-GREEN")
     ok += 1
 
-    run("rka.point_build", cut_ground=False)
+    run("rka.point_build")
     surf = [o for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_CARRIER)]
     pads = [o for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_PAD)]
     assert len(surf) >= 5 and len(pads) == 1, (len(surf), len(pads))
@@ -1076,6 +1190,7 @@ def main():
     assert broke["ramp_orphans"], "cutting the AUX link must orphan the ramp in the report"
     run("rka.preview_report")
     run("rka.preview_refresh")
+    run("rka.recentre_junctions")
     # ...and the agents walk the graph rather than teleporting: with the ramp orphaned, no car
     # can be on it except one that spawned there.
     bpy.context.scene.rka_preview_flow = True
@@ -1101,6 +1216,198 @@ def main():
     bpy.context.scene.rka_preview_flow = False
     check("the flow preview reads the EXPORT: %d lanes, and cutting the AUX link is reported as "
           "an orphaned ramp (%s)" % (rep["lanes"], broke["ramp_orphans"][0]))
+    ok += 1
+
+    # -- the preview draws the PATH3D, and can see it leave the road --------------------------------
+    # The defect this whole mode exists for: `WorldBaker` builds every Curve3D from the `curve`
+    # block, and the preview used to draw `points`. A lane 22.57 m off the road previewed perfect.
+    bpy.context.scene.rka_preview_flow = True
+    sizes = {}
+    for mode in (pv3.GEO_POLY, pv3.GEO_PATH, pv3.GEO_BOTH):
+        bpy.context.scene.rka_preview_geometry = mode
+        pv3.invalidate()
+        pv3.document(bpy.context.scene)
+        sizes[mode] = len(pv3._cache["lanes"]["demo_ramp_F0"].pts)
+    assert sizes[pv3.GEO_PATH] != sizes[pv3.GEO_POLY], \
+        "PATH and POLY must be different geometry -- that is the entire point of the toggle"
+    assert not pv3._cache["alt"] or bpy.context.scene.rka_preview_geometry == pv3.GEO_BOTH
+    # BOTH draws the lane, the path over it, and NO rungs while the two agree.
+    bpy.context.scene.rka_preview_geometry = pv3.GEO_BOTH
+    pv3.invalidate()
+    batches = pv3.flow_batches(bpy.context.scene)
+    assert batches.get(pv3.COL_PATH), "BOTH must draw the exported path over the lane"
+    assert not batches.get(pv3.COL_DEVIATION), \
+        "a rung where the two agree is noise: %d drawn" % (len(batches[pv3.COL_DEVIATION]) // 2)
+    # Now BREAK one lane's curve the way the Catmull refit did -- a handle pointing the wrong way --
+    # and every eye must open at once: the report, the rungs, and the gate.
+    doc = pv3._cache["doc"]
+    victim = next(l for l in doc["lanes"] if l["id"] == "demo_ramp_F0")
+    # Swing one handle 90 degrees sideways and lengthen it -- geometrically exactly what the
+    # Catmull refit did at an open end (a handle 70.3 deg off the true heading), just deliberate.
+    h = victim["curve"][1]["out"]
+    victim["curve"][1]["out"] = [-h[2] * 8.0, h[1], h[0] * 8.0]
+    assert pe3.path_deviation(victim) > pe3.PATH_DEVIATION_ERROR, \
+        "the sabotage must actually move the curve off the road"
+    assert any(i == "demo_ramp_F0" for i, _d in pe3.deviating_lanes(doc)), \
+        "deviating_lanes must name it"
+    rep2 = pv3.flow_report(doc)
+    assert any(i == "demo_ramp_F0" for i, _d in rep2["path_off_road"]), \
+        "Flow Report must list a path that has left its lane"
+    bpy.context.scene.rka_preview_geometry = pv3.GEO_PATH
+    bpy.context.scene.rka_preview_flow = False
+    check("Preview draws the exported Path3D (%d pts vs %d polyline), and a curve pushed off its "
+          "lane is reported by name" % (sizes[pv3.GEO_PATH], sizes[pv3.GEO_POLY]))
+    ok += 1
+
+    # -- STYLE: markings, one material registry, and a profile asset --------------------------------
+    # The road kit used to build kerbs, footways, walls, pads and gores and not one lane line --
+    # while `lane_profile.marking_runs` had computed every painted boundary since the profile model
+    # landed and `kit_common.MATS` had carried `M_LineW`/`M_LineY`, described in its own source as
+    # lane lines, with no user at all.
+    #
+    # A FRESH sample first: the preview block above deliberately cut demo_hwy's AUX links to
+    # orphan a ramp, which leaves the aux slot opening over a span far too short for its taper --
+    # a red gate, and correctly so. Style is a different subject and starts from a green network.
+    # `_wipe()` and not `replace=True`: the cut links left `demo_spur` an EMPTY collection, and
+    # `Add Sample Network` extends roads by selecting their last point.
+    _wipe()
+    run("rka.demo_network", replace=True)
+    bpy.ops.rka.point_build()
+    gen = bpy.data.collections.get(pm.ROAD_MANAGER_GEN)
+    built = _all_objects(gen)
+    marks = [o for o in built if "__marks" in o.name]
+    assert marks, "a multi-lane network must paint lane lines"
+    dg = bpy.context.evaluated_depsgraph_get()
+    painted = set()
+    for o in marks:
+        me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), depsgraph=dg)
+        painted.update(m.name for m in me.materials if m)
+        zs = [v.co.z for v in me.vertices]
+        base = min(zs) if zs else 0.0
+        assert len(me.polygons) > 0, "%s painted nothing" % o.name
+        bpy.data.meshes.remove(me)
+    assert {"M_LineW", "M_LineY"} <= painted, painted
+    # ...and paint is NOT collidable: a proxy per stripe is a paper-thin StaticBody under every
+    # dashed line in the world, for something no bullet, wheel or navmesh agent wants.
+    assert not [o for o in built if "__marks" in o.name and pb.SUFFIX_COL in o.name], \
+        "lane markings must not reach collision"
+    # ONE material registry: everything the road builds is now a `kit_common` `M_*` datablock, not
+    # the parallel `rka_*` set that had no lane lines in it.
+    road_mats = {m.name for o in built for m in (o.data.materials if o.data else ()) if m}
+    assert not [m for m in road_mats if m.startswith("rka_")], sorted(road_mats)
+    check("markings paint %d object(s) in M_LineW/M_LineY, out of collision, from ONE registry"
+          % len(marks))
+    ok += 1
+
+    # -- a PROFILE ASSET replaces its layer, at its own size, gated the same way ---------------------
+    run("rka.link_road_kit")
+    kit = pstyle.kit_assets()
+    if kit:
+        road = next(c for c in pm.road_collections() if c.name == "demo_main")
+        road.rka_road.kerb_asset = "RKA_PROFILE_kerb_granite"
+        st = pstyle.resolve(road.rka_road, material_fn=pb.material)
+        got = pstyle.asset_width(st.asset("kerb"))
+        # MEASURED OFF THE CURVE DATA, never `bound_box`: on a freshly linked object in background
+        # Blender the cached box is stale and reported this 0.32 m kerb as 2.32 m.
+        assert abs(got - 0.32) < 1e-3, "asset width must be the section's own: %.3f" % got
+        assert abs(pstyle.asset_height(st.asset("kerb")) - 0.17) < 1e-3
+        bpy.ops.rka.point_build()
+        edges = [o for o in _all_objects(bpy.data.collections.get(pm.ROAD_MANAGER_GEN))
+                 if o.name.startswith("demo_main") and pb.SUFFIX_EDGE in o.name
+                 and pb.SUFFIX_COL not in o.name]
+        dg = bpy.context.evaluated_depsgraph_get()
+        tops = []
+        for o in edges:
+            me = bpy.data.meshes.new_from_object(o.evaluated_get(dg), depsgraph=dg)
+            if me.vertices:
+                tops.append(max(v.co.z for v in me.vertices))
+            bpy.data.meshes.remove(me)
+        # The granite section is 0.17 m tall where the parametric default is 0.15 -- so the height
+        # of the built kerb IS the proof the asset drove the geometry.
+        assert tops and abs(max(tops) - 0.17) < 1e-3, \
+            "the swept kerb must be the ASSET's own height, got %r" % (tops,)
+        # ...and an asset layer is still gated: `demo_main` is at grade with ped access, so
+        # `solve_road` says no barrier, and naming one must not build one anyway. (An asset layer
+        # has no WidthAttr, which is what `layer_has_content` used to gate on.)
+        road.rka_road.barrier_asset = "RKA_PROFILE_wall_jersey"
+        bpy.ops.rka.point_build()
+        edges = [o for o in _all_objects(bpy.data.collections.get(pm.ROAD_MANAGER_GEN))
+                 if o.name.startswith("demo_main") and pb.SUFFIX_EDGE in o.name
+                 and pb.SUFFIX_COL not in o.name]
+        assert not [o for o in edges if any(m.name == "Barrier" for m in o.modifiers)], \
+            "an asset barrier must obey the same rule the parametric one does"
+        road.rka_road.kerb_asset = ""
+        road.rka_road.barrier_asset = ""
+        check("a profile asset sweeps at its OWN measured size (0.32 x 0.17 m) and is gated by "
+              "the same attribute the parametric layer is")
+        ok += 1
+
+    # -- a style slot naming nothing FALLS BACK, and the gate says so ---------------------------------
+    road = next(c for c in pm.road_collections() if c.name == "demo_main")
+    road.rka_road.kerb_mat = "M_ThisDoesNotExist"
+    st = pstyle.resolve(road.rka_road, material_fn=pb.material)
+    assert st.material("kerb") is pb.material("concrete"), "a missing name must fall back"
+    assert ("kerb", "material", "M_ThisDoesNotExist") in st.missing()
+    findings = pv.validate(pm.read_network(), (pv.check_style,))
+    assert any(f.code == "style_missing" for f in findings), \
+        "a silently-wrong look must still be reported"
+    assert not pv.errors(findings), "...as a WARNING: falling back is a working build"
+    road.rka_road.kerb_mat = ""
+    check("a style slot naming a missing datablock falls back AND is reported by the gate")
+    ok += 1
+
+    # -- ...and the GATE says so too, from the same function ----------------------------------------
+    # A preview only helps the artist who looks. `check_path_fidelity` measures with
+    # `point_export.path_deviation`, the same one the picture is drawn with.
+    net_ok = pm.read_network()
+    assert not [f for f in pv.validate(net_ok, (pv.check_path_fidelity,))], \
+        "a healthy network must not report a path deviation"
+    check("check_path_fidelity is green on the sample network and shares the preview's measure")
+    ok += 1
+
+    # -- MERGING AT A CROSSING MUST LEAVE A PAD, not a component ---------------------------------
+    # `Merge Points` carries every link that left the collapsed run onto the survivor, which is
+    # right and was all it did. A pad is a CLIQUE whose members are `INTERSECTION` and hang off the
+    # `JCT_*` handle -- `make_pad` writes all three together and was the only thing that ever did.
+    # So merging a mouth with the station beside it left the island's port junction a 4-node
+    # component with 3 edges and two mouths still typed SEGMENT: 8 gate errors from one gesture,
+    # reported by the user. The earlier merge case above uses interior stations only, which is
+    # exactly why it never saw this.
+    net = pm.read_network()
+    comp = next(c for c in net.junction_cliques() if len(c) >= 3)
+    by_uid = {o.rka_pt.uid: o for c in pm.road_collections() for o in po.points_in(c)}
+    # THE MATE MUST COME FIRST IN THE CHAIN. The survivor is `doomed[0]`, so merging a mouth with
+    # the station AFTER it keeps the mouth -- already `INTERSECTION`, already in the clique,
+    # already parented -- and proves nothing. The reported defect is the other order: the plain
+    # station survives, inherits the JUNCTION links, and was left typed SEGMENT and unparented.
+    inpad = set(comp)
+    cand = None
+    for u in comp:
+        o = by_uid[u]
+        ch = po.points_in(po.collection_of(o))
+        k = ch.index(o)
+        if k > 0 and ch[k - 1].rka_pt.uid not in inpad:
+            cand = (o, ch[k - 1])
+            break
+    assert cand is not None, "no pad mouth with a plain station before it"
+    mouth, mate = cand
+    assert mate.rka_pt.role != pm.INTERSECTION, "the mate must be a plain station"
+    _sel(mate, mouth, active=mate)
+    run("rka.merge_points")
+    net = pm.read_network()
+    survivor = mate.rka_pt.uid
+    assert survivor in net.points, "the FIRST of the run survives"
+    comp2 = next(c for c in net.junction_cliques() if survivor in c)
+    for a in comp2:
+        assert net.points[a].role == pm.INTERSECTION, "a mouth typed %s" % net.points[a].role
+        for b in comp2:
+            assert a == b or net.points[a].has_link(b, pm.LINK_JUNCTION), \
+                "the pad came out a component, not a clique"
+    assert mate.parent is not None and mate.parent.name.startswith(po.JCT_PREFIX), \
+        "the survivor must still hang off the JCT_* handle or it will not turn with the crossing"
+    codes = {f.code for f in pv.errors(pv.validate(net))}
+    assert not (codes & {"junction_incomplete", "junction_role"}), codes
+    check("Merge Points at a crossing leaves a full clique, INTERSECTION roles and the JCT parent")
     ok += 1
 
     # Every button the sidebar offers must be an operator this file actually drives -- otherwise

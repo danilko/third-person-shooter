@@ -229,17 +229,23 @@ def land_area_km2(N=300000):
 
 # ------------------------------------------------------------------- terrain bands
 def terrain_paths():
-    out = []
+    out, plain = [], 0
     for spec, rot in ((G.MASSIF, 0.0), (G.SPUR, G.SPUR.get("rot", 0.0))):
         cx, cy = spec["cx"], spec["cy"]
-        for (rx, ry, lab) in spec["bands"]:
+        for (rx, ry, z, tag) in spec["bands"]:
             pts = G.pull_ashore(cx, cy, G.ellipse(cx, cy, rx, ry, 44, rot))
-            out.append((pts, lab))
+            col = BAND_COL.get(tag)
+            if col is None:
+                col = BAND_PLAIN[min(plain, len(BAND_PLAIN) - 1)]
+                plain += 1
+            out.append((pts, "+%d%s" % (round(z), (" " + tag) if tag else ""), tag, col))
     return out
 
 
-BAND_COL = {"+120": "#BDCDA4", "+240": "#A6BE8B", "+320 snow": "#DCE6D4",
-            "peak +380": "#F1F4EE", "+80": "#C3D2AA", "+140 hill": "#AAC191"}
+#: Keyed by the band's TAG, not by its label text — a label carries the elevation, and the
+#: elevation moves with `G.SCALE`. Untagged bands step through `BAND_PLAIN` outermost first.
+BAND_COL = {"snow": "#DCE6D4", "peak": "#F1F4EE", "hill": "#AAC191"}
+BAND_PLAIN = ["#BDCDA4", "#A6BE8B", "#C3D2AA"]
 
 
 # ============================================================ PLATE 1 — modeling
@@ -274,13 +280,14 @@ def modeling_plate():
     for p in (G.HARBOUR, G.AIRPORT):
         a(f'<path d="{path(px, p)}" fill="#E0DAC7" stroke="#5D7E90" stroke-width="1.5"/>')
 
-    for pts, lab in terrain_paths():
-        a(f'<path d="{path(px, pts)}" fill="{BAND_COL[lab]}" fill-opacity="0.95" '
+    for pts, lab, tag, col in terrain_paths():
+        a(f'<path d="{path(px, pts)}" fill="{col}" fill-opacity="0.95" '
           f'stroke="#798a64" stroke-width="0.8"/>')
 
     # paddy wash
-    for (cx, cy, rx, ry) in ((180, 590, 460, 190), (740, 290, 160, 240),
-                             (-430, 615, 200, 120)):
+    for (cx, cy, rx, ry) in ((G._s(180), G._s(590), G._s(460), G._s(190)),
+                             (G._s(740), G._s(290), G._s(160), G._s(240)),
+                             (G._s(-430), G._s(615), G._s(200), G._s(120))):
         pts = G.pull_ashore(cx, cy, G.ellipse(cx, cy, rx, ry, 40))
         a(f'<path d="{path(px, pts)}" fill="#CBD8AE" fill-opacity="0.55"/>')
 
@@ -293,7 +300,7 @@ def modeling_plate():
         for run in clipped(band, 10):
             a(f'<path d="{path(px, run, False)}" fill="none" stroke="#B7C79A" '
               f'stroke-width="2.4" stroke-opacity="0.75"/>')
-    a(f'<path d="{path(px, G.pull_ashore(560, 430, G.PINE))}" fill="#6F8A5E" '
+    a(f'<path d="{path(px, G.pull_ashore(G._s(560), G._s(430), G.PINE))}" fill="#6F8A5E" '
       f'fill-opacity="0.9" stroke="#4f6543" stroke-width="0.8"/>')
     a(f'<path d="{path(px, G.LAGOON)}" fill="#7FA3B8" stroke="#5D7E90" stroke-width="1"/>')
     for p, col in ((G.MOAT, "#7FA3B8"), (G.CASTLE, "#B4C79A"), (G.SHIBA_PK, "#A6BD8A"),
@@ -428,8 +435,9 @@ def modeling_plate():
 
     la = land_area_km2()
     lines = [
-        ("t", f"World 2016 x 2016 m · 4 x 4 districts of 504 m · centre origin "
-              f"[-1008,+1008] — world_grid.GRID_N 6 -> 4, one constant"),
+        ("t", f"World {WORLD:.0f} x {WORLD:.0f} m · {GRID_N} x {GRID_N} districts of "
+              f"{DISTRICT:.0f} m · centre origin [-{ORIGIN:.0f},+{ORIGIN:.0f}] — "
+              f"island_v3_geom.SCALE {G.SCALE:g}, one constant"),
         ("s", f"Land {la:.2f} km² (v1 proposed 2.4 · GTA III 4.38) · buildings on this "
               f"plate: {total} ({per['neonA']}+{per['neonB']}+{per['neonC']} neon · "
               f"{per['resid']} resid · {per['farm']} farm · {per['port']} port)"),
@@ -469,7 +477,7 @@ def overview_plate(total, la):
       '.zt{font:700 11px sans-serif;fill:#23231f}</style>')
     a(f'<rect width="{W}" height="{H}" fill="#F1EDE1"/>')
     a(f'<text class="h" x="{MX}" y="34">Tokyo-Bay Island v3 — plan overview</text>')
-    a(f'<text class="sub" x="{MX}" y="52">2016 x 2016 m · 4 x 4 districts of 504 m · '
+    a(f'<text class="sub" x="{MX}" y="52">{WORLD:.0f} x {WORLD:.0f} m · {GRID_N} x {GRID_N} districts of {DISTRICT:.0f} m · '
       f'Plan A&#8217;s fictional island, condensed. Transect south to north: '
       f'harbour, neon x3 split by the river, residential, farmland, mountain. '
       f'Coast pattern after Niigata / the Echigo plain.</text>')
@@ -483,9 +491,9 @@ def overview_plate(total, la):
     a('</clipPath></defs>')
     a('<g clip-path="url(#ld)">')
     a(f'<rect x="{MX:.0f}" y="{MY:.0f}" width="{MW:.0f}" height="{MW:.0f}" fill="#E5E0CF"/>')
-    for r, row in enumerate(G.MATRIX):
-        gy = GRID_N - 1 - r
-        for gx, key in enumerate(row):
+    for gy in range(GRID_N):
+        for gx in range(GRID_N):
+            key = G.theme_at(gx, gy)
             col = G.THEME[key.lower()][0]
             if not col:
                 continue
@@ -497,12 +505,12 @@ def overview_plate(total, la):
     for p in G.LAND:
         a(f'<path d="{path(px, p)}" fill="none" stroke="#4E7183" stroke-width="1.8"/>')
 
-    for pts, lab in terrain_paths():
-        if lab in ("+320 snow", "peak +380", "+140 hill"):
-            a(f'<path d="{path(px, pts)}" fill="{BAND_COL[lab]}" fill-opacity="0.85" '
+    for pts, lab, tag, col in terrain_paths():
+        if tag:                        # only the named bands — snow, peak, hill
+            a(f'<path d="{path(px, pts)}" fill="{col}" fill-opacity="0.85" '
               f'stroke="#8fa07c" stroke-width="0.8"/>')
 
-    a(f'<path d="{path(px, G.pull_ashore(560, 430, G.PINE))}" fill="#6F8A5E" '
+    a(f'<path d="{path(px, G.pull_ashore(G._s(560), G._s(430), G.PINE))}" fill="#6F8A5E" '
       f'fill-opacity="0.9"/>')
     a(f'<path d="{path(px, G.LAGOON)}" fill="#7FA3B8" stroke="#5D7E90" stroke-width="1"/>')
     a(f'<path d="{path(px, G.MOAT)}" fill="#7FA3B8"/>')
@@ -516,9 +524,9 @@ def overview_plate(total, la):
         _, y = px(0, v)
         a(f'<line x1="{x:.1f}" y1="{MY}" x2="{x:.1f}" y2="{MY+MW:.0f}" stroke="#00000030"/>')
         a(f'<line x1="{MX}" y1="{y:.1f}" x2="{MX+MW:.0f}" y2="{y:.1f}" stroke="#00000030"/>')
-    for r, row in enumerate(G.MATRIX):
-        gy = GRID_N - 1 - r
-        for gx, key in enumerate(row):
+    for gy in range(GRID_N):
+        for gx in range(GRID_N):
+            key = G.theme_at(gx, gy)
             sx, sy = px(-ORIGIN + (gx + .5) * DISTRICT, -ORIGIN + (gy + .07) * DISTRICT)
             a(f'<text class="cell" x="{sx:.0f}" y="{sy:.0f}" text-anchor="middle" '
               f'opacity="{0.85 if key.isupper() else 0.55}">{gx}{gy} {key} '
@@ -679,7 +687,7 @@ def main():
     print(f"ring {G.plen(RING, True):.0f} m · arterials " +
           ", ".join(f"{n} {G.plen(pts):.0f}" for n, pts in G.ARTERIALS))
     print("population", POP)
-    print("land fraction per cell (gy3 top):")
+    print("land fraction per cell (gy%d top):" % (GRID_N - 1))
     for gy in range(GRID_N - 1, -1, -1):
         print("  " + "  ".join(f"{land_fraction(gx,gy)*100:3.0f}%" for gx in range(GRID_N)))
     print(f"wrote {os.path.basename(p1)}, {os.path.basename(p2)}")

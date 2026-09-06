@@ -46,6 +46,7 @@ sys.path.insert(0, os.path.join(REPO, "tools"))
 import kit_common as kc
 import island_v3_geom as G
 import island_v3_plan as P
+import island_v3_terrain as IT
 
 FLOOR_H = 3.20          # Japanese commercial storey
 ANCHOR_EVERY = 7        # v3 §2b: one block in seven carries a 24 x 34 m anchor
@@ -70,21 +71,21 @@ def floors_for(spec, x, y, rng):
     return max(lo, min(hi, int(round(rng.uniform(lo, top)))))
 
 
-def emit_box(name, x, y, bearing, w, d, floors, coll, matkey, props):
+def emit_box(name, x, y, bearing, w, d, floors, coll, matkey, props, ground):
     obj = kc.box(name, -w / 2.0, w / 2.0, -d / 2.0, d / 2.0, 0.0, floors * FLOOR_H,
                  coll, matkey)
-    obj.location = (x, y, 0.0)
+    obj.location = (x, y, ground.height(x, y))
     obj.rotation_euler = (0.0, 0.0, math.radians(bearing))
     for k, v in props.items():
         obj[k] = v
     return obj
 
 
-def emit_instance(name, x, y, bearing, floors, coll, kit_coll, props):
+def emit_instance(name, x, y, bearing, floors, coll, kit_coll, props, ground):
     obj = bpy.data.objects.new(name, None)
     obj.instance_type = 'COLLECTION'
     obj.instance_collection = kit_coll
-    obj.location = (x, y, 0.0)
+    obj.location = (x, y, ground.height(x, y))
     obj.rotation_euler = (0.0, 0.0, math.radians(bearing))
     obj.empty_display_size = 2.0
     coll.objects.link(obj)
@@ -102,6 +103,11 @@ def build(opts):
     if opts.kit and kit_coll is None:
         print("  NOTE: kit collection '%s' not found — emitting boxes instead. Link or append "
               "the kit .blend first, then re-run." % opts.kit)
+
+    # A BUILDING STANDS ON THE GROUND. It used to be emitted at z = 0 because the island's ground
+    # WAS z = 0; since WORLD_REBUILD_PLAN.md step 1 gave it a real surface, a lot in the hillside
+    # residential belt would be up to 140 m underground. Same one owner as everything else.
+    ground = IT.Terrain(relief=True)
 
     want = {s.strip() for s in opts.zones.split(",")} if opts.zones else None
     counts, n_anchor, n_block, n_sub, n_clipped = {}, 0, 0, 0, 0
@@ -134,7 +140,8 @@ def build(opts):
                     emit_box("anchor_%s%d_%03d" % (zname, ri, bi), bx, by, 0.0,
                              ANCHOR_W, ANCHOR_D, fl, coll, "glasscurtain",
                              dict(rka_kit_id=90, rka_floors=fl, rka_quarter=q,
-                                  rka_lot="%dx%d" % (ANCHOR_W, ANCHOR_D), rka_anchor=True))
+                                  rka_lot="%dx%d" % (ANCHOR_W, ANCHOR_D), rka_anchor=True),
+                             ground)
                     n_anchor += 1
                     total += 1
                     continue
@@ -160,9 +167,10 @@ def build(opts):
                                      rka_quarter=q, rka_lot="%.1fx%.1f" % (f, d))
                         nm = "bld_%s%d_%03d_%02d_%03d" % (zname, ri, bi, si, li)
                         if kit_coll is not None:
-                            emit_instance(nm, x, y, bearing, fl, coll, kit_coll, props)
+                            emit_instance(nm, x, y, bearing, fl, coll, kit_coll,
+                                          props, ground)
                         else:
-                            emit_box(nm, x, y, bearing, f, d, fl, coll, mat, props)
+                            emit_box(nm, x, y, bearing, f, d, fl, coll, mat, props, ground)
                         counts[q] = counts.get(q, 0) + 1
                         total += 1
 
@@ -180,7 +188,8 @@ def build(opts):
                             emit_box("infill_%s%d_%03d_%02d_%02d" % (zname, ri, bi, si, k),
                                      x, y, rng.uniform(0, 90), 5.0, 8.0, fl, coll, mat,
                                      dict(rka_kit_id=rng.randrange(0, 3), rka_floors=fl,
-                                          rka_quarter=q, rka_lot="5.0x8.0", rka_infill=True))
+                                          rka_quarter=q, rka_lot="5.0x8.0", rka_infill=True),
+                                     ground)
                             counts[q] = counts.get(q, 0) + 1
                             total += 1
 

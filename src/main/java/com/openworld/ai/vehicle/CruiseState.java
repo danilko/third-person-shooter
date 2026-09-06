@@ -34,7 +34,7 @@ public class CruiseState implements VehicleAIState {
 
         Vector3 pos = body.getGlobalPosition();
 
-        // Already at a dead-end (no continuation) — hold stopped; WorldZoneManager despawns us.
+        // Already at a dead-end (no continuation) — hold stopped; ZoneManager despawns us.
         if (ctrl.isFinished()) { cmd.motor = 0f; cmd.steering = 0f; return this; }
 
         ctrl.updateProgress(pos);

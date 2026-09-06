@@ -135,6 +135,24 @@ for cname in ("ROADS", "WALLS", "PROPS", "EXTRAS", "HIGHRISE", "INFRA", "LANDMAR
 if _dropped:
     print("dropped %d kit source objects (kept out of the export)" % _dropped)
 
+# ------------------------------------------------------------------ the ground cutters
+# THERE ARE NONE ANY MORE, and this note is what is left of them.
+#
+# `point_build.cut_ground` used to build one solid per road/pad and hand it to the terrain as a
+# BOOLEAN target. They were scene objects in `ROAD_MANAGER_GEN/CUTTERS`, and the glTF exporter
+# takes the whole scene -- so all 32 baked into the game as raw white boxes straddling every road
+# ("one white ground cover the main pave segment, like an open box over the road"). Unseen for as
+# long as `bmesh.ops.solidify` was silently producing zero-thickness sheets at z = -40 (`W22`);
+# giving them real volume made them real geometry in Godot. Removing the objects was NOT the fix,
+# because the boolean would then lose its target and the terrain would export uncut, so they were
+# UNLINKED from every collection instead -- the modifier's own reference keeping them alive while
+# the exporter, which walks the scene rather than `bpy.data`, no longer saw them.
+#
+# The boolean cut itself was removed on 2026-09-06 (the road now deforms the heightfield instead --
+# `island_v3_terrain.Carve`), so there is no cutter to hide and this workaround went with it. Left
+# as a comment because "a modifier input is not content" is a rule the exporter will meet again the
+# next time anything hands the scene a helper object.
+
 # view-layer objects only: bpy.data.objects also holds library-linked datablocks (neighbour
 # refs), and select_set raises on an object that is not in the view layer. Snapshot the list and
 # skip None entries: the removals above leave stale None slots in view_layer.objects until the
@@ -142,6 +160,76 @@ if _dropped:
 for o in list(bpy.context.view_layer.objects):
     if o is not None:
         o.select_set(False)
+
+# ------------------------------------------------------------------ material flattening
+# A PROCEDURAL BASE COLOUR CANNOT CROSS glTF, AND IT LEAVES NO TRACE WHEN IT FAILS.
+#
+# glTF carries a base colour as either a CONSTANT factor or an IMAGE texture. Blender's exporter
+# reads the Principled BSDF's Base Color: unlinked, it writes the constant; linked to an image, it
+# writes the texture; linked to anything else -- a Checker, a Noise, a Mix -- it writes **nothing**,
+# and Godot renders the surface pure white with no warning on either side.
+#
+# `kit_common.get_tiled_mat` builds exactly that shape, and for a good reason (a world-position
+# checker survives a curved corner without the UV pinch a tangent-frame pattern gets, which is what
+# a footway wrapping a junction fillet needs). So `M_ConcreteTile` -- the PAVEMENT, the most visible
+# surface in the world after the asphalt -- has been white in-game since it was introduced, while
+# looking right in every Blender render.
+#
+# The authoring intent belongs in Blender and the constraint belongs to the seam, so the fix lives
+# here: just before export, any Base Color driven by a non-image node is temporarily replaced by a
+# representative constant, and restored afterwards. A Checker's constant is the mean of its two
+# colours; anything else falls back to the material's own viewport `diffuse_color`, which is what a
+# human already picked as "what this material looks like".
+_flattened = []
+
+
+def _flatten_base_colours():
+    for m in bpy.data.materials:
+        if not m.use_nodes or not m.node_tree:
+            continue
+        for n in m.node_tree.nodes:
+            if n.type != 'BSDF_PRINCIPLED':
+                continue
+            sock = n.inputs.get("Base Color")
+            if sock is None or not sock.is_linked:
+                continue
+            src = sock.links[0].from_node
+            if src.type in ('TEX_IMAGE',):
+                continue                      # an image DOES cross; leave it alone
+            if src.type == 'TEX_CHECKER':
+                c1 = tuple(src.inputs["Color1"].default_value)
+                c2 = tuple(src.inputs["Color2"].default_value)
+                col = tuple((a + b) * 0.5 for a, b in zip(c1, c2))
+            else:
+                col = tuple(m.diffuse_color)
+            _flattened.append((m, [l for l in sock.links], tuple(sock.default_value)))
+            for l in list(sock.links):
+                m.node_tree.links.remove(l)
+            sock.default_value = col
+
+
+def _restore_base_colours():
+    for m, links, prev in _flattened:
+        for n in m.node_tree.nodes:
+            if n.type != 'BSDF_PRINCIPLED':
+                continue
+            sock = n.inputs.get("Base Color")
+            if sock is None:
+                continue
+            sock.default_value = prev
+            # The link objects themselves are gone; re-make them from the checker that is still
+            # in the tree. Export runs in a throwaway process, so this is belt-and-braces.
+            for src in m.node_tree.nodes:
+                if src.type == 'TEX_CHECKER':
+                    m.node_tree.links.new(src.outputs["Color"], sock)
+                    break
+    _flattened.clear()
+
+
+_flatten_base_colours()
+if _flattened:
+    print("flattened %d procedural base colour(s) for export: %s"
+          % (len(_flattened), ", ".join(sorted({m.name for m, _l, _p in _flattened}))))
 
 bpy.ops.export_scene.gltf(
     filepath=OUT,
@@ -153,4 +241,5 @@ bpy.ops.export_scene.gltf(
     export_lights=False,
     export_yup=True,                 # Blender Z-up -> glTF Y-up (Godot importer expects this)
 )
+_restore_base_colours()
 print("EXPORTED world master ->", OUT)

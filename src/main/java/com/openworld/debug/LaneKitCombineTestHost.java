@@ -2,7 +2,7 @@ package com.openworld.debug;
 
 import com.openworld.world.PathLaneRoute;
 import com.openworld.world.WorldBaker;
-import com.openworld.world.WorldZoneManager;
+import com.openworld.world.ZoneManager;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -22,7 +22,7 @@ import java.util.Set;
  * piece's own {@code export_*_json}) via {@link WorldBaker} and confirms every built
  * {@link PathLaneRoute} carries the {@code zoneId} its sidecar entry was tagged with — the
  * property-based zone tag {@code lib/lane_kit.py:combine_pieces} stamps on every lane, consumed
- * by {@link WorldZoneManager#registerRoute}/the new zone-id-equality path in its (private)
+ * by {@link ZoneManager#registerRoute}/the new zone-id-equality path in its (private)
  * {@code findRoute}. Unlike {@link PathLaneRouteTestHost} (one hand-built junction, driving
  * behavior), this test is about the COMBINER pipeline: many pieces, one sidecar, one zone. Run
  * with:
@@ -30,7 +30,7 @@ import java.util.Set;
  *   godot --headless res://src/main/resources/com/openworld/debug/LaneKitCombineTest.tscn
  *
  * Grep for "LKCTEST verdict" (PASS iff at least one PathLaneRoute is built, every one carries the
- * expected non-empty zoneId, and {@link WorldZoneManager#getRoutes()} reflects the same count —
+ * expected non-empty zoneId, and {@link ZoneManager#getRoutes()} reflects the same count —
  * i.e. every baked lane actually registered).
  *
  * {@link #lanekitPath}/{@link #expectedZoneId} are {@code @Export} (overridable per-scene, e.g.
@@ -73,9 +73,9 @@ public class LaneKitCombineTestHost extends Node3D {
         boolean nonEmpty = !found.isEmpty();
         boolean allExpectedZone = found.stream().allMatch(p -> expectedZoneId.equals(p.zoneId));
 
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         int registered = mgr != null ? mgr.getRoutes().size() : -1;
-        GD.print("LKCTEST WorldZoneManager.getRoutes() size=" + registered);
+        GD.print("LKCTEST ZoneManager.getRoutes() size=" + registered);
         boolean allRegistered = mgr != null && registered == found.size();
 
         GD.print(String.format("LKCTEST SUMMARY nonEmpty=%s allExpectedZone=%s allRegistered=%s",

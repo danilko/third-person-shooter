@@ -7,10 +7,10 @@ import com.openworld.ai.AIBehaviorConfig;
 import com.openworld.character.Faction;
 
 /**
- * One ambient-vehicle spawn group inside a {@link WorldZone} (PLAN.md I3).
+ * One ambient-vehicle spawn group inside a {@link Zone} (PLAN.md I3).
  *
  * <p>The vehicle counterpart of {@link SpawnConfig}: "spawn N vehicles of scene Z driving route
- * {@link #routeName}". {@code WorldZoneManager} replays this recipe host/SP-side when a zone loads,
+ * {@link #routeName}". {@code ZoneManager} replays this recipe host/SP-side when a zone loads,
  * attaching a {@link com.openworld.ai.vehicle.VehicleAIController} to each spawned body.
  *
  * <p>{@link #routeName} is resolved to a {@link VehicleRoute} node in the active scene by name

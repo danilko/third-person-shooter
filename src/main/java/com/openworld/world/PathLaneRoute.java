@@ -36,7 +36,7 @@ import java.util.List;
  * interchange pieces, because at a gore every lane end is within a few metres of every other and
  * proximity cannot tell a mainline continuing from a ramp departing. A plain lane leaves them
  * empty and stays entirely on the proximity path. It DOES
- * register with {@link WorldZoneManager}'s route registry (as of the road_kit_authoring district
+ * register with {@link ZoneManager}'s route registry (as of the road_kit_authoring district
  * integration — see {@code road_blender_godot.md} Phase 6), so a {@code PathLaneRoute} network can
  * participate in ambient/disposable-traffic zone spawn configs exactly like a {@code VehicleRoute}
  * network.
@@ -167,13 +167,13 @@ public class PathLaneRoute extends Node3D implements Lane {
         var pathNode = getNodeOrNull(PATH_CHILD_NAME);
         if (pathNode instanceof Path3D p3d) curve = p3d.getCurve();
         ensureBaked();
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (mgr != null) mgr.registerRoute(this);
     }
 
     @Register
     public void _exitTree() {
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (mgr != null) mgr.unregisterRoute(this);
     }
 
@@ -213,7 +213,7 @@ public class PathLaneRoute extends Node3D implements Lane {
 
     /** {@link #startPoint()}, but O(1) off the already-baked array (no curve/point-count re-read)
      *  — this route is static/baked-once content, so the plain baked cache doubles as the entry
-     *  cache {@code WorldZoneManager.findRoute}'s per-candidate spawn scan needs. */
+     *  cache {@code ZoneManager.findRoute}'s per-candidate spawn scan needs. */
     @Override
     public Vector3 entryPoint() {
         ensureBaked();
@@ -323,7 +323,7 @@ public class PathLaneRoute extends Node3D implements Lane {
     }
 
     /**
-     * Resolve any lane by node name through the {@link WorldZoneManager} registry — the same
+     * Resolve any lane by node name through the {@link ZoneManager} registry — the same
      * registry read {@code VehicleRoute.resolveRoute} uses, never a scene-tree scan (those were
      * the "periodic hitch in all movement" regression). Unlike {@code VehicleRoute}'s version this
      * one is deliberately NOT type-filtered: a baked interchange is all {@code PathLaneRoute}s,
@@ -333,7 +333,7 @@ public class PathLaneRoute extends Node3D implements Lane {
     @Override
     public Lane resolveRoute(String name) {
         if (name == null || name.isBlank()) return null;
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         return mgr == null ? null : mgr.routeByName(name.trim());
     }
 

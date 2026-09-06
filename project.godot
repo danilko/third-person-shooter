@@ -28,7 +28,7 @@ NetworkManager="*res://src/main/java/com/openworld/net/NetworkManager.java"
 PlayerRegistry="*res://src/main/java/com/openworld/game/PlayerRegistry.java"
 SpatialEntityGrid="*res://src/main/java/com/openworld/world/SpatialEntityGrid.java"
 FactionManager="*res://src/main/java/com/openworld/character/FactionManager.java"
-WorldZoneManager="*res://src/main/java/com/openworld/world/WorldZoneManager.java"
+ZoneManager="*res://src/main/java/com/openworld/world/ZoneManager.java"
 StimulusManager="*res://src/main/java/com/openworld/world/StimulusManager.java"
 
 [display]

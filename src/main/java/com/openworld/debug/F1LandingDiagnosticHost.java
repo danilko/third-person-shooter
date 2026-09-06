@@ -1,8 +1,8 @@
 package com.openworld.debug;
 
-import com.openworld.world.WorldZone;
-import com.openworld.world.WorldZoneManager;
-import com.openworld.world.WorldZoneMarker;
+import com.openworld.world.Zone;
+import com.openworld.world.ZoneManager;
+import com.openworld.world.ZoneMarker;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.*;
@@ -30,11 +30,11 @@ import godot.global.GD;
 public class F1LandingDiagnosticHost extends Node3D {
 
     private static final String DISTRICT =
-            "res://src/main/resources/com/openworld/world/districts/District_industry_5_1.tscn";
+            "res://src/main/resources/com/openworld/world/pieces/District_industry_5_1.tscn";
     private static final Vector3 MARKER_POS = new Vector3(1260f, 0f, 756f);   // from World_master.tscn
     private static final Vector3 F1_LANDING = new Vector3(1260f, 3f, 756f);    // marker + (0,3,0)
 
-    private WorldZoneMarker marker;
+    private ZoneMarker marker;
     private double timer = 0.0;
     private boolean raycastDone = false;
     private com.openworld.character.Player player;
@@ -44,20 +44,20 @@ public class F1LandingDiagnosticHost extends Node3D {
     @Register
     @Override
     public void _ready() {
-        WorldZone zone = new WorldZone();
+        Zone zone = new Zone();
         zone.zoneId = "District_industry_5_1";
         zone.geometryPath = DISTRICT;
         zone.size = new Vector3(504f, 40f, 504f);
         zone.loadRadius = 402f;
         zone.unloadRadius = 552f;
 
-        marker = new WorldZoneMarker();
+        marker = new ZoneMarker();
         marker.setName(new StringName("ZoneMarker_District_industry_5_1"));
         marker.zone = zone;
         addChild(marker);
         marker.setGlobalPosition(MARKER_POS);
 
-        // No Player needed for a raycast-only diagnostic -- but WorldZoneManager's streaming
+        // No Player needed for a raycast-only diagnostic -- but ZoneManager's streaming
         // distance check is nearest-PLAYER-based (PlayerRegistry), so without one nothing ever
         // streams in. Spawn one and teleport it to the F1 landing point directly, same as the
         // real bug repro, so this also mirrors "does physics actually catch the fall" not just
@@ -102,7 +102,7 @@ public class F1LandingDiagnosticHost extends Node3D {
             }
         }
 
-        // Once the zone has had time to stream in (WorldZoneManager eval tick is 0.5s, plus the
+        // Once the zone has had time to stream in (ZoneManager eval tick is 0.5s, plus the
         // GEO_ENTER budget-sliced entry), raycast straight down from well above the F1 landing
         // point and report exactly what (if anything) is hit.
         if (!raycastDone && timer >= 6.0) {

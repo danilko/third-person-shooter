@@ -105,13 +105,19 @@ def main():
     print("OK: New Road / Extend Road / Make Intersection / Make Ramp build a green network")
     ok += 1
 
+
     # -- the crossing did NOT split the street --------------------------------------------------
     assert len(net.roads["road_main"].points) == 6, "a junction sits INSIDE a chain (defect 3)"
     cliques = net.junction_cliques()
     assert len(cliques) == 1 and len(cliques[0]) == 4, cliques
     jct = [o for o in bpy.data.objects if o.name.startswith("JCT_")]
-    assert len(jct) == 1 and tuple(jct[0].lock_rotation) == (True, True, True), \
-        "the JCT parent's rotation and scale must be locked, or a stray R rescales every mouth"
+    # SCALE fully locked -- a mouth's width is its lane count. Rotation locked OUT OF PLANE only:
+    # turning a whole crossing about Z is a real gesture and the model supports it (`facing_of`
+    # reads `matrix_world`, so every arm turns together).
+    assert len(jct) == 1 and tuple(jct[0].lock_scale) == (True, True, True), \
+        "the JCT parent's scale must stay locked, or a stray S restates every mouth's lane count"
+    assert tuple(jct[0].lock_rotation) == (True, True, False), \
+        "Z must be free to turn the crossing; X/Y locked -- the pad is solved in plan"
     arms = [o for o in bpy.data.objects if o.rka_pt.is_point and o.parent is jct[0]]
     assert len(arms) == 4
     # The parent owns position, and `matrix_parent_inverse` was set by hand -- without it every
@@ -121,6 +127,64 @@ def main():
            for o in arms}
     assert got == want, "parenting must not move a mouth: %s" % sorted(got)
     print("OK: 4 arms parented to one locked JCT_*, positions preserved through parenting")
+    ok += 1
+
+    # -- the handle sits on the CENTRE, and keeps sitting there (Part C) -------------------------
+    # `make_junction` wrote this origin once and nothing re-derived it, while
+    # `point_solve.JunctionSolve.centre` recomputes the same centroid every solve -- two owners of
+    # "where is this junction", one frozen at creation. Dragging one mouth left the Empty 10.44 m
+    # from the real centre, so G and R pivoted on a point with nothing there.
+    import mathutils
+    from road_kit_authoring import point_solve as ps
+    handle = jct[0]
+    assert po.junction_drift(handle) < 1e-6, "a fresh junction's handle is already its centre"
+    before = [o.matrix_world.translation.copy() for o in arms]
+    mw = arms[0].matrix_world.copy()
+    mw.translation += mathutils.Vector((40.0, 12.0, 0.0))
+    arms[0].matrix_world = mw
+    bpy.context.view_layer.update()
+    drift = po.junction_drift(handle)
+    assert drift > 5.0, "dragging a mouth 42 m must move the centre off the handle, got %.2f" % drift
+    moved = po.recentre_junction(handle, bpy.context)
+    bpy.context.view_layer.update()
+    assert po.junction_drift(handle) < 1e-6, "the handle must land ON the centre"
+    # ...AND NOT ONE MOUTH MOVED. Moving a parent moves its children unless each world transform is
+    # restored; if this ever regresses it silently drags a whole intersection sideways.
+    now = [o.matrix_world.translation.copy() for o in arms]
+    want_after = [before[0] + mathutils.Vector((40.0, 12.0, 0.0))] + before[1:]
+    assert max((a - b).length for a, b in zip(now, want_after)) < 1e-5, \
+        "recentring the handle moved a mouth"
+    # The solve is the owner; the handle agrees with it or it is not a handle.
+    net2 = pm.read_network()
+    js = list(ps.solve_junctions(net2))[0]
+    assert (handle.matrix_world.translation - mathutils.Vector(js.centre)).length < 1e-5, \
+        "the handle must sit on JunctionSolve.centre, the one owner"
+    print("OK: the JCT handle follows the live centre (%.2f m of drift recovered, no mouth moved) "
+          "and agrees with JunctionSolve.centre" % moved)
+    ok += 1
+
+    # -- turning the crossing turns every arm, and promotes NOTHING ------------------------------
+    import math as _math
+    f0 = [pm.facing_of(o) for o in arms]
+    handle.rotation_euler = mathutils.Euler((0.0, 0.0, _math.radians(30.0)), 'XYZ')
+    bpy.context.view_layer.update()
+    turned = [_math.degrees(mathutils.Vector(a).angle(mathutils.Vector(b)))
+              for a, b in zip(f0, [pm.facing_of(o) for o in arms])]
+    assert all(abs(t - 30.0) < 0.01 for t in turned), turned
+    # THE POINT OF THE PARENT-FRAME BASELINE. With it stored in world space this was 4 of 4 --
+    # four hand-authored facings baked by one gesture, which `Follow Road (Auto)` could then never
+    # straighten and rotating back would not undo.
+    assert not [o for o in arms if pm.was_rotated(o)], \
+        "turning the pad is the pad's frame moving, not the artist turning each arm"
+    # ...but a genuine hand rotation of ONE arm is still adopted, which is 8i's whole gesture.
+    hand = arms[1]
+    hand.matrix_world = (mathutils.Euler((0.0, 0.0, _math.radians(40.0)), 'XYZ')
+                         .to_matrix().to_4x4() @ hand.matrix_world.copy())
+    bpy.context.view_layer.update()
+    assert [o for o in arms if pm.was_rotated(o)] == [hand], \
+        "a hand rotation of one mouth must still promote exactly that one"
+    print("OK: rotating the JCT turns all 4 arms 30 deg and promotes none; a hand rotation of one "
+          "still promotes exactly that one")
     ok += 1
 
     # -- Make Ramp aligned the ramp to the aux slot edge, with no pad ----------------------------
@@ -263,6 +327,41 @@ def main():
         bpy.data.objects.remove(c, do_unlink=True)
     bpy.data.collections.remove(dup)
     print("OK: duplicating a whole road keeps the copy's own wiring and orphans nothing")
+    ok += 1
+
+    # -- ADD SAMPLE NETWORK IS IDEMPOTENT (user-reported) ----------------------------------------
+    # A second press used to raise `IndexError` and leave the network half-built, after which Build
+    # failed the gate on three unaligned ramp mouths -- with the PREVIOUS build's geometry still
+    # standing, so it read as "the roads built but the markings did not". Cause: `replace` deleted
+    # the point objects but not the collections they emptied, and names are GLOBAL, so the freshly
+    # branched `demo_spur` became `demo_spur.001` while every lookup found the stale empty one.
+    _wipe()
+    shape = []
+    for _ in range(3):
+        bpy.ops.rka.demo_network()
+        bpy.ops.rka.point_build()
+        gen = pm._local(bpy.data.collections, pm.ROAD_MANAGER_GEN)
+        objs = []
+        def _walk(c):
+            objs.extend(c.objects)
+            for ch in c.children:
+                _walk(ch)
+        if gen is not None:
+            _walk(gen)
+        shape.append((len(objs), sum("__marks" in o.name for o in objs),
+                      sorted(c.name for c in pm.road_collections())))
+    assert shape[0] == shape[1] == shape[2], \
+        "Add Sample Network + Build must be repeatable: %s" % [s[:2] for s in shape]
+    assert shape[0][1] > 0, "every iteration must paint its markings"
+    assert not [n for n in shape[0][2] if "." in n], \
+        "a stale empty collection kept its name and pushed the new road to <name>.001: %s" \
+        % shape[0][2]
+    jct_parents = [o for o in bpy.data.objects
+                   if o.type == 'EMPTY' and o.name.startswith("JCT_") and o.parent is None]
+    assert len(jct_parents) == 1, \
+        "one crossing, one junction parent -- %d left as debris" % len(jct_parents)
+    print("OK: Add Sample Network + Build is repeatable -- %d objects, %d marking(s), no stale "
+          "collection or junction parent after 3 presses" % (shape[0][0], shape[0][1]))
     ok += 1
 
     print("\nALL OPERATOR SMOKETESTS PASSED (%d)" % ok)

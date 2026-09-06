@@ -43,13 +43,14 @@ import java.util.Set;
  *
  * <p>Chosen over {@code EditorScenePostImport} because godot-kotlin-jvm exposes no editor API in this
  * project (verified), so the conversion must run as ordinary Java that reuses the game classes
- * ({@link VehicleRoute}, {@link WorldZone}, …). Run it from a dev key ({@code DebugHarness}) or a
+ * ({@link VehicleRoute}, {@link Zone}, …). Run it from a dev key ({@code DebugHarness}) or a
  * {@code BakeWorld} scene with {@link #bakeOnReady}; re-run when the source changes.
  *
  * <p><b>Prefix → node</b>: {@code lane_<route>_<n>} → one {@link VehicleRoute} per route (ordered
  * {@link Marker3D} children); {@code spawn_<faction>_<n>} → a {@link SpawnConfig} on the nearest
- * {@code zone_}; {@code zone_<id>}/{@code region_<id>} → {@link WorldZoneMarker} + {@link WorldZone}
- * (+ {@link RegionConfig}); {@code water_<id>} → {@link Area3D} in group {@code "water"};
+ * {@code zone_}; {@code zone_<id>}/{@code region_<id>} → {@link ZoneMarker} + {@link Zone}
+ * (+ {@link RegionConfig}); {@code water_<id>} → {@link WaterVolume} in group {@code "water"};
+ * {@code bounds_<id>} → {@link WorldBounds} (the logic wall);
  * {@code intersection_<id>} → {@link IntersectionZone}. Everything else (meshes, {@code -col} collision)
  * is kept untouched. Parameters come from Blender custom properties (node metadata) with defaults.
  *
@@ -162,22 +163,22 @@ public class WorldBaker extends Node {
     }
 
     /**
-     * {@code buildZone()}'s {@code root.addChild(marker)} adds each {@link WorldZoneMarker} to an
+     * {@code buildZone()}'s {@code root.addChild(marker)} adds each {@link ZoneMarker} to an
      * already-live tree, so its {@code _ready()} — and the {@code instantiateLodLow()}/
      * {@code buildDebugVisuals()} it calls — fires synchronously during conversion, before
      * {@code pack()}. Left alone that bakes two things permanently into the master {@code .tscn}
      * that should never ship: whatever LOD_LOW tier happens to exist on disk *at bake time* (making
-     * a re-bake's LOD_LOW content depend on district build order — {@link WorldZoneManager} already
+     * a re-bake's LOD_LOW content depend on district build order — {@link ZoneManager} already
      * loads it lazily at runtime, so the baked-in copy is a pure liability), and the translucent
      * zone-volume box + load/unload rings — a single-zone dev aid that, baked once per district,
      * becomes dozens of large overlapping transparent rings embedded across the whole map (real
      * geometry + material sub-resources the editor then has to load/render just to open the scene).
      * Strip both here, right after conversion and before {@code pack()}. A no-op for per-district
-     * bakes (they never contain a {@code WorldZoneMarker}; those only come from the master's
+     * bakes (they never contain a {@code ZoneMarker}; those only come from the master's
      * {@code zone_}/{@code region_} markers).
      */
     private static void stripEagerLodLow(Node node) {
-        if (node instanceof WorldZoneMarker marker) {
+        if (node instanceof ZoneMarker marker) {
             marker.removeLodLow();
             marker.removeDebugVisuals();
         }
@@ -197,6 +198,7 @@ public class WorldBaker extends Node {
         List<Node3D> zones = new ArrayList<>();
         List<Node3D> spawns = new ArrayList<>();
         List<Node3D> waters = new ArrayList<>();
+        List<Node3D> boundsMarkers = new ArrayList<>();
         List<Node3D> junctions = new ArrayList<>();
         List<Node3D> instances = new ArrayList<>();
         List<Node3D> mmeshes = new ArrayList<>();
@@ -209,17 +211,19 @@ public class WorldBaker extends Node {
             else if (name.startsWith("zone_") || name.startsWith("region_")) zones.add(n);
             else if (name.startsWith("spawn_"))        spawns.add(n);
             else if (name.startsWith("water_"))        waters.add(n);
+            else if (name.startsWith("bounds_"))       boundsMarkers.add(n);
             else if (name.startsWith("intersection_")) junctions.add(n);
         }
 
         // Zones first (spawns attach to the nearest one).
-        List<WorldZoneMarker> markers = new ArrayList<>();
+        List<ZoneMarker> markers = new ArrayList<>();
         for (Node3D z : zones) markers.add(buildZone(root, z));
 
         int routeCount = 0;
         for (Map.Entry<String, List<Node3D>> e : lanes.entrySet()) { buildRoute(root, e.getKey(), e.getValue()); routeCount++; }
         for (Node3D s : spawns)    attachSpawn(markers, s);
         for (Node3D w : waters)    buildWater(root, w);
+        for (Node3D b : boundsMarkers) buildBounds(root, b);
         for (Node3D j : junctions) buildJunction(root, j);
 
         int instanceCount = 0;
@@ -235,6 +239,7 @@ public class WorldBaker extends Node {
         for (Node3D n : zones)     freeEmpty(n);
         for (Node3D n : spawns)    freeEmpty(n);
         for (Node3D n : waters)    freeEmpty(n);
+        for (Node3D n : boundsMarkers) freeEmpty(n);
         for (Node3D n : junctions) freeEmpty(n);
         for (Node3D n : instances) freeEmpty(n);   // proxy geometry under the marker goes with it
         for (Node3D n : mmeshes)   freeEmpty(n);
@@ -479,6 +484,14 @@ public class WorldBaker extends Node {
             }
         }
         curve.setClosed(lane.loop);
+        // NO UP VECTOR. Godot bakes one by propagating a frame along the curve, and on a climbing
+        // road it rotates that frame about an axis derived from consecutive tangents -- which on
+        // the shrine touge's benched hairpins comes out 0.05% off unit and prints
+        // "The axis Vector3 (...) must be normalized" once per lane (19 of them on a clean load).
+        // Nothing here reads it: `PathLaneRoute` takes `getBakedPoints()` for XZ arc length and
+        // there is no `PathFollow3D` on a lane anywhere in the project. Turning the propagation off
+        // removes the whole computation rather than silencing its complaint.
+        curve.setUpVectorEnabled(false);
 
         Path3D path3d = new Path3D();
         path3d.setName(new StringName("Path3D"));
@@ -533,9 +546,9 @@ public class WorldBaker extends Node {
         try { return (Boolean) v; } catch (Exception e) { return def; }
     }
 
-    private static WorldZoneMarker buildZone(Node root, Node3D empty) {
+    private static ZoneMarker buildZone(Node root, Node3D empty) {
         String id = idOf(empty.getName().toString());
-        WorldZone zone = new WorldZone();
+        Zone zone = new Zone();
         zone.zoneId = id;
         zone.size = metaVec3(empty, "size", new Vector3(80f, 10f, 80f));
         zone.loadRadius = metaFloat(empty, "load_radius",
@@ -545,7 +558,7 @@ public class WorldBaker extends Node {
         zone.lodLowGeometryPath = metaString(empty, "geometry_lod_low", "");   // eager, always-resident tier
         zone.regionConfig = buildRegion(empty);
         // Ambient-traffic recipe (roads-v2 Phase 1): traffic_count cars on the lanes whose route
-        // name starts with traffic_route (a PREFIX — WorldZoneManager.findRoute distributes spawns
+        // name starts with traffic_route (a PREFIX — ZoneManager.findRoute distributes spawns
         // across the matching lanes near the zone). No meta = no traffic for this zone.
         int trafficCount = (int) metaFloat(empty, "traffic_count", 0f);
         String trafficRoute = metaString(empty, "traffic_route", "");
@@ -556,7 +569,7 @@ public class WorldBaker extends Node {
             vc.cruiseThrottle = metaFloat(empty, "traffic_throttle", vc.cruiseThrottle);
             zone.vehicleSpawnConfigs.add(vc);
         }
-        WorldZoneMarker marker = new WorldZoneMarker();
+        ZoneMarker marker = new ZoneMarker();
         marker.setName(new StringName("ZoneMarker_" + id));
         marker.zone = zone;
         root.addChild(marker);
@@ -588,8 +601,8 @@ public class WorldBaker extends Node {
         return rc;
     }
 
-    private static void attachSpawn(List<WorldZoneMarker> markers, Node3D empty) {
-        WorldZoneMarker nearest = nearestMarker(markers, empty.getGlobalPosition());
+    private static void attachSpawn(List<ZoneMarker> markers, Node3D empty) {
+        ZoneMarker nearest = nearestMarker(markers, empty.getGlobalPosition());
         if (nearest == null || nearest.zone == null) return;
         SpawnConfig cfg = new SpawnConfig();
         cfg.faction = factionOf(empty.getName().toString());
@@ -597,9 +610,26 @@ public class WorldBaker extends Node {
         nearest.zone.spawnConfigs.add(cfg);
     }
 
+    /**
+     * {@code water_<id>} → a {@link WaterVolume}, which is the whole of "the world has water in it":
+     * any {@code Character} overlapping it swims or wades, and {@code Boat} floats to its surface.
+     *
+     * <p>IT IS A {@code WaterVolume}, NOT A BARE {@code Area3D}, AND ITS MASK IS SET. Both halves
+     * were missing and each was silently fatal on its own: a scriptless area has no
+     * {@code body_entered} handler, so nothing ever called {@code Character.setInWater}; and an
+     * area left on the default mask (layer 1, world) never sees a character body at all, since
+     * characters are on {@code CollisionLayers.CHARACTER}. The swim system — {@code SwimState},
+     * the buoyancy spring, the depth-based wade-vs-swim decision — has been complete since I1 and
+     * had no world to run in. Same shape as the {@code -noped} gap in {@code NavBaker}: an
+     * authoring convention whose runtime half was never built.
+     *
+     * <p>The area's own layer is cleared: it detects, and nothing needs to detect it.
+     */
     private static void buildWater(Node root, Node3D empty) {
-        Area3D area = new Area3D();
+        WaterVolume area = new WaterVolume();
         area.setName(new StringName("Water_" + idOf(empty.getName().toString())));
+        area.setCollisionLayer(0L);
+        area.setCollisionMask(com.openworld.util.CollisionLayers.CHARACTER);
         CollisionShape3D cs = new CollisionShape3D();
         BoxShape3D box = new BoxShape3D();
         box.setSize(metaVec3(empty, "size", new Vector3(10f, 4f, 10f)));
@@ -608,6 +638,24 @@ public class WorldBaker extends Node {
         root.addChild(area);
         area.setGlobalPosition(empty.getGlobalPosition());
         area.addToGroup(new StringName("water"), true);
+    }
+
+    /**
+     * {@code bounds_<id>} → {@link WorldBounds}, the logic wall. {@code size} is the playable
+     * square (x and z; the y is ignored) and {@code floor} the kill-Z.
+     *
+     * <p>A marker rather than a constant somewhere, for the same reason a zone is: a different
+     * world has a different edge, and the edge belongs with the world data that defines it.
+     */
+    private static void buildBounds(Node root, Node3D empty) {
+        WorldBounds bounds = new WorldBounds();
+        bounds.setName(new StringName("WorldBounds"));
+        Vector3 size = metaVec3(empty, "size", new Vector3(4032f, 4000f, 4032f));
+        bounds.setHalfExtent((float) (Math.min(size.getX(), size.getZ()) * 0.5));
+        bounds.setFloorY(metaFloat(empty, "floor", -64f));
+        bounds.setSoftMargin(metaFloat(empty, "soft_margin", 80f));
+        root.addChild(bounds);
+        bounds.setGlobalPosition(empty.getGlobalPosition());
     }
 
     private static void buildJunction(Node root, Node3D empty) {
@@ -647,10 +695,10 @@ public class WorldBaker extends Node {
         if (GD.isInstanceValid(empty)) { empty.getParent().removeChild(empty); empty.queueFree(); }
     }
 
-    private static WorldZoneMarker nearestMarker(List<WorldZoneMarker> markers, Vector3 pos) {
-        WorldZoneMarker best = null;
+    private static ZoneMarker nearestMarker(List<ZoneMarker> markers, Vector3 pos) {
+        ZoneMarker best = null;
         double bestD = Double.MAX_VALUE;
-        for (WorldZoneMarker m : markers) {
+        for (ZoneMarker m : markers) {
             Vector3 p = m.getGlobalPosition();
             double dx = p.getX() - pos.getX(), dz = p.getZ() - pos.getZ();
             double d = dx * dx + dz * dz;

@@ -10,7 +10,7 @@
 # Blender: open kit/intersection_prototype.blend, use the "Intersection (prototype)" panel's
 # "Build Intersection" (or F9 redo on the last run) with BOTH "Export .glb" and "Export
 # .lanekit.json" pointed at the same pair this script expects by default:
-#   Export .glb          -> src/main/resources/com/openworld/world/districts/District_intersectiondemo.glb
+#   Export .glb          -> src/main/resources/com/openworld/world/pieces/District_intersectiondemo.glb
 #   Export .lanekit.json -> assets/world_source/kit/intersection_prototype.4way.lanekit.json
 # (matching what tools/build_intersection_prototype.py's first-time run already writes) -- then
 # run this script to get it into Godot.
@@ -26,7 +26,7 @@ REPO="$(cd "$BP/.." && pwd)"                                    # repo root
 WORLD_SOURCE="$REPO/assets/world_source"                        # data root
 source "$BP/tools/env.sh"
 
-RES_DIR="src/main/resources/com/openworld/world/districts"      # relative to res://
+RES_DIR="src/main/resources/com/openworld/world/pieces"      # relative to res://
 GLTF_REL="$RES_DIR/District_intersectiondemo.glb"
 TSCN_REL="$RES_DIR/District_intersectiondemo.tscn"
 GLTF_ABS="$REPO/$GLTF_REL"

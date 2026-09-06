@@ -38,15 +38,18 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
     os.path.abspath(__file__)))), "lib"))
 
+import kit_common as kc                                                      # noqa: E402
 import road_support as rs                                                    # noqa: E402
 
 try:
-    from . import point_edges as pe, point_model as pm, point_nodes as gn, point_solve as ps
+    from . import (point_edges as pe, point_model as pm, point_nodes as gn, point_solve as ps,
+                   point_style as pstyle)
 except ImportError:
     import point_edges as pe                                                 # noqa: E402
     import point_model as pm                                                 # noqa: E402
     import point_nodes as gn                                                 # noqa: E402
     import point_solve as ps                                                 # noqa: E402
+    import point_style as pstyle                                             # noqa: E402
 
 
 SUFFIX_CARRIER = "__surface"
@@ -67,28 +70,58 @@ COL_WALK = "walk"
 #: expressway wall not, so the at-grade case is right already; the elevated case is not.
 NO_PED_SUFFIX = "-noped"
 
-MATERIALS = {
-    "asphalt": (0.05, 0.05, 0.055, 1.0),
-    "concrete": (0.55, 0.54, 0.52, 1.0),
-    "footway": (0.42, 0.41, 0.40, 1.0),
-    "median": (0.20, 0.30, 0.16, 1.0),
-    "barrier": (0.68, 0.67, 0.64, 1.0),
+#: Road layer -> the key in `kit_common.MATS`, THE repo's one material registry.
+#:
+#: This used to be a second registry: `point_build` get-or-created its own `rka_asphalt`,
+#: `rka_concrete`, `rka_median`, `rka_footway` and `rka_barrier` as flat colours, in parallel with
+#: `kit_common.MATS`, which every other builder in the repo already shared -- and which had
+#: carried `M_LineW` and `M_LineY`, described in its own source as "white lane line" and "yellow
+#: lane line", with no user at all. Two registries meant a road's asphalt was a different
+#: datablock from a car park's, and the only materials in the file that were FOR roads were the
+#: ones the roads could not reach.
+#:
+#: The footway deliberately takes `concrete_tile` rather than a flat grey: it is the procedural
+#: world-position checker built precisely so a paved surface survives a curved corner without the
+#: UV pinch a tangent-frame pattern gets, and a footway wrapping a junction fillet is exactly the
+#: case it was built for.
+#:
+#: AND THE DATABLOCK ITSELF NOW COMES FROM `assets/` (2026-09-05). `kit_common.mat()` LINKS every
+#: material from `assets/world_source/kit/road_kit.blend` instead of creating a copy in whichever
+#: `.blend` is building, so the road's asphalt, the kerb SECTION's concrete and a building's
+#: concrete are one datablock authored in a file an artist can open. This module keeps exactly the
+#: one resolver it had -- `material(key)` -> `kc.mat(...)` -- because that is where the change
+#: belongs; nothing here needed a second lookup.
+MATERIAL_KEYS = {
+    "asphalt": "asphalt",
+    "concrete": "concrete",
+    "footway": "concrete_tile",
+    "median": "median",
+    "barrier": "barrier",
+    "line_w": "line_w",
+    "line_y": "line_y",
 }
 
 
 def material(key):
-    """Get-or-create a flat material by key, so a rebuild reuses the same datablock and any
-    hand-edited shading on it survives."""
-    mat = bpy.data.materials.get("rka_%s" % key)
-    if mat is None:
-        mat = bpy.data.materials.new("rka_%s" % key)
-        mat.use_nodes = True
-        mat.diffuse_color = MATERIALS.get(key, (0.5, 0.5, 0.5, 1.0))
-        bsdf = mat.node_tree.nodes.get("Principled BSDF")
-        if bsdf is not None:
-            bsdf.inputs["Base Color"].default_value = MATERIALS.get(key, (0.5, 0.5, 0.5, 1.0))
-            bsdf.inputs["Roughness"].default_value = 0.9
-    return mat
+    """The material for a road layer, from `kit_common` -- one registry, shared with the world.
+
+    Get-or-create by name, so a rebuild reuses the same datablock and any hand-edited shading on
+    it survives, exactly as before."""
+    return kc.mat(MATERIAL_KEYS.get(key, key))
+
+
+def named_material(name, fallback_key):
+    """A material by DATABLOCK NAME (a style slot), falling back to the layer's default.
+
+    Names, not pointers, because `<stem>.roads.json` is the source of truth and has to round-trip
+    -- the same reason every other authored reference in this model is a name. A name that
+    resolves to nothing falls back rather than building a black road, and `point_validate` says
+    so; a silently missing material is indistinguishable from a shading mistake."""
+    if name:
+        mat = bpy.data.materials.get(name)
+        if mat is not None:
+            return mat
+    return material(fallback_key)
 
 
 # ------------------------------------------------------------------------------- GEN lifetime
@@ -151,7 +184,37 @@ def clear_all(scene=None):
 
 # ------------------------------------------------------------------------------- ground sampling
 
+#: Collections whose meshes are terrain outright. A district authored for this kit puts its ground
+#: in one of these.
 TERRAIN_COLLECTIONS = ("TERRAIN", "GROUND", "MANUAL")
+
+#: ...and the name every district BAKED BY THIS REPO'S PIPELINE gives its ground, which is not in
+#: any of those. A grid district's terrain is `District_<theme>_<gx>_<gy>_Terrain-col`, and it
+#: lives in `STREET` beside 1000-odd buildings -- so a collection allowlist alone finds no terrain
+#: at all on every district the world is actually made of.
+TERRAIN_NAME_TOKEN = "Terrain"
+
+
+def is_terrain(obj):
+    """Is this mesh the GROUND? The one owner of that question.
+
+    THE SAMPLER AND THE CUT MUST AGREE, and they did not: `terrain_objects` looked only inside
+    `TERRAIN_COLLECTIONS` (finding nothing on a real district, so the ground cut silently never
+    ran), while `ground_sampler` raycast the WHOLE scene and took whatever it hit first. Measured
+    on `Piece_3_1`, 300 downward rays: 134 hit the terrain, **96 hit buildings** -- up to 66.2 m,
+    a rooftop -- and 70 hit the district's previously baked road. A third of a road's stations
+    would have sampled their ground off a roof, and the supports are derived from exactly that
+    number.
+
+    Neither half was visible on the synthetic sample network, which has no buildings and no
+    terrain. It took one probe against a real district."""
+    if obj is None or obj.type != 'MESH' or obj.library is not None:
+        return False
+    if obj.name.startswith("rka_"):
+        return False
+    if TERRAIN_NAME_TOKEN in obj.name:
+        return True
+    return any(c.name in TERRAIN_COLLECTIONS for c in obj.users_collection)
 
 
 def ground_sampler(scene=None, depsgraph=None, top=2000.0):
@@ -173,14 +236,46 @@ def ground_sampler(scene=None, depsgraph=None, top=2000.0):
     # nothing and skipped nothing. Membership, computed once, is the answer; a name is not.
     skip = gen_collection_names()
 
+    #: How many non-terrain hits one cast may punch through before giving up.
+    #:
+    #: THIS WAS 8, AND 8 WAS A GUESS ("a city block is a building, its collision proxy, maybe a
+    #: canopy -- not thirty things"). Measured on the shrine touge's hairpins, where a road passes
+    #: under ITSELF above an always-resident island collision layer, a ray reaches the ground only
+    #: after **9 to 12** non-terrain hits: the road's own cutter solid (2-4 times, since a
+    #: switchback's cutter overlaps itself), `Ground-colonly`, then the surface, kerb runs and lane
+    #: markings of every loop it passes under. At 8 the ray gave up, `sample()` returned None,
+    #: `_cut_section` read a daylight height of 0 and the apex was never cut -- the same silent
+    #: shape as everything else in this story.
+    #:
+    #: It is not a budget, it is a runaway guard, and the loop already has a real one (`nz >= z`
+    #: stops a degenerate hit spinning). Each punch is one raycast and is only paid where geometry
+    #: is actually stacked, so a cap with room in it costs nothing on the 99% of the world that is
+    #: one road on one ground.
+    max_punch = 64
+
     def sample(x, y):
-        hit, loc, _n, _i, obj, _m = scene.ray_cast(
-            depsgraph, (x, y, top), (0.0, 0.0, -1.0))
-        if not hit or obj is None:
-            return None
-        if any(c.name in skip for c in obj.users_collection):
-            return None
-        return loc.z
+        """The GROUND under `(x, y)`, punching through everything that is not it.
+
+        NOT "whatever the first ray hits". A district is a thousand buildings and a previously
+        baked road standing on the terrain, and the first hit is one of those two thirds of the
+        time -- so the ray restarts just below each non-terrain hit until it reaches the ground or
+        runs out of scene. Taking the first hit put a road's `ground_z` on a 66 m rooftop, and
+        every support is derived from that number."""
+        z = top
+        for _ in range(max_punch):
+            hit, loc, _n, _i, obj, _m = scene.ray_cast(
+                depsgraph, (x, y, z), (0.0, 0.0, -1.0))
+            if not hit or obj is None:
+                return None
+            # A ROAD'S OWN OUTPUT IS NOT TERRAIN -- and neither is the road it replaces, nor a
+            # building. Punch through and keep going down.
+            if not any(c.name in skip for c in obj.users_collection) and is_terrain(obj):
+                return loc.z
+            nz = loc.z - 1e-3
+            if nz >= z:                       # no progress: a degenerate hit, stop rather than spin
+                return None
+            z = nz
+        return None
 
     return sample
 
@@ -230,10 +325,10 @@ def _mesh_object(name, me, coll):
     return o
 
 
-def build_carrier(solve, coll, name):
+def build_carrier(solve, coll, name, style=None):
     """`<road>__surface` -- the swept road. One object, N modifiers."""
     obj = _mesh_object(name + SUFFIX_CARRIER, _carrier_mesh(name + SUFFIX_CARRIER, solve), coll)
-    build_stack(obj)
+    build_stack(obj, surface_spec(style))
     return obj
 
 
@@ -262,7 +357,70 @@ def _layer(name, inner, offset=0.0, offset_attr="", z=0.0, z_attr="", require_at
             "z": z, "z_attr": z_attr, "require_attr": require_attr, "inputs": inputs}
 
 
-def surface_spec():
+#: Where a PROFILE ASSET's origin sits for each slot -- the line the road hands it, which is not
+#: always the line the parametric layer is anchored on.
+#:
+#: A section is authored standing on its own base at (0, 0), so an asset is placed by its FOOT.
+#: The parametric layers are not all anchored that way: the kerb is a bar hung down from its top
+#: and the barrier likewise, so reusing their `z_attr` for an asset floats the section a whole
+#: wall-height into the air. Measured on the jersey barrier: 0.96 m up instead of standing on the
+#: footway. One entry per slot that can take an asset, and the ones that already agree say so.
+#: What must be non-zero somewhere on a carrier for a slot's ASSET to build at all.
+#:
+#: An asset layer takes no `WidthAttr`/`ThicknessAttr` -- the section's own size is its size -- and
+#: those attributes were what `layer_has_content` gated on. Without this an asset barrier is built
+#: along EVERY road that names one, including the at-grade street where `solve_road` decided there
+#: should be no barrier: measured, a jersey barrier down both flanks of a pedestrian street whose
+#: parametric wall was correctly zero. The question "does this layer have content" is the same
+#: question either way; only the attribute that answers it moves.
+ASSET_REQUIRE = {
+    "kerb": "rka_curb_hl",
+    "footway": "rka_walk_hl",
+    "barrier": "rka_wall_h",
+    "median": "rka_med_h",
+}
+
+ASSET_Z_ATTR = {
+    "kerb": "",                 # the kerb line, at road level -- the carrier polyline itself
+    "footway": "rka_walk_zl",   # on top of the kerb, which is where the parametric band is too
+    "barrier": "rka_wall_foot", # the foot, NOT `rka_wall_z`, which is the top
+    "median": "rka_med_z",
+    "surface": "",
+}
+
+
+def _styled(style, slot, name, inner, flip=False, **kw):
+    """One layer, taking its material -- and possibly its whole SHAPE -- from the road's style.
+
+    If the slot names a profile asset, the layer becomes a swept section of the artist's own
+    geometry (`GN_PointProfile`) instead of the parametric band, and its material comes off the
+    asset (because `Curve to Mesh` drops it -- see `point_style`). Otherwise nothing changes:
+    same group, same attributes, only the material is now a slot rather than a constant.
+
+    The asset REPLACES the layer rather than adding one, because the two build the same thing.
+    Sweeping both is how a road ends up with a parametric kerb inside a modelled one, z-fighting
+    along its entire length."""
+    if style is None:
+        return _layer(name, inner, **kw)
+    asset = style.asset(slot)
+    if asset is not None:
+        mat = pstyle.asset_material(asset) or style.material(slot)
+        # An asset sweep takes NO width/thickness attributes: its own dimensions are its size.
+        # Passing them would scale the artist's section by a design number -- the exact mismatch
+        # that once put a 3.0 m footway piece where 3.5 m was assumed.
+        keep = {k: v for k, v in kw.items()
+                if k in ("offset", "offset_attr", "z", "require_attr")}
+        keep["z_attr"] = ASSET_Z_ATTR.get(slot, kw.get("z_attr", ""))
+        keep["require_attr"] = (kw.get("require_attr")
+                                or ASSET_REQUIRE.get(slot, "")
+                                or kw.get("WidthAttr", ""))
+        return _layer(name, gn.make_profile_group(), Profile=asset, Flip=bool(flip),
+                      Material=mat, **keep)
+    kw["Material"] = style.material(slot)
+    return _layer(name, inner, **kw)
+
+
+def surface_spec(style=None):
     """THE ROAD SURFACE, AS DATA. Adding a band is one entry here, not a node tree (3.3a).
 
     Every entry names the attributes it reads, and every one of those names is declared in
@@ -276,28 +434,40 @@ def surface_spec():
     than a rule someone has to remember."""
     band, deck = gn.make_band_group(), gn.make_deck_group()
     pillars = gn.make_pillars_group()
+    # WHICH median material follows `median_style`, which is a fact about the divide, not a
+    # separate choice: a painted divide is paint and a raised one is an island, and asking the
+    # artist to keep a style enum and a material slot agreeing is how they come to disagree. An
+    # explicitly named `median_mat` still wins -- `point_style` only falls back to the default.
+    med_slot = "median"
+    if style is not None and getattr(style.road, "median_style", None) == pm.MED_PAINT:
+        med_slot = "mark_y"
     return [
-        _layer("Carriageway", band, offset_attr="rka_shift", WidthAttr="rka_halfw",
-               Material=material("asphalt")),
+        _styled(style, "surface", "Carriageway", band, offset_attr="rka_shift",
+                WidthAttr="rka_halfw", Material=material("asphalt")),
         # A PAINTED median is flush with the road, which is the same coplanar-surface trap the
         # deck fell into, just narrower -- so lift the paint by the matching bias. A raised median
         # already clears the asphalt and is unaffected.
-        _layer("Median", band, WidthAttr="rka_med_h", z=ps.PAINT_Z_BIAS, z_attr="rka_med_z",
-               Material=material("median")),
+        _styled(style, med_slot, "Median", band, WidthAttr="rka_med_h", z=ps.PAINT_Z_BIAS,
+                z_attr="rka_med_z", Material=material("median")),
         # THE DECK TOP MUST SIT BELOW THE ROAD, NOT ON IT -- a top face at z = 0 is coplanar with
         # the asphalt over the entire road, which is z-fighting across the whole network. It spans
         # the FULL outline (`rka_deck_w`), not just the carriageway, so a viaduct carrying a
         # footway carries the footway too.
-        _layer("Deck", deck, offset_attr="rka_deck_c", z=ps.DECK_Z_BIAS,
-               WidthAttr="rka_deck_w", ThicknessAttr="rka_deck_h",
-               Material=material("concrete")),
+        _styled(style, "deck", "Deck", deck, offset_attr="rka_deck_c", z=ps.DECK_Z_BIAS,
+                WidthAttr="rka_deck_w", ThicknessAttr="rka_deck_h",
+                Material=material("concrete")),
         _layer("Pillars", pillars, offset_attr="rka_deck_c", SpacingAttr="rka_sp_pillar",
-               Material=material("concrete"), require_attr="rka_pillar_param"),
+               Material=(style.material("deck") if style else material("concrete")),
+               require_attr="rka_pillar_param"),
     ]
 
 
-def edge_spec():
+def edge_spec(style=None, sgn=1.0):
     """THE EDGE FURNITURE, swept along an `__edges` carrier whose polyline IS the kerb line.
+
+    `sgn` is the side (+1 = the polyline's left), and it matters only to a PROFILE ASSET: the
+    parametric bands are symmetric and carry the side in their offset value, but an artist's
+    asymmetric section has to be mirrored to face outward on the right-hand flank.
 
     Same two node groups, same attribute names, no second implementation of "what a kerb looks
     like" -- which is the point. Because the polyline is already the line, `rka_curb_ol` is 0 on
@@ -305,11 +475,13 @@ def edge_spec():
     the value, so one spec serves both sides."""
     band, deck = gn.make_band_group(), gn.make_deck_group()
     return [
-        _layer("Curb", deck, offset_attr="rka_curb_ol", z_attr="rka_curb_hl",
-               WidthAttr="rka_curb_tl", ThicknessAttr="rka_curb_hl",
-               Material=material("concrete")),
-        _layer("Sidewalk", band, offset_attr="rka_walk_cl", z_attr="rka_walk_zl",
-               WidthAttr="rka_walk_hl", Material=material("footway")),
+        _styled(style, "kerb", "Curb", deck, flip=(sgn < 0.0),
+                offset_attr="rka_curb_ol", z_attr="rka_curb_hl",
+                WidthAttr="rka_curb_tl", ThicknessAttr="rka_curb_hl",
+                Material=material("concrete")),
+        _styled(style, "footway", "Sidewalk", band, flip=(sgn < 0.0),
+                offset_attr="rka_walk_cl", z_attr="rka_walk_zl", WidthAttr="rka_walk_hl",
+                Material=material("footway")),
         # THE BARRIER, and it belongs here for the same structural reason the kerb does: swept
         # along the OUTLINE, so `point_edges.open_runs` opens it wherever another road's asphalt
         # is -- at a gore, at a merge, at a junction mouth. A wall on the centreline would run
@@ -317,9 +489,10 @@ def edge_spec():
         # failure the previous model never got on top of. It is the same `deck` group as the kerb:
         # a bar of `WidthAttr` half-thickness whose TOP is at `z_attr`, extruded down by its
         # height, so there is no second idea of what a wall is either.
-        _layer("Barrier", deck, offset_attr="rka_wall_c", z_attr="rka_wall_z",
-               WidthAttr="rka_wall_hw", ThicknessAttr="rka_wall_h",
-               Material=material("barrier")),
+        _styled(style, "barrier", "Barrier", deck, flip=(sgn < 0.0),
+                offset_attr="rka_wall_c", z_attr="rka_wall_z",
+                WidthAttr="rka_wall_hw", ThicknessAttr="rka_wall_h",
+                Material=material("barrier")),
     ]
 
 
@@ -425,18 +598,22 @@ def edge_run_values(walk, kerb, wall, sgn):
             "rka_wall_hw": half_t if wl > 0.0 else 0.0,
             "rka_wall_c": sgn * (2.0 * w + half_t),
             "rka_wall_z": h + wl,
+            # The wall's FOOT: the top of whatever it stands on (the kerb, and the footway is
+            # level with it). A parametric barrier hangs down from `rka_wall_z`; a profile ASSET
+            # is drawn standing on its base and needs this instead. Same wall, both ends named.
+            "rka_wall_foot": h,
         })
     return out
 
 
-def build_edge_run(points, walk, kerb, wall, sgn, coll, name):
+def build_edge_run(points, walk, kerb, wall, sgn, coll, name, style=None):
     """One `__edges` carrier: the polyline, its per-vertex furniture, the `edge_spec()` stack."""
     o = _polyline_object(name, points, coll, edge_run_values(walk, kerb, wall, sgn))
-    build_stack(o, edge_spec())
+    build_stack(o, edge_spec(style, sgn))
     return o
 
 
-def build_edges(solve, bands, coll, name):
+def build_edges(solve, bands, coll, name, style=None):
     """`<road>__edges_<side>_<n>` -- kerb and footway, over the OPEN RUNS only.
 
     THIS IS WHERE THE GORE OPENS, and nothing here knows what a gore is. `point_edges.kerb_runs`
@@ -462,13 +639,74 @@ def build_edges(solve, bands, coll, name):
                 [v[walk_key] for v in vals],
                 [v[kerb_key] for v in vals],
                 [v["rka_wall_h"] for v in vals],
-                sgn, coll, "%s%s_%s_%d" % (name, SUFFIX_EDGE, side, n)))
+                sgn, coll, "%s%s_%s_%d" % (name, SUFFIX_EDGE, side, n), style))
+    return out
+
+
+# ------------------------------------------------------------------------------- the markings
+
+SUFFIX_MARKS = "__marks"
+
+
+def mark_spec(style, yellow):
+    """THE PAINT: one flush band, on the marking carrier whose polyline IS the line.
+
+    Lifted by `PAINT_Z_BIAS` for the same reason the painted median is -- a stripe coplanar with
+    the asphalt z-fights along its entire length, which at world scale is the whole road network
+    flickering."""
+    slot = "mark_y" if yellow else "mark_w"
+    return [_layer("Paint", gn.make_band_group(), WidthAttr="rka_mark_w", z=ps.PAINT_Z_BIAS,
+                   Material=(style.material(slot) if style is not None
+                             else material("line_y" if yellow else "line_w")))]
+
+
+def _polylines_object(name, chains, coll, values):
+    """ONE mesh holding SEVERAL disconnected polylines, all carrying the same attributes.
+
+    A dashed lane line is 113 separate pieces of paint on one run of the testbed; as 113 objects
+    that is 113 modifier stacks, 113 evaluations and an outliner nobody can read. `Mesh to Curve`
+    turns each disconnected chain into its own spline, so one object sweeps them all."""
+    me = bpy.data.meshes.new(name)
+    verts, edges = [], []
+    for chain in chains:
+        base = len(verts)
+        verts.extend(tuple(p) for p in chain)
+        edges.extend((base + i, base + i + 1) for i in range(len(chain) - 1))
+    me.from_pydata(verts, edges, [])
+    me.update()
+    for a in ps.CARRIER_ATTRS:
+        att = me.attributes.new(name=a.name, type='FLOAT', domain='POINT')
+        att.data.foreach_set("value", [float(values.get(a.name, a.default))] * len(verts))
+    return _mesh_object(name, me, coll)
+
+
+def build_marks(solve, coll, name, style=None):
+    """`<road>__marks_w` / `_y` -- every painted lane boundary on this run.
+
+    Grouped by COLOUR and nothing else: a road's white lines are one object and its yellow ones
+    another, whatever slot each divides, because that is exactly as fine as the material makes it
+    worth splitting. Dashes are already separate polylines by the time they arrive.
+
+    NOT COLLIDABLE, and that is deliberate rather than an oversight: `build_collision` is handed an
+    explicit list of surfaces and this is not in it. Paint is 15 cm wide and 1 cm proud; a proxy
+    per stripe would put a paper-thin `StaticBody3D` under every dashed line in the world for
+    nothing a bullet, a wheel or a navmesh would ever want."""
+    runs = ps.solve_marks(solve)
+    out = []
+    for yellow in (False, True):
+        chains = [r.points for r in runs if r.yellow is yellow]
+        if not chains:
+            continue
+        o = _polylines_object("%s%s_%s" % (name, SUFFIX_MARKS, "y" if yellow else "w"),
+                              chains, coll, {"rka_mark_w": ps.MARK_WIDTH / 2.0})
+        build_stack(o, mark_spec(style, yellow))
+        out.append(o)
     return out
 
 
 # ------------------------------------------------------------------------------- the pad
 
-def build_pad(jsolve, coll, name):
+def build_pad(jsolve, coll, name, style=None):
     """One junction pad, tessellated by `point_solve.pad_triangles` and by nothing here.
 
     A fan and not an n-gon: n-gon tessellation of a concave, non-planar pad left measured
@@ -493,11 +731,11 @@ def build_pad(jsolve, coll, name):
     me.update()
     me.validate()
     o = _mesh_object(name + SUFFIX_PAD, me, coll)
-    o.data.materials.append(material("asphalt"))
+    o.data.materials.append(style.material("surface") if style else material("asphalt"))
     return o
 
 
-def build_junction_edges(jsolve, coll, name):
+def build_junction_edges(jsolve, coll, name, style=None):
     """`JCT_*__edges_c<N>` -- the pad's own kerb and footway, one object per corner.
 
     Same `edge_spec()` as a road's edges, on the same kind of carrier, deliberately: a junction
@@ -514,13 +752,13 @@ def build_junction_edges(jsolve, coll, name):
         if len(c.points) < 2:
             continue
         out.append(build_edge_run(c.points, c.walk, c.kerb, c.wall, -1.0, coll,
-                                  "%s%s_c%d" % (name, SUFFIX_EDGE, i)))
+                                  "%s%s_c%d" % (name, SUFFIX_EDGE, i), style))
     return out
 
 
 # ------------------------------------------------------------------------------- the gore
 
-def build_gore(gsolve, coll, name):
+def build_gore(gsolve, coll, name, style=None):
     """The paved wedge where a ramp leaves its mainline, as a triangle strip.
 
     2.4's rule is edge alignment and NO pad -- and that is still right for the JOIN. But a join
@@ -562,11 +800,11 @@ def build_gore(gsolve, coll, name):
     me.update()
     me.validate()
     o = _mesh_object(name + SUFFIX_GORE, me, coll)
-    o.data.materials.append(material("asphalt"))
+    o.data.materials.append(style.material("surface") if style else material("asphalt"))
     return o
 
 
-def build_gore_edges(gsolve, coll, name):
+def build_gore_edges(gsolve, coll, name, style=None):
     """`GORE_*__edges_nose` -- the cap that closes the open V at the gore's wide end.
 
     A gore is bare paint, so both flanking walls OPEN across it (`point_edges.Band.carries_edge`
@@ -588,49 +826,40 @@ def build_gore_edges(gsolve, coll, name):
     if not any(abs(v) > 1e-6 for v in list(c.kerb) + list(c.walk) + list(c.wall)):
         return []
     return [build_edge_run(c.points, c.walk, c.kerb, c.wall, gsolve.nose_sgn, coll,
-                           name + SUFFIX_EDGE + "_nose")]
+                           name + SUFFIX_EDGE + "_nose", style)]
 
 
-# ------------------------------------------------------------------------------- the ground cut
+# ------------------------------------------------------------------- the ground cut lives ELSEWHERE
+#
+# THERE USED TO BE A BOOLEAN CUT HERE, and it was removed on 2026-09-06 rather than fixed again.
+# `cut_ground` hung one BOOLEAN modifier per road band on the terrain mesh; `clear_cuts`,
+# `_cut_tube`, `_cut_section`, `_outward_offsets` and `_self_intersects` all existed to serve it.
+# Every defect it cost was a property of the tool, not of the road:
+#
+#   * the cutter was a zero-thickness sheet and no boolean had EVER cut anything (`W22`);
+#   * the sampler raycast the terrain the PREVIOUS build had already cut, so a deep station found
+#     no ground, read a daylight height of 0 and was never cut again (`W13`);
+#   * a switchback's cutter passes through itself, and an exact solver has no defined inside for a
+#     doubly-covered region: it leaves the ground standing, silently. From identical inputs -- the
+#     same network, the same terrain, the same sampled `ground_z` byte for byte -- a second Build
+#     took the touge from 2 buried stations to 9;
+#   * and it could never be applied to the COLLIDER, because a boolean removes material and the
+#     always-resident ground is the one layer that must never have a hole (`W21`).
+#
+# THE ROAD DEFORMS THE GROUND NOW, which is what every open-world pipeline does. Terrain is a
+# heightfield, a heightfield has no topology to cut, and from Unreal's `Deform Landscape to
+# Splines` to a Houdini road HDA the operation is to write the road's elevation INTO the field.
+# `island_v3_terrain.Carve` is that rule, `build_island_v3.build_ground(carve=...)` samples it, and
+# `road_corridors` above is this module's whole contribution: the centrelines and widths of what it
+# just built. A `min` cannot open a hole, so the collider is now a copy of the visual ground and
+# `W21` is closed by construction rather than worked around.
+#
+# WHAT THIS COSTS, recorded rather than hidden: the carve needs a terrain that is a FIELD, so it
+# serves the island (whose ground is generated from `island_v3_terrain`) and not a district whose
+# ground is a hand-modelled mesh. No such district exists -- the world is one continuous island by
+# `WORLD_REBUILD_PLAN.md` step 3 -- and a hand-modelled terrain would want the artist to model its
+# own cut faces anyway, which is also what production does for a benched mountain road.
 
-def cut_ground(footprints, terrain_objects, depth=40.0):
-    """Cut the terrain to each road footprint, as part of Build -- never a button.
-
-    The union polygon the plan reached for is not needed: difference distributes over union, so
-    cutting with each band in turn gives the same terrain as cutting with their union once
-    (`point_edges`'s module docstring works this through). That is why there is no polygon clipper
-    anywhere in this addon.
-
-    Returns the cutter objects, which the caller frees. Skips silently when there is no terrain --
-    a district authored without ground is a valid work-in-progress, not an error to raise into an
-    artist's Build."""
-    if not terrain_objects:
-        return []
-    cutters = []
-    for owner, poly in footprints:
-        if len(poly) < 3:
-            continue
-        me = bpy.data.meshes.new("rka_cut_" + owner)
-        bm = bmesh.new()
-        vs = [bm.verts.new((x, y, -depth)) for (x, y) in poly]
-        try:
-            face = bm.faces.new(vs)
-        except ValueError:
-            bm.free()
-            bpy.data.meshes.remove(me)
-            continue                      # a self-touching footprint: the gate reports it
-        bmesh.ops.solidify(bm, geom=[face], thickness=2.0 * depth)
-        bm.to_mesh(me)
-        bm.free()
-        o = bpy.data.objects.new("rka_cut_" + owner, me)
-        bpy.context.scene.collection.objects.link(o)
-        cutters.append(o)
-    for t in terrain_objects:
-        for c in cutters:
-            mod = t.modifiers.new("rka_cut", 'BOOLEAN')
-            mod.operation = 'DIFFERENCE'
-            mod.object = c
-    return cutters
 
 
 # ------------------------------------------------------------------------------- collision
@@ -712,18 +941,30 @@ def _joined(a, b):
 # ------------------------------------------------------------------------------- the whole build
 
 def terrain_objects(scene=None):
-    """The meshes the ground cut applies to: anything in a terrain-ish collection that is not
-    generated. Local-only, so a linked neighbour's terrain is never cut by this district."""
+    """The meshes the ground cut applies to -- `is_terrain`, and nothing else.
+
+    THE SAME QUESTION THE SAMPLER ASKS, through the same function. This used to scan a fixed list
+    of collection names and so found NO terrain on any district the pipeline actually bakes (whose
+    ground sits in `STREET`), which meant the ground cut quietly did nothing on real content while
+    passing every test on the synthetic sample. Local-only, so a linked neighbour's terrain is
+    never cut by this district."""
     scene = scene or bpy.context.scene
-    out = []
-    for name in TERRAIN_COLLECTIONS:
-        c = _local(bpy.data.collections, name)
-        if c is None:
+    skip = gen_collection_names()
+    out, seen = [], set()
+    for o in scene.objects:
+        if o.name in seen or not is_terrain(o):
             continue
-        for o in c.all_objects:
-            if o.type == 'MESH' and o.library is None and not o.name.startswith("rka_"):
-                out.append(o)
+        if any(c.name in skip for c in o.users_collection):
+            continue
+        seen.add(o.name)
+        out.append(o)
     return out
+
+
+#: Set on the scene by whatever deforms the terrain to the roads
+#: (`build_island_base.carve_ground_to_roads`). Its ONE reader is `write_ground_back`, which must
+#: not mistake a carved ground for the natural one -- see there.
+CARVED_FLAG = "rka_ground_carved"
 
 
 def write_ground_back(net, solves, ground, scene=None):
@@ -740,8 +981,22 @@ def write_ground_back(net, solves, ground, scene=None):
     a road over water, or past the terrain's edge, keeps whatever it had and keeps saying so.
     Claiming a sample that never happened would silently hand the support solver a 0.
 
+    AND IT MUST NOT RUN AGAINST A GROUND THAT IS ALREADY CARVED (`CARVED_FLAG`, 2026-09-06). The
+    ground the terrain builder leaves in the file has the roads cut into it, so a second Build in
+    that file samples a surface that MEETS the road and stamps that back as "the natural ground
+    here". Measured on `Island_base`: **195 of 225 stations rewritten, the biggest by 9.46 m**, and
+    a benched stretch silently reclassified from CUT to at-grade. It changes no geometry today --
+    a CUT's batter is the terrain's now, so a CUT that reads as NONE builds the same nothing -- but
+    it destroys the record of what the natural ground was, which is the input every support
+    decision is made from. So it is refused with a message rather than done quietly; the tool path
+    is unaffected because `build_island_base` always emits the NATURAL ground before it seeds.
+
     Returns `(hits, misses)`."""
     if ground is None:
+        return (0, 0)
+    if scene is not None and scene.get(CARVED_FLAG):
+        print("point_build: ground_z NOT re-sampled -- this file's terrain is carved to its roads. "
+              "Rebuild the natural ground first (build_island_base.py) if you need it re-derived.")
         return (0, 0)
     by_uid = {}
     for coll in _local_road_collections(scene):
@@ -779,17 +1034,22 @@ def _local_road_collections(scene=None):
     return [c for c in root.children if c.library is None and c.name != pm.JUNCTIONS]
 
 
-def build_network(net, scene=None, sample_ground=True, cut=True):
-    """Build everything. Returns a report dict the panel and the smoketests both read.
+def _road_of(net, uid):
+    """Which road a uid belongs to, or None. A pad and a gore each span more than one road and
+    must still resolve ONE style; this is how each picks the road it takes it from."""
+    for name, road in net.roads.items():
+        if uid in road.points:
+            return name
+    return None
 
-    ORDER MATTERS AND IS NOT NEGOTIABLE: solve every road and every clique FIRST, collect the
-    bands, and only then emit. The edge furniture is a fact about TWO roads at once -- how far a
-    ramp is from the road it runs alongside -- so it cannot be answered inside a loop that only
-    ever holds one. That was the previous model's `merge_corridor_ends` staging, and it is the one
-    structural lesson from it worth keeping."""
-    scene = scene or bpy.context.scene
-    ground = ground_sampler(scene) if sample_ground else None
 
+def solve_all(net, ground=None):
+    """Solve every road, clique and gore, and collect the bands. `(solves, jsolves, gsolves, bands)`.
+
+    ONE OWNER of the solve ORDER, because two things need it: `build_network`, which emits the
+    meshes, and `road_corridors`, which the terrain builder asks for the ground carve. Order is not
+    negotiable -- the edge furniture is a fact about TWO roads at once, so every carrier must exist
+    before any band is collected."""
     solves, jsolves = [], ps.solve_junctions(net, ground_fn=ground)
     for road in net.roads.values():
         for uids in ps.road_runs(net, road):
@@ -799,26 +1059,99 @@ def build_network(net, scene=None, sample_ground=True, cut=True):
     # The gore is solved from the finished carriers, not alongside them: its two boundaries ARE
     # the two roads' own paved edges, so it cannot exist until both roads have some.
     gsolves = ps.solve_gores(net, solves)
-    bands = pe.collect_bands(solves, jsolves, gsolves)
+    return solves, jsolves, gsolves, pe.collect_bands(solves, jsolves, gsolves)
+
+
+def band_corridors(bands):
+    """Every built surface as `(polyline, half)` for `island_v3_terrain.Carve` -- the ground the
+    road needs cleared, expressed as a centreline the terrain can carve to.
+
+    THE WIDTH IS READ OFF THE BAND, not from the road's authored numbers: `band.poly` is the paved
+    outline (left edge out, right edge back), so the distance from a spine point to its own two
+    edge points IS the half-width there, aux lanes, median tapers and all. One owner, and it cannot
+    disagree with the mesh that was just swept from the same band.
+
+    Junction pads and gores are bands too, and they are included on purpose -- a pad is a paved
+    surface the ground must clear exactly as a carriageway is. An ELEVATED stretch needs no case:
+    the carve is a `min`, so a deck 18 m over the bay proposes a ceiling far above the water and
+    changes nothing."""
+    out = []
+    for band in bands:
+        spine = list(getattr(band, "spine", ()) or ())
+        poly = list(getattr(band, "poly", ()) or ())
+        m = len(spine)
+        if m < 2 or len(poly) != 2 * m:
+            continue
+        line = []
+        for i, (sx, sy, sz) in enumerate(spine):
+            lx, ly = poly[i][0], poly[i][1]
+            rx, ry = poly[2 * m - 1 - i][0], poly[2 * m - 1 - i][1]
+            half = max(math.hypot(lx - sx, ly - sy), math.hypot(rx - sx, ry - sy))
+            # `sz` is the spine's OWN height, not `band.surface_z(sx, sy)` -- which is a
+            # nearest-sample lookup over this very list and would answer with the same number by a
+            # longer route, or with a neighbour's where two samples land close together.
+            line.append((sx, sy, sz, half))
+        out.append((line, 0.0))
+    return out
+
+
+def road_corridors(scene=None, net=None, ground=None):
+    """The corridors for a ground carve, solved from the authored network. See `band_corridors`."""
+    scene = scene or bpy.context.scene
+    if net is None:
+        net = pm.read_network(scene)
+    if ground is None:
+        ground = ground_sampler(scene)
+    return band_corridors(solve_all(net, ground)[3])
+
+
+def build_network(net, scene=None, sample_ground=True):
+    """Build everything. Returns a report dict the panel and the smoketests both read.
+
+    ORDER MATTERS AND IS NOT NEGOTIABLE: solve every road and every clique FIRST, collect the
+    bands, and only then emit. The edge furniture is a fact about TWO roads at once -- how far a
+    ramp is from the road it runs alongside -- so it cannot be answered inside a loop that only
+    ever holds one. That was the previous model's `merge_corridor_ends` staging, and it is the one
+    structural lesson from it worth keeping."""
+    scene = scene or bpy.context.scene
+
+    # THE GROUND THIS SAMPLES IS THE NATURAL ONE, and keeping it that way is the whole reason the
+    # carve happens after the build rather than inside it: a road's profile is derived FROM the
+    # ground, so sampling a ground already carved to the last pass derives a lower road, which
+    # carves deeper, forever. See `island_v3_terrain.Carve` ("one direction of derivation") and
+    # `build_island_base._emit_ground`.
+    ground = ground_sampler(scene) if sample_ground else None
+
+    solves, jsolves, gsolves, bands = solve_all(net, ground)
 
     report_ground = write_ground_back(net, solves, ground, scene)
 
-    report = {"roads": 0, "runs": 0, "pads": 0, "gores": 0, "edges": 0, "colonly": 0,
+    report = {"roads": 0, "runs": 0, "pads": 0, "gores": 0, "edges": 0, "marks": 0, "colonly": 0,
               "not_star": [], "objects": [], "ground": report_ground}
     clear_all(scene)
     by_road = {}
     for s in solves:
         by_road.setdefault(s.road.name, []).append(s)
 
+    # ONE style per road, resolved once and handed to every layer -- rather than each layer
+    # looking a name up for itself, which is how a kerb and the footway beside it come to resolve
+    # the same slot differently.
+    styles = {name: pstyle.resolve(road, material_fn=material)
+              for name, road in net.roads.items()}
     for road_name, runs in by_road.items():
         coll = gen_group(road_name, scene)
         report["roads"] += 1
+        style = styles.get(road_name)
+        for slot, kind, missing_name in (style.missing() if style else ()):
+            report.setdefault("missing_style", []).append((road_name, slot, kind, missing_name))
         for i, s in enumerate(runs):
             name = road_name if len(runs) == 1 else "%s_%d" % (road_name, i)
-            surf = build_carrier(s, coll, name)
-            edges = build_edges(s, bands, coll, name)
+            surf = build_carrier(s, coll, name, style)
+            edges = build_edges(s, bands, coll, name, style)
+            marks = build_marks(s, coll, name, style)
             report["runs"] += 1
             report["edges"] += len(edges)
+            report["marks"] = report.get("marks", 0) + len(marks)
             report["objects"].append(surf.name)
             cols = build_collision([surf], edges, coll, name, bool(s.road.ped_access))
             report["colonly"] += len(cols)
@@ -829,10 +1162,15 @@ def build_network(net, scene=None, sample_ground=True, cut=True):
             name = "JCT_" + j.uids[0][:8]
             if not j.star_ok:
                 report["not_star"].append((name, round(j.star_worst, 3)))
-            pad = build_pad(j, jcoll, name)
+            # A pad spans several roads and can only carry ONE look. It takes the style of the
+            # road owning its first mouth -- a documented simplification, and the honest one: the
+            # alternative is a pad tiled from N styles meeting along invisible seams. Author a
+            # crossing of two differently-paved streets by giving them the same surface slot.
+            jstyle = styles.get(_road_of(net, j.uids[0]))
+            pad = build_pad(j, jcoll, name, jstyle)
             report["pads"] += 1
             report["objects"].append(pad.name)
-            corners = build_junction_edges(j, jcoll, name)
+            corners = build_junction_edges(j, jcoll, name, jstyle)
             report["edges"] += len(corners)
             # The corner footway is walkable, so it must reach the navmesh as a WALK proxy --
             # otherwise AI cross the road at the pad and never use the pavement they can see.
@@ -841,12 +1179,15 @@ def build_network(net, scene=None, sample_ground=True, cut=True):
     if gsolves:
         gcoll = gen_group(pm.GORES, scene)
         for g in gsolves:
-            gore = build_gore(g, gcoll, "GORE_" + g.ramp_uid[:8])
+            # THE GORE CARRIES THE RAMP'S SECTION (8h.3) -- so it carries the ramp's style too.
+            # The two rules are the same rule: the wedge is the ramp's divergence.
+            gstyle = styles.get(_road_of(net, g.ramp_uid))
+            gore = build_gore(g, gcoll, "GORE_" + g.ramp_uid[:8], gstyle)
             if gore is None:
                 continue
             report["gores"] += 1
             report["objects"].append(gore.name)
-            nose = build_gore_edges(g, gcoll, "GORE_" + g.ramp_uid[:8])
+            nose = build_gore_edges(g, gcoll, "GORE_" + g.ramp_uid[:8], gstyle)
             report["edges"] += len(nose)
             report["objects"] += [o.name for o in nose]
             # `ped_access` is BOTH flanks' answer (`GoreSolve.ped_access`), not a constant: an
@@ -856,9 +1197,6 @@ def build_network(net, scene=None, sample_ground=True, cut=True):
             report["colonly"] += len(build_collision([gore], nose, gcoll,
                                                      "GORE_" + g.ramp_uid[:8], g.ped_access))
 
-    if cut:
-        cutters = cut_ground([(b.owner, b.poly) for b in bands], terrain_objects(scene))
-        report["cutters"] = len(cutters)
     return report
 
 
@@ -869,10 +1207,6 @@ class RKA_OT_point_build(bpy.types.Operator):
     bl_idname = "rka.point_build"
     bl_label = "Build Roads"
     bl_options = {'REGISTER', 'UNDO'}
-
-    cut_ground: bpy.props.BoolProperty(
-        name="Cut Ground", default=True,
-        description="Cut the terrain to each road's own footprint, as part of the build")
 
     def execute(self, context):
         try:
@@ -889,6 +1223,10 @@ class RKA_OT_point_build(bpy.types.Operator):
         promoted, _refaced = po.sync_facings(context.scene)
         for name in promoted[:4]:
             self.report({'INFO'}, "%s was rotated -- its facing now shapes the road" % name)
+        # ...and every junction handle back onto its own centre, for the same reason: what the
+        # artist grabs next must be where the junction actually is. Moves the Empty only -- no
+        # mouth, and therefore no geometry, is touched.
+        po.recentre_all_junctions(context)
         net = pm.read_network(context.scene)
         findings = pv.validate(net)
         errs = pv.errors(findings)
@@ -901,7 +1239,7 @@ class RKA_OT_point_build(bpy.types.Operator):
                 self.report({'ERROR'}, pv.describe(f, label))
             self.report({'ERROR'}, "%d gate error(s) -- nothing built" % len(errs))
             return {'CANCELLED'}
-        rep = build_network(net, context.scene, cut=self.cut_ground)
+        rep = build_network(net, context.scene)
         for name, worst in rep["not_star"]:
             self.report({'WARNING'}, "%s pad ring folds %.2f m -- ear-clipped instead of fanned; "
                                      "Auto Setback tidies it" % (name, worst))
@@ -912,10 +1250,16 @@ class RKA_OT_point_build(bpy.types.Operator):
             # column growing 40 m to nothing.
             self.report({'WARNING'}, "%d station(s) found no terrain below -- their support "
                                      "still uses the last sampled ground" % misses)
+        # A style slot naming a datablock this file does not have falls back rather than building
+        # a black road -- but silently falling back is how a whole district ships in the wrong
+        # material, so it is reported by name.
+        for road_name, slot, kind, missing in (rep.get("missing_style") or ())[:4]:
+            self.report({'WARNING'}, "%s: %s %s '%s' not found -- using the default"
+                        % (road_name, slot, kind, missing))
         self.report({'INFO'}, "%d road(s), %d run(s), %d pad(s), %d gore(s), %d edge run(s), "
-                              "%d proxy(ies), %d ground sample(s)"
+                              "%d marking(s), %d proxy(ies), %d ground sample(s)"
                     % (rep["roads"], rep["runs"], rep["pads"], rep["gores"], rep["edges"],
-                       rep["colonly"], hits))
+                       rep.get("marks", 0), rep["colonly"], hits))
         return {'FINISHED'}
 
 

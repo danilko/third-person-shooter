@@ -5,7 +5,7 @@ import com.openworld.game.PlayerRegistry;
 import com.openworld.world.IntersectionZone;
 import com.openworld.world.Lane;
 import com.openworld.world.VehicleRoute;
-import com.openworld.world.WorldZoneManager;
+import com.openworld.world.ZoneManager;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.BaseMaterial3D;
@@ -82,7 +82,7 @@ public class RouteDebugOverlay extends Node3D {
         surfaceOpen = false;
 
         Vector3 center = localPlayerPos();
-        WorldZoneManager mgr = WorldZoneManager.get();
+        ZoneManager mgr = ZoneManager.get();
         if (center == null || mgr == null) return;
 
         int drawn = 0;
@@ -220,7 +220,7 @@ public class RouteDebugOverlay extends Node3D {
         return fallback != null ? fallback.getGlobalPosition() : null;
     }
 
-    /** Unshaded, vertex-colored, depth-test-free line material (WorldZoneMarker debug-mat idiom). */
+    /** Unshaded, vertex-colored, depth-test-free line material (ZoneMarker debug-mat idiom). */
     private StandardMaterial3D makeMaterial() {
         StandardMaterial3D mat = new StandardMaterial3D();
         mat.setTransparency(BaseMaterial3D.Transparency.ALPHA);

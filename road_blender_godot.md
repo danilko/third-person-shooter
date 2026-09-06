@@ -377,7 +377,7 @@ before touching geometry, in particular the intersection strategy (item 4).
      on whichever successor lane it lands on at a junction (the existing straightness-biased
      weighted pick in `VehicleAIController.advanceToNextRoute`), with **no new AI decision code** —
      exactly the scope the user asked for this pass.
-   - `PathLaneRoute` does **not** register with `WorldZoneManager`'s route registry (spawn-config
+   - `PathLaneRoute` does **not** register with `ZoneManager`'s route registry (spawn-config
      lookups) and its `pickNextRoute()`/`resolveRoute()` always return null — connectivity is
      entirely geometry-derived for this route type. Wiring it as an ambient-traffic zone spawn
      target is a natural but separate future step, not required for junction traversal.
@@ -432,7 +432,7 @@ before touching geometry, in particular the intersection strategy (item 4).
    the `lanecl_*` data curves, which carry no separate meaning once exported since the JSON
    sidecar is the data source of truth for Godot.
    - `tools/build_intersection_prototype.py` now also writes the 4-way's pair to
-     `src/main/resources/com/openworld/world/districts/District_intersectiondemo.glb` +
+     `src/main/resources/com/openworld/world/pieces/District_intersectiondemo.glb` +
      `kit/intersection_prototype.4way.lanekit.json` on every regeneration (kept as the default,
      ready-to-bake fixture).
    - **New `tools/build_intersection_piece.sh`** — deliberately does **not** invoke Blender or
@@ -967,7 +967,7 @@ concrete need for it shows up. Reasoning:
 - [ ] P3.4 Export flow: `export_world.py` keeps glTF-extras only for small scalar metas
       (unchanged); the lane/connectivity data ships as a **parallel JSON artifact**, copied
       alongside the exported `.glb` into
-      `src/main/resources/com/openworld/world/districts/District_X.lanekit.json`.
+      `src/main/resources/com/openworld/world/pieces/District_X.lanekit.json`.
 - [ ] P3.5 Verify: build a small multi-piece test layout (straight → 4-way intersection →
       straight, plus a T off a side arm) via the addon; run `RKA_OT_validate` → zero
       dangling/island warnings; export and confirm `District_lanekittest.lanekit.json` is
@@ -1019,7 +1019,7 @@ concrete need for it shows up. Reasoning:
       based on which sidecar exists next to the district's export (`roads.json`-derived markers
       → old `buildRoute`; `.lanekit.json` → new `buildPathRoute`).
 - [ ] P5.3 Verify: side-by-side walk-test against the old placeholder (traffic density/behavior
-      parity via `WorldZoneManager.debugLog`'s routed/moving counts per §7). Once satisfied,
+      parity via `ZoneManager.debugLog`'s routed/moving counts per §7). Once satisfied,
       write it up as the worked example in a new `AUTHORING_GUIDE.md` §7 subsection, the way
       `District_kitdemo_9_9` is today.
 
@@ -1039,9 +1039,9 @@ concrete need for it shows up. Reasoning:
 > instead of separate files) was explicitly raised and explicitly deferred — do not fold it into
 > this phase; it needs its own dedicated research+plan pass once P6 ships.
 
-- [x] P6.1 — `WorldZoneManager`/`Lane`/`PathLaneRoute` retyping (Java). `Lane.entryPoint()` (new
+- [x] P6.1 — `ZoneManager`/`Lane`/`PathLaneRoute` retyping (Java). `Lane.entryPoint()` (new
       interface method — NOT redundant with `pointAtLength(0)`, see rationale below); retype
-      `WorldZoneManager`'s registry/`findRoute`/`spawnVehicle`/`vehicleStartPoint` from
+      `ZoneManager`'s registry/`findRoute`/`spawnVehicle`/`vehicleStartPoint` from
       `VehicleRoute` to `Lane`; `vehicleStartPoint` rewritten off `Lane.total()`/`pointAtLength()`
       (was raw `VehicleRoute.waypoints()` — not expressible against `Lane`); `VehicleRoute`/
       `PathLaneRoute` add `entryPoint()`; `PathLaneRoute` gains `_ready()` registration +
@@ -1123,7 +1123,7 @@ concrete need for it shows up. Reasoning:
       **Property-based zone tagging (per user decision):** every lane carries `zone_id` (stem
       default, per-piece override via `rka_zone_id`). Java: `PathLaneRoute.zoneId` (new `@Export`),
       populated by `WorldBaker.buildPathLaneRoute` from the sidecar's `zone_id`;
-      `WorldZoneManager.findRoute` gains a zone-id-equality pass (checked before the unchanged
+      `ZoneManager.findRoute` gains a zone-id-equality pass (checked before the unchanged
       name-prefix fallback) via a new shared `isSpawnCandidate` filter.
       **Verified end-to-end this session** against the user-designated AI-drive test fixture
       `assets/world_source/debug_road.blend` (5 intersections, 12 segments, 1 transition): `blender
@@ -1133,7 +1133,7 @@ concrete need for it shows up. Reasoning:
       regression host (`LaneKitCombineTestHost`/`LaneKitCombineTest.tscn`, run via `godot
       --headless res://.../LaneKitCombineTest.tscn`, grep `LKCTEST verdict`) — confirmed all 82
       `PathLaneRoute`s built, all tagged `zoneId="debug_road"`, all 82 registered in
-      `WorldZoneManager.getRoutes()`. `./gradlew build`/`test` pass. `python3 lib/lane_kit.py` and
+      `ZoneManager.getRoutes()`. `./gradlew build`/`test` pass. `python3 lib/lane_kit.py` and
       `python3 lib/intersection_kit.py` self-tests both pass.
       **Finding, not a bug, and confirmed INTENTIONAL by the user** (dense layout on purpose, to
       simulate real close-quarters traffic — not something to "fix"): `debug_road.blend`'s
@@ -1222,7 +1222,7 @@ concrete need for it shows up. Reasoning:
       `has_roads` wins (prints a WARNING if both sidecars somehow exist — a district mid-migration,
       not a supported permanent state); `has_lanekit` sets `traffic_route = stem` (an EXACT match,
       not a `"<stem>__"` prefix — matches `lib/lane_kit.py:combine_pieces`'s default `zone_id`,
-      hits `WorldZoneManager.findRoute`'s new zone-id-equality pass from P6.4 directly).
+      hits `ZoneManager.findRoute`'s new zone-id-equality pass from P6.4 directly).
       **Verified this session, real bakes (not just syntax-checking):**
       - `bash tools/build_piece.sh District_industry_5_1` (stem form, no sidecar present) →
         `pathlanes=0`, no `lanekit ->` log line — unchanged from before this phase.
@@ -1372,13 +1372,13 @@ concrete need for it shows up. Reasoning:
 
   ### Multi-district streaming + connectivity test (2026-07-27, user-requested follow-up)
 
-  User asked whether `debug_road.blend` could exercise real multi-district `WorldZoneManager`
+  User asked whether `debug_road.blend` could exercise real multi-district `ZoneManager`
   streaming (not just single-district pipeline loading, already covered by P6.4/P6.7's tests)
   without needing the full 36-district production world. Investigated and confirmed: districts
-  are authored in **local** coordinates and positioned entirely by their `WorldZoneMarker`'s own
-  world transform at stream time (`WorldZoneManager`: `t.marker.addChild(geo)`, read directly, not
-  assumed) — so `WorldZoneManager` streaming needs no production-scale setup at all; any host scene
-  with `WorldZoneMarker`/`WorldZone` objects works, exactly the `DebugHarness.spawnDebugZone()`
+  are authored in **local** coordinates and positioned entirely by their `ZoneMarker`'s own
+  world transform at stream time (`ZoneManager`: `t.marker.addChild(geo)`, read directly, not
+  assumed) — so `ZoneManager` streaming needs no production-scale setup at all; any host scene
+  with `ZoneMarker`/`Zone` objects works, exactly the `DebugHarness.spawnDebugZone()`
   (F12) precedent, just with real baked district geometry instead of a code-built box. Explicitly
   scoped OUT: physically co-authoring multiple districts in one `.blend` split into multiple
   output scenes at export time — overlaps with the deferred Track B "restructure districts as
@@ -1415,11 +1415,11 @@ concrete need for it shows up. Reasoning:
     `District_test_7_8` → 12 (note: baking a second district after the first repoints
     `SoloPiece.tscn` at whichever was baked last — `build_piece.sh`'s own documented behavior, not
     a bug; it now points at `District_test_7_8`).
-  - `src/main/java/com/openworld/debug/MultiDistrictStreamTestHost.java` +
-    `MultiDistrictStreamTest.tscn` (new) — builds both districts' `WorldZone`/`WorldZoneMarker` in
+  - `src/main/java/com/openworld/debug/MultiZoneStreamTestHost.java` +
+    `MultiZoneStreamTest.tscn` (new) — builds both districts' `Zone`/`ZoneMarker` in
     CODE (the `spawnDebugZone()` idiom, no master `.blend`/region-marker authoring needed for a
     lightweight test), each with a `VehicleSpawnConfig.routeName = zoneId` (exercising P6.4's
-    zone-id-equality `findRoute` path), plus a `Characters` container Node (`WorldZoneManager`
+    zone-id-equality `findRoute` path), plus a `Characters` container Node (`ZoneManager`
     silently skips ambient/vehicle spawns without one — found by the first run logging "Characters
     container not found"). Spawns a real `Player`, teleports it near both zone centers then far
     away, logs `PathLaneRoute` + vehicle counts at each phase.
@@ -1434,7 +1434,7 @@ concrete need for it shows up. Reasoning:
   future district-pair check will need.
 - [x] P6.10 — DONE (2026-07-27). `WorldPreviewBuilder.java` (new, `@Tool`-annotated, same
       `bakeOnReady`/`quitWhenDone` offline-batch idiom as `WorldBaker`/`NavBaker`/
-      `DistrictBinaryConverter`) + `hosts/BuildWorldPreview.tscn`. Answers "can't see districts
+      `PieceBinaryConverter`) + `hosts/BuildWorldPreview.tscn`. Answers "can't see districts
       assembled together in the Godot editor" (confirmed real: `hosts/WorldMaster.tscn` has zero
       static `District_*` references, every district is 100% runtime-streamed — opening it in the
       editor shows only region markers). **Built to the revised scope** (user follow-up,
@@ -1444,11 +1444,11 @@ concrete need for it shows up. Reasoning:
       **Positions read from the real baked master, never recomputed**: rather than re-deriving
       `lib/world_grid.py:district_center` math in Java (a real risk of drift between the two
       languages), `WorldPreviewBuilder` instantiates the already-built `World_master.tscn`,
-      walks its `WorldZoneMarker` children, and reads `(zoneId, geometry_path,
-      globalPosition)` straight off each one — the exact same values `WorldZoneManager` streams
+      walks its `ZoneMarker` children, and reads `(zoneId, geometry_path,
+      globalPosition)` straight off each one — the exact same values `ZoneManager` streams
       districts at in the real game. Each selected district's own already-baked `.tscn` (full
       detail, the same file that streams in-game) is instanced as a plain child at that position
-      — no `WorldZoneMarker`/`WorldZone` wrapper, nothing that would make `WorldZoneManager` try
+      — no `ZoneMarker`/`Zone` wrapper, nothing that would make `ZoneManager` try
       to stream it.
       **Bug found and fixed while verifying, not assumed correct from the design:** the first
       version called `setOwnerRecursive` on every instanced district (owning every descendant,
@@ -1505,7 +1505,7 @@ concrete need for it shows up. Reasoning:
      as a variable/return type) is untouched — only the `createUnsafe` factory call itself moved.
   **Verified**: `./gradlew build`+`test` pass; the new binary actually RUNS correctly too, not
   just compiles — `QuitSignalCheck.tscn`, `LaneKitCombineTest.tscn` (82 lanes, PASS), and
-  `MultiDistrictStreamTest.tscn` (84+12 lanes, 6 vehicles, PASS) all re-run clean under
+  `MultiZoneStreamTest.tscn` (84+12 lanes, 6 vehicles, PASS) all re-run clean under
   `godot.linuxbsd.editor.x86_64.jvm.0.16.3`/Godot 4.6.3. The old 0.15.0 binary is left on disk
   untouched as a fallback, just no longer what any tool script defaults to.
       needed) — an enable-as-needed / Terrain3D-style toggle so only the district(s) you're
@@ -1549,7 +1549,7 @@ concrete need for it shows up. Reasoning:
      direct, concrete consequence of P6.7's migration never being followed by a master re-bake.
      Harmless for the falling bug specifically (doesn't affect collision), but means ambient
      traffic for this district was silently broken in the shipped master until fixed (the
-     `WorldZoneManager.findRoute` zone-id-equality pass never matched a `"...__"`-suffixed
+     `ZoneManager.findRoute` zone-id-equality pass never matched a `"...__"`-suffixed
      `traffic_route` against the new `zone_id`-tagged lanes).
 
   **Fix**: `bash tools/build_world.sh --full` — re-ran `towns/build_world.py --full` (now:
@@ -1643,7 +1643,7 @@ concrete need for it shows up. Reasoning:
   connectors, was excluded from ambient-traffic spawn candidacy.** `intersection_kit.py` stamps a
   `turn` letter (`S`/`L`/`R`) on EVERY lane it exports, including plain straight road segments —
   intentional internal steering-behavior metadata (`assert (m["turn"]=="S") == (m["kind"]==
-  "through")` is one of its own self-test invariants). But `WorldZoneManager.isSpawnCandidate`
+  "through")` is one of its own self-test invariants). But `ZoneManager.isSpawnCandidate`
   treats ANY non-empty `turn` as "this is a junction connector, never spawn ambient traffic here"
   — the old `road_graph.py`/`assemble.py` convention, where only real junction connector markers
   carried a `turn` meta at all. Left as-is, `findRoute()` had **zero** legal spawn candidates in
@@ -2148,7 +2148,7 @@ concrete need for it shows up. Reasoning:
 returns the smoothed+lane-offset baked path's start instead — a different value whenever
 `laneOffset != 0` — and `ensureBaked()`'s cache-validity check still re-walks `waypoints()`
 (JVM-bridge marker-child calls) on every invocation just to check `pts.size()`, even when the bake
-itself is skipped. `entryPoint()` exists specifically so `WorldZoneManager.findRoute`'s
+itself is skipped. `entryPoint()` exists specifically so `ZoneManager.findRoute`'s
 per-candidate prefix scan (hundreds of lanes) doesn't pay that walk; reusing `pointAtLength(0)`
 instead would silently reintroduce the exact hitch the caching was written to avoid.
 

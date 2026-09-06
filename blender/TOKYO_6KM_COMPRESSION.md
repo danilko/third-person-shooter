@@ -408,7 +408,7 @@ quietly redirecting it.
 > ground plane were removed for a good reason (CLAUDE.md): a collision-only floor below
 > visual ground silently trapped `Character`/`Player` bodies with no recovery path. Do
 > **not** reintroduce a world-spanning invisible plane as an "edge" — vehicles are
-> reclaimed below `Y = -30` by `WorldZoneManager.maintainTraffic`, but characters are not.
+> reclaimed below `Y = -30` by `ZoneManager.maintainTraffic`, but characters are not.
 > A void district must be genuinely unreachable, not merely floored.
 
 ---
@@ -479,7 +479,7 @@ with every coordinate in `layout.json`.
    polyline).
 3. **`compress.py --size 6048`**, not the 6144 default, so the compressed PLATEAU extract
    registers exactly on the 12 × 504 m grid.
-4. **Streaming radii**: `WorldZoneManager` load/unload radii were tuned for a 3 km world.
+4. **Streaming radii**: `ZoneManager` load/unload radii were tuned for a 3 km world.
    With 144 districts, re-check `loadRadius ≈ halfExtent + 150` / `unloadRadius ≈
    loadRadius + 150` per `AUTHORING_GUIDE.md` — the *count* changes, the per-district cost
    does not.

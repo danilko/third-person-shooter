@@ -61,7 +61,7 @@ import com.openworld.weapon.WeaponController;
 @Script(className = "Vehicle")
 public class Vehicle extends RigidBody3D implements Controllable, NameplateTarget {
 
-    /** Group tag for vehicles spawned at runtime by {@code WorldZoneManager} (ambient traffic, I3b) —
+    /** Group tag for vehicles spawned at runtime by {@code ZoneManager} (ambient traffic, I3b) —
      *  as opposed to scene-authored vehicles that already exist on every peer. Only members of this
      *  group are announced over {@code MSG_VEHICLE_SPAWN} and replayed in the late-join baseline. */
     public static final String STREAMED_GROUP = "streamed_vehicle";
@@ -647,8 +647,10 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     // ── NOS / booster ─────────────────────────────────────────────────────────
     // Authority-only physics multiplier (sprint key while driving): the wheels read the
     // accel/max-speed scale; puppets need nothing — the snapshot velocity carries the
-    // result, and the speed-feel camera (FOV kick, speed lines, blur) reacts to real
-    // speed automatically. Meter exposed via getBoostFraction() for a future HUD gauge.
+    // result. The camera's speed-feel terms (VehicleCameraController) all ship at 0 since
+    // 2026-08-31 and the speed-line overlay is deleted, so NOS currently reads as speed and
+    // engine note only; a world-space trail effect on the CAR is the planned replacement.
+    // Meter exposed via getBoostFraction() for a future HUD gauge.
 
     private double  boostMeter  = Double.NaN;   // lazily seeded from config (full tank)
     private boolean boostActive = false;
@@ -1014,7 +1016,17 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         // so do NOT steal the occupant's controller (it keeps its own AIController, suppressed by the
         // drive-state physics-off, ready to resume on eviction). The hot-swap is only for the normal
         // case (player or AI taking the wheel of a car with no AI driver of its own).
-        if (!(c.getController() instanceof NetworkController) && !(controller instanceof VehicleAIController)) {
+        // A PLAYER TAKING SEAT 0 TAKES THE WHEEL. An ambient car drives itself through the
+        // VehicleAIController on the vehicle, and the guard below deliberately refuses to hot-swap
+        // a controller in while that brain is there — right for the AI RIDER that ZoneManager
+        // seats in a traffic car (it is cargo, the brain keeps driving), wrong for a player, who
+        // pressed the key precisely to drive. A carjack drops the brain via requestCarjack; a car
+        // with an empty seat never went through that path, so it drops it here. Runs on every peer
+        // (tryEnter is the occupancy-event executor), so the networked path is covered by the same
+        // three lines instead of a second rule in the arbitration layer.
+        if (c instanceof Player && isAiDriven()) removeAiDriverBrain();
+
+        if (!(c.getController() instanceof NetworkController) && !isAiDriven()) {
             // A leftover puppet controller would be silently orphaned by attachController's
             // removeChild — applyAuthorityState normally clears it first (with velocity
             // seeding); this is the belt-and-braces for any other path.
@@ -1288,6 +1300,23 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     }
 
     /**
+     * Is an AI BRAIN currently driving this car? The one owner of that question.
+     *
+     * It is NOT the same question as {@link #isAiOccupied}, and conflating the two is what made an
+     * ambient traffic car un-drivable and un-exitable once a player got in. Design B puts the
+     * lane-follow {@link VehicleAIController} on the VEHICLE, not on the seated AI — so a car
+     * spawned by {@code ZoneManager} (or {@code DebugHarness} F4) with no rider at all is
+     * AI-driven with an EMPTY seat: `isAiOccupied()` says false, the player takes the ordinary
+     * enter path, and {@link #tryEnter}'s guard then refused the controller hot-swap because the
+     * vehicle already had a brain. The player was seated in a car that kept driving itself and
+     * whose exit key reached nothing (the exit branch runs off the vehicle's own controller, which
+     * was still the AI's).
+     */
+    public boolean isAiDriven() {
+        return controller instanceof VehicleAIController;
+    }
+
+    /**
      * Player intent to carjack an AI-driven car (PLAN.md I3c). Host-arbitrated like {@link #requestEnter}
      * (the car is host-owned in the synced model): single-player evicts + seats locally; a networked host
      * runs the carjack through the {@link GameManager} seat path (it detects an AI-occupied seat and evicts
@@ -1328,7 +1357,7 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
      * player's controller in and the player couldn't drive.
      */
     public void removeAiDriverBrain() {
-        if (controller instanceof VehicleAIController) {
+        if (isAiDriven()) {
             Controller old = detachController();
             if (old != null) old.queueFree();
         }

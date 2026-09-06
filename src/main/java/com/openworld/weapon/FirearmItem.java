@@ -43,6 +43,17 @@ public class FirearmItem extends WeaponItem {
    *  pellet samples the spread cone independently; audio/bloom/recoil fire once. */
   @Export public int pelletCount = 1;
 
+  /**
+   * Two-stage ("2-way") hit resolution. When true (the default) a bullet is traced from the weapon's
+   * own {@code Muzzle} marker toward the point the sight ray is on, instead of straight out of the
+   * camera. In third person the camera sits above/behind the shoulder, so a single camera-origin
+   * trace let a character standing fully behind cover hit anything the camera could peek at over it.
+   * The second leg starts at the gun, so the cover the character is visibly hiding behind blocks the
+   * shot — while the bullet still converges on the crosshair. Set false for the legacy
+   * camera-origin trace.
+   */
+  @Export public boolean muzzleTrace = true;
+
   private StanceName currentStance = StanceName.UPRIGHT;
 
   // Added to spread per m/s of horizontal+vertical speed before the stance multiplier,
@@ -89,7 +100,7 @@ public class FirearmItem extends WeaponItem {
     playFireCue();
     applyRecoil();
     currentBloom = Math.min(currentBloom + bloomPerShot, bloomMax);
-    for (int i = 0; i < pelletCount; i++) performHitscan();
+    fireShot();
     postGunshotStimulus();
   }
 
@@ -217,57 +228,174 @@ public class FirearmItem extends WeaponItem {
     c.applyRecoil(recoil, horizRecoil);
   }
 
-  private void performHitscan() {
+  // ── Two-stage ("2-way") hit resolution ─────────────────────────────────────
+  // Stage 1 (sight)  — the camera AimRay (player) or the ray AttackState already snapped onto its
+  //                    scatter point (AI) says WHERE this shot is aimed.
+  // Stage 2 (muzzle) — the bullet is traced from the gun to that point, so geometry between the
+  //                    weapon and the target stops it. A shot the shooter's own cover blocks now
+  //                    hits that cover, instead of leaving the camera on the free side of the wall.
+
+  /** Ignore stage-1 hits this close to the sight origin (camera near-plane / degenerate hits). */
+  private static final float SIGHT_MIN_DISTANCE = 0.1f;
+  /** Ignore stage-2 hits this close to the origin. Small on purpose: a wall 10 cm from the barrel MUST block. */
+  private static final float MUZZLE_MIN_DISTANCE = 0.02f;
+  /** Below this the muzzle counts as co-located with the body and the clearance trace is skipped. */
+  private static final float MUZZLE_CLEARANCE_MIN = 0.05f;
+  /** Tracer length when the shot hits nothing (matches REMOTE_TRACER_LENGTH's convention). */
+  private static final float TRACER_MISS_LENGTH = 200f;
+
+  /** Resolves the sight point and shot origin once, then traces one bullet per pellet through them. */
+  private void fireShot() {
     RayCast3D ray = getEffectiveAimRay();
     if (ray == null) return;
 
-    // Player: apply angular spread + force update. Enemy: snapAimRay already
-    // positioned the ray (with scatter baked in) — rotating it again would override that.
-    boolean applySpread = owningCharacter instanceof Character c && c.useWeaponSpread;
-    Vector3 savedRot = null;
-    if (applySpread && spread > 0f) {
-      savedRot = ray.getRotationDegrees();
-      float halfSpread = getCurrentSpreadDeg() * 0.5f;
-      // Circular cone: pick a random angle and a sqrt-distributed radius so
-      // shots fill the disk uniformly (no diagonal bulge from a square pattern).
-      double coneAngle  = GD.randfRange(0, (float)(2.0 * Math.PI));
-      double coneRadius = Math.sqrt(GD.randf()) * halfSpread;
-      float pitchOff = (float)(Math.cos(coneAngle) * coneRadius);
-      float yawOff   = (float)(Math.sin(coneAngle) * coneRadius);
-      ray.setRotationDegrees(new Vector3(savedRot.getX() + pitchOff, savedRot.getY() + yawOff, 0f));
-      ray.forceRaycastUpdate();
-    }
+    Vector3 sightPoint = resolveSightPoint(ray);
+    Vector3 origin = useMuzzleTrace() ? resolveShotOrigin(ray) : ray.getGlobalPosition();
+    // Every pellet of one trigger pull shares the sight point and the origin; only the cone sample differs.
+    int pellets = Math.max(1, pelletCount);
+    for (int i = 0; i < pellets; i++) resolveShot(ray, origin, sightPoint);
+  }
 
-    boolean hit = ray.isColliding()
-        && ray.getCollisionPoint().minus(ray.getGlobalTransform().getOrigin()).length() > 0.1;
-    Node hitNode = (hit && ray.getCollider() instanceof Node n) ? n : null;
+  /**
+   * True when this shot should leave the muzzle rather than the camera. On-foot characters only:
+   * a seated occupant's gun (and a vehicle's own mounted weapon) sits inside/against the carrier's
+   * collision, where a muzzle-origin trace would be blocked by the vehicle itself — and a passenger
+   * shooting from a car is not the cover exploit this guards against.
+   */
+  private boolean useMuzzleTrace() {
+    return muzzleTrace && owningCharacter instanceof Character c && c.currentVehicleNode == null;
+  }
+
+  /**
+   * Stage 1 — where this shot is AIMED: the world point the sight ray is currently on. This is the
+   * same point the crosshair sits on and (via UserCommand.aimTargetPosition) the point the spine IK
+   * and the visible gun converge on, so what you see aimed at is what the bullet is sent toward.
+   * Falls back to the ray's far end when it hits nothing.
+   */
+  private Vector3 resolveSightPoint(RayCast3D ray) {
+    ray.forceRaycastUpdate();
+    Vector3 origin = ray.getGlobalPosition();
+    if (ray.isColliding()
+        && ray.getCollisionPoint().minus(origin).length() > SIGHT_MIN_DISTANCE) {
+      return ray.getCollisionPoint();
+    }
+    return ray.toGlobal(ray.getTargetPosition());
+  }
+
+  /**
+   * Stage-2 origin: the weapon's muzzle — pulled back to the shooter's own chest when the barrel has
+   * clipped THROUGH geometry (standing flush against a wall). Without that guard the two-stage trace
+   * is bypassed by hugging the cover: the muzzle ends up on the far side and its trace then starts
+   * past the very wall that should have stopped the shot.
+   */
+  private Vector3 resolveShotOrigin(RayCast3D ray) {
+    Vector3 muzzle = weaponMuzzle().getGlobalPosition();
+    if (owningCharacter == null) return muzzle;
+    Vector3 body  = owningCharacter.getGlobalPosition();
+    Vector3 chest = new Vector3(body.getX(), muzzle.getY(), body.getZ());
+    Vector3 toMuzzle = muzzle.minus(chest);
+    float reach = (float) toMuzzle.length();
+    if (reach < MUZZLE_CLEARANCE_MIN) return muzzle;
+    // The AimRay excepts our own body + ragdoll bones (Character._ready), so this only reports world
+    // geometry — an obstruction here means the gun is on the other side of something.
+    return trace(ray, chest, toMuzzle.normalized(), reach) != null ? chest : muzzle;
+  }
+
+  /** Stage 2 — trace one bullet from the gun toward the sight point and apply/report the result. */
+  private void resolveShot(RayCast3D ray, Vector3 origin, Vector3 sightPoint) {
+    Vector3 toTarget = sightPoint.minus(origin);
+    if (toTarget.lengthSquared() < 1e-6f) return;
+    Vector3 dir = toTarget.normalized();
+
+    // Player: sample the spread cone around the muzzle→target line. AI: AttackState already baked its
+    // scatter into the sight point via snapAimRay — scattering again would override that.
+    if (owningCharacter instanceof Character c && c.useWeaponSpread) dir = applySpread(dir);
+
+    // Reach at least as far as the ray's own resting length, so a shot that misses (spread / AI
+    // scatter) keeps travelling past the aim point instead of stopping in mid-air.
+    float range = (float) Math.max(ray.getTargetPosition().length(), toTarget.length());
+    TraceHit hit = trace(ray, origin, dir, range);
 
     if (isNetworkedClient()) {
       // Host-resolved bullets: predict the cosmetics here (muzzle/recoil/bloom/tracer already done),
-      // but DON'T apply damage — send the post-spread ray to the host, which raycasts it against
-      // authoritative positions and applies the damage. Show local impact VFX only (no Health touch).
-      Vector3 origin = ray.getGlobalPosition();
-      Vector3 dir = ray.toGlobal(ray.getTargetPosition()).minus(origin).normalized();
+      // but DON'T apply damage — send the post-spread ray to the host, which re-traces it against
+      // authoritative positions. The reported origin is now the muzzle, so the host re-runs the very
+      // same cover test rather than a camera-origin one.
       sendShotToHost(origin, dir);
-      if (hit) {
+      if (hit != null) {
         var im = getImpactManager();
-        if (im != null) im.processVisualHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()));
+        if (im != null) im.processVisualHit(new HitInfo(hit.node, hit.point, hit.normal));
       }
-    } else if (hit) {
+    } else if (hit != null) {
       // Server / single-player: resolve fully and locally (VFX + damage).
       var im = getImpactManager();
       if (im != null) {
-        im.processHit(new HitInfo(hitNode, ray.getCollisionPoint(), ray.getCollisionNormal()),
+        im.processHit(new HitInfo(hit.node, hit.point, hit.normal),
                       damage, getDisplayName(), weaponIcon, resolveAttackerName(), resolveAttackerFaction(),
                       resolveAttackerPosition());
       }
     }
 
-    if (savedRot != null) {
-      ray.setRotationDegrees(savedRot);
+    spawnBulletTracer(hit != null ? hit.point
+                                  : origin.plus(dir.times(Math.min(range, TRACER_MISS_LENGTH))));
+  }
+
+  /**
+   * One sample of the circular spread cone around {@code dir} — a random axis perpendicular to the
+   * shot plus a sqrt-distributed angle, so pellets fill the disk uniformly (no diagonal bulge from
+   * sampling pitch and yaw independently). Rotating the direction rather than the ray's own
+   * transform keeps the cone centred on the muzzle→target line, whatever the ray is resting at.
+   */
+  private Vector3 applySpread(Vector3 dir) {
+    float halfSpread = getCurrentSpreadDeg() * 0.5f;
+    if (halfSpread <= 0f) return dir;
+    double coneAngle  = GD.randfRange(0, (float) (2.0 * Math.PI));
+    double coneRadius = Math.toRadians(Math.sqrt(GD.randf()) * halfSpread);
+    Vector3 side = dir.cross(Vector3.Companion.getUP());
+    if (side.lengthSquared() < 1e-6f) side = dir.cross(Vector3.Companion.getRIGHT());
+    side = side.normalized();
+    Vector3 lift = side.cross(dir).normalized();
+    Vector3 axis = side.times((float) Math.cos(coneAngle))
+                       .plus(lift.times((float) Math.sin(coneAngle)));
+    return dir.rotated(axis.normalized(), coneRadius).normalized();
+  }
+
+  /** Immutable result of one trace — read after the borrowed RayCast3D has been put back. */
+  private static final class TraceHit {
+    final Node node;
+    final Vector3 point;
+    final Vector3 normal;
+    TraceHit(Node node, Vector3 point, Vector3 normal) {
+      this.node = node; this.point = point; this.normal = normal;
+    }
+  }
+
+  /**
+   * Casts the character's AimRay from an arbitrary world origin/direction and restores it afterwards
+   * — the same borrow-the-ray idiom {@link #resolveServerShot} uses, so a trace keeps the ray's
+   * collision mask and its self-exceptions (own body + ragdoll bones) with no extra query setup.
+   */
+  private TraceHit trace(RayCast3D ray, Vector3 origin, Vector3 dir, float range) {
+    // Both saved values are LOCAL, so putting them back is exact — restoring a global position
+    // instead would re-derive the local one through the parent transform and drift a little every
+    // shot.
+    Vector3 savedPos    = ray.getPosition();
+    Vector3 savedTarget = ray.getTargetPosition();
+
+    ray.setGlobalPosition(origin);
+    ray.setTargetPosition(ray.toLocal(origin.plus(dir.times(range))));
+    ray.forceRaycastUpdate();
+
+    TraceHit hit = null;
+    if (ray.isColliding()
+        && ray.getCollisionPoint().minus(origin).length() > MUZZLE_MIN_DISTANCE) {
+      hit = new TraceHit((ray.getCollider() instanceof Node n) ? n : null,
+                         ray.getCollisionPoint(), ray.getCollisionNormal());
     }
 
-    spawnBulletTracer(ray);
+    ray.setTargetPosition(savedTarget);
+    ray.setPosition(savedPos);
+    return hit;
   }
 
   /**
@@ -329,14 +457,10 @@ public class FirearmItem extends WeaponItem {
     }
   }
 
-  private void spawnBulletTracer(RayCast3D ray) {
-    Vector3 muzzlePos = weaponMuzzle().getGlobalPosition();
-    Vector3 rayOrigin = ray.getGlobalPosition();
-    Vector3 rayDir    = ray.toGlobal(ray.getTargetPosition()).minus(rayOrigin).normalized();
-    Vector3 tracerEnd = ray.isColliding() ? ray.getCollisionPoint()
-                                          : rayOrigin.plus(rayDir.times(200f));
+  /** Draws the visible round from the barrel to where the bullet actually stopped. */
+  private void spawnBulletTracer(Vector3 end) {
     BulletTracerManager tm = getBulletTracerManager();
-    if (tm != null) tm.spawnTracer(muzzlePos, tracerEnd);
+    if (tm != null) tm.spawnTracer(weaponMuzzle().getGlobalPosition(), end);
   }
 
   /**

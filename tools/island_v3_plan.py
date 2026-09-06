@@ -56,8 +56,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
                                 "blender", "lib"))
 from road_support import (                                                   # noqa: E402,F401
     SUPPORT_NONE, SUPPORT_FILL, SUPPORT_PIER, SUPPORT_CUT, SUPPORT_TUNNEL,
-    AT_GRADE_TOL, FILL_MAX, CUT_MAX, FILL_SLOPE, PIER_SPACING, PIER_SECTION, DECK_THICK,
-    support_kind, fill_footprint, pier_stations, _frange)
+    AT_GRADE_TOL, FILL_MAX, CUT_MAX, FILL_SLOPE, CUT_SLOPE, PIER_SPACING, PIER_SECTION,
+    DECK_THICK, support_kind, fill_footprint, pier_stations, _frange)
 
 
 # =============================================================================== height
@@ -124,10 +124,14 @@ def run_needed(dz, kind="ramp"):
 # =============================================================================== §0/§2
 # The two density fields. Everything about block size, height and infill is a function of
 # these, which is why the city reads as grown rather than placed.
-CASTLE_C = (-120.0, 78.0)                      # moat centre, from geom.CASTLE/MOAT
-STATIONS = [("central",  (-60.0, -222.0)),     # Neon A — the main station
-            ("electric", (470.0, -140.0)),     # Neon B
-            ("coastal",  (800.0,  330.0))]     # farmland/ocean arm
+# POSITIONS ARE LAYOUT, so they carry `G.SCALE` like everything in `island_v3_geom`; the WALK
+# does not, because ten minutes of walking is ten minutes of walking whatever size the map is.
+# That asymmetry is deliberate and is what compressing a world means — see the SCALE note in
+# `island_v3_geom.py`.
+CASTLE_C = G._p((-120.0, 78.0))                # moat centre, from geom.CASTLE/MOAT
+STATIONS = [("central",  G._p((-60.0, -222.0))),   # Neon A — the main station
+            ("electric", G._p((470.0, -140.0))),   # Neon B
+            ("coastal",  G._p((800.0,  330.0)))]   # farmland/ocean arm
 STATION_WALK = 500.0                           # density falls off over a 10-minute walk
 
 
@@ -172,10 +176,10 @@ BLOCKS = {
 
 # Concentric castle-town rings, measured from the moat centre. Outside the last ring the
 # zone's own quarter applies — the gradient is a CENTRE, not a whole-map scheme.
-CASTLE_RINGS = [(150.0, None),          # inside the moat — no blocks at all
-                (300.0, "samurai"),     # 武家地
-                (430.0, "neon_edge"),   # 町人地 outer
-                (520.0, "teramachi")]   # 寺町 — the old town's defensive perimeter
+CASTLE_RINGS = [(G._s(150.0), None),          # inside the moat — no blocks at all
+                (G._s(300.0), "samurai"),     # 武家地
+                (G._s(430.0), "neon_edge"),   # 町人地 outer
+                (G._s(520.0), "teramachi")]   # 寺町 — the old town's defensive perimeter
 
 # Which quarter each authored ZONE falls back to when it is outside the castle rings.
 ZONE_QUARTER = {"neonA": "neon_core", "neonB": "neon_core", "neonC": "neon_edge",
@@ -425,9 +429,50 @@ RING = offset_inward(G.MAIN_BASE, G.RING_INSET)
 
 
 # =============================================================================== §3
-DECK_Z    = 12.0     # T1 expressway deck — v3 §5
-RAIL_Z    = 8.0      # rail viaduct deck, deliberately BELOW the road deck so they cross
-ISLAND_Z  = 4.0      # airport island grade
+# THE LAYOUT SCALE IS 3D, NOT 2D — and this is the line where that was learned.
+#
+# These carry `G.SCALE` like every XY coordinate, because a ramp's LENGTH is derived from them:
+# `run_needed(12 m, 6%)` is 200 m of horizontal run whatever size the island is. Compress the
+# layout to 0.75 and leave the deck at 12 m and the ramps have 25% less room for a run that did
+# not shrink — measured, that took `IC_CHUO_EN` from a 219 m radius to 19 m. Scaling the deck with
+# the plan makes the whole elevated network scale-invariant: every ramp comes out exactly as it did.
+#
+# What stays 1:1 is the ENGINEERING: `MAX_GRADE`, `RAMP_MIN_RADIUS`, lane widths, pier sections,
+# `road_support`'s fill/cut thresholds. A car's cornering does not care how big the map is.
+DECK_Z    = G._s(12.0)   # T1 expressway deck — v3 §5
+RAIL_Z    = G._s(8.0)    # rail viaduct deck, deliberately BELOW the road deck so they cross
+ISLAND_Z  = G._s(4.0)    # airport island grade
+
+#: Half-width of each road tier's drawn surface. A PLANNING fact (it is what decides whether two
+#: alignments overlap, and how wide a bridge deck has to be to carry the road on it), so it lives
+#: here rather than in the builder that draws it. `CORRIDOR` above is the different, larger
+#: number: the clearance a road claims from BUILDINGS.
+#: Half the total paved width of each tier, metres. T2/T3 follow `seed_district_roads.LANE_WIDTH`
+#: (4.5 m since 2026-08-31 -- an arcade lane, see the note there): T2 is 4 lanes + a 3 m median +
+#: two 4 m footways = 29.0 m, T3 is 2 lanes + two 3.5 m footways = 16.0 m. The others are the plan
+#: diagram's own ribbons and are not seeded through the road kit, so they are unchanged.
+ROAD_HALF = {"T1": 11.0, "T2": 14.5, "T3": 8.0, "T4": 2.25, "RAIL": 5.0, "RAMP": 4.5}
+
+#: THE BRIDGES, as one list: name, span, deck height, half-width.
+#:
+#: One owner, because three things now ask the same question. `build_island_v3.build_bridges`
+#: draws them; `island_v3_terrain.report` asks whether an arterial's off-land stations are carried;
+#: and `check_island_ground.py` asks the same of the BUILT deck. A span authored in `island_v3_geom`
+#: with a width invented separately in the builder could not be checked by either.
+BRIDGES = [
+    ("Arch_bridge",    G.ARCH_BRIDGE,    G._s(6.0),  ROAD_HALF["T2"]),
+    ("Bay_bridge",     G.BAY_BRIDGE,     G._s(9.0),  ROAD_HALF["T2"]),
+    ("Airport_bridge", G.AIRPORT_BRIDGE, DECK_Z,     ROAD_HALF["T1"]),
+]
+
+
+def bridge_at(x, y):
+    """The bridge whose deck covers this point, or None. A deck is a straight ribbon, so this is
+    a point-to-segment distance against its half-width — the same shape `kc.flat_ribbon` draws."""
+    for (name, (a, b), z, half) in BRIDGES:
+        if _seg_dist(x, y, a, b) <= half:
+            return (name, z)
+    return None
 
 # Interchanges. Each is (id, gore point on the LOOP, touchdown on an arterial, kind).
 # kind: "pair" = on+off ramp both directions, "half" = one direction only (Shuto's usual
@@ -440,12 +485,24 @@ INTERCHANGES = [
     # IC_RINKAI_W, threw 9 of its 20 points out over open water. Moving each touchdown one or two
     # nodes further along the SAME arterial fixes radius, grade and the coastline together:
     # IC_CHUO 18.7 -> 50.3 m, IC_PORT 17.0 -> 47.9 m, IC_RINKAI_W 20.2 -> 38.1 m and back on land.
-    ("IC_CHUO",     ( 30.0,  290.0), (  74.0,  600.0), "pair", "Chuo-dori"),
-    ("IC_RINKAI_E", (500.0,  -96.0), ( 680.0, -104.0), "pair", "Rinkai-dori"),
-    ("IC_YAMATE",   (500.0,  218.0), ( 700.0,  208.0), "half", "Yamate-dori"),
-    ("IC_RINKAI_W", (-560.0, -155.0), (-806.0, -128.0), "half", "Rinkai-dori west"),
-    ("IC_PORT",     (-150.0, -450.0), (-215.0, -700.0), "half", "PORTSPUR / container port"),
-    ("JCT_AIRPORT", (500.0, -335.0), ( 800.0, -180.0), "jct",  "airport bridge"),
+    # IC_CHUO's touchdown MOVED when the island got a real ground surface (WORLD_REBUILD_PLAN.md
+    # step 1). (74, 600) was a Chuo-dori vertex; Chuo-dori now ends at the massif's foot at
+    # (52, 430), so that point is 100 m up a 92% flank with no road on it. It moves to the nearest
+    # arterial that still runs there — Nogyo-michi, the farm cross-street Chuo-dori now terminates
+    # ON — and the position along it is where the pair's WORSE radius peaks: exit 69.8 m / entry
+    # 226.6 m, against 33.9 / 92.1 before. Both ramps clear the 59.1 m tier minimum for the first
+    # time (the exit is still 0.2 m under the 70 m fit TARGET, hence the surviving warning).
+    # (205, 445.4) was the optimum at the uncompressed 2016 m island. `G.SCALE` shrank every
+    # radius by 0.75 while `RAMP_MIN_RADIUS` stayed 59.1 m — a car's cornering does not compress —
+    # so the pair was re-swept at the real scale and (170, 441.9) is where its WORSE radius peaks.
+    ("IC_CHUO",     G._p(( 30.0,  290.0)), G._p(( 170.0,  441.9)), "pair",
+     "Chuo-dori / Nogyo-michi"),
+    ("IC_RINKAI_E", G._p((500.0,  -96.0)), G._p(( 680.0, -104.0)), "pair", "Rinkai-dori"),
+    ("IC_YAMATE",   G._p((500.0,  218.0)), G._p(( 700.0,  208.0)), "half", "Yamate-dori"),
+    ("IC_RINKAI_W", G._p((-560.0, -155.0)), G._p((-806.0, -128.0)), "half", "Rinkai-dori west"),
+    ("IC_PORT",     G._p((-150.0, -450.0)), G._p((-215.0, -700.0)), "half",
+     "PORTSPUR / container port"),
+    ("JCT_AIRPORT", G._p((500.0, -335.0)), G._p(( 800.0, -180.0)), "jct",  "airport bridge"),
 ]
 
 
@@ -1230,11 +1287,17 @@ def ramps():
     return out
 
 
-def spiral_ramp(center, r=40.0, z_top=DECK_Z, z_bot=ISLAND_Z, turns=1.0,
+def spiral_ramp(center, r=G._s(40.0), z_top=DECK_Z, z_bot=ISLAND_Z, turns=1.0,
                 start_deg=90.0, samples=48):
     """The Odaiba-end descent: a full loop ramp winding from the bridge deck down to island
     grade. This is the real Rainbow Bridge's own solution and the reason the airport island
-    reads as arrived-at rather than driven-to."""
+    reads as arrived-at rather than driven-to.
+
+    `r` CARRIES `G.SCALE` like every other layout dimension. It was a bare 40 m while `z_top` and
+    `z_bot` scaled, so the loop's height moved with the world and its radius did not: at
+    `SCALE` 2.0 the descent came out at 6.37% against a 6% ramp limit, purely because the helix
+    stayed the size it was drawn at.
+    """
     cx, cy = center
     pts = []
     for i in range(samples + 1):
@@ -1402,8 +1465,8 @@ def _selftest():
 
     q = quarter_at(*CASTLE_C)
     assert q is None or q == CASTLE_RINGS[0][1]
-    assert quarter_at(CASTLE_C[0] + 250, CASTLE_C[1]) == "samurai"
-    assert quarter_at(-260, -430, "neonA") == "neon_core"
+    assert quarter_at(CASTLE_C[0] + G._s(250), CASTLE_C[1]) == "samurai"
+    assert quarter_at(*G._p((-260, -430)), zone="neonA") == "neon_core"
 
     bad_ramps = []
     for rid, p3, par, grade, ok, kind in ramps():
@@ -1460,13 +1523,32 @@ def _selftest():
     # them. Move each touchdown further along its arterial in the direction of mainline travel, or
     # give the interchange a loop ramp, which is the real answer when a surface street is behind
     # the gore.
-    NEEDS_AUTHORING = {"IC_CHUO", "IC_PORT", "IC_RINKAI_E", "IC_RINKAI_W", "IC_YAMATE"}
+    # THE LIST IS THE MEASUREMENT, and it moves with `G.SCALE` — because `RAMP_MIN_RADIUS` is
+    # 59.1 m whatever size the world is (a car's cornering does not scale), a bigger layout is
+    # strictly more room for the fitter and a smaller one is strictly less. Measured on the same
+    # nine ramps:
+    #
+    #     SCALE 0.75 (1512 m):  6 tight  — IC_CHUO 37, IC_CHUO_EN 38, IC_RINKAI_E 21,
+    #                                      IC_YAMATE 55, IC_RINKAI_W 28, IC_PORT 36
+    #     SCALE 2.00 (4032 m):  3 tight  — IC_RINKAI_E 47, IC_RINKAI_W 58, JCT_AIRPORT_EN 48
+    #
+    # `JCT_AIRPORT_EN` is the one that got WORSE (155 -> 48 m), and that is not a contradiction:
+    # the fitter's own search is not scale-invariant even though the geometry is — `max_parallel`,
+    # the 20 m parallel step and `need` are all absolute metres, so a bigger layout changes WHICH
+    # candidate wins, not just how good it is.
+    #
+    # The shape of the authoring decision is unchanged: a real exit lands DOWNSTREAM of its gore --
+    # you leave the motorway and arrive further along. These touchdowns sit beside or behind their
+    # gores, so a correctly-directed ramp has to turn most of the way round to reach them. Move each
+    # touchdown further along its arterial in the direction of mainline travel, or give the
+    # interchange a loop ramp, which is the real answer when a surface street is behind the gore.
+    NEEDS_AUTHORING = {"IC_RINKAI_E", "IC_RINKAI_W", "JCT_AIRPORT_EN"}
     unexpected = [b for b in bad_ramps if b.split()[0] not in NEEDS_AUTHORING]
     assert not unexpected, ("ramps violating grade or minimum radius: %s" % ", ".join(unexpected))
     if bad_ramps:
         print("  (%d ramp(s) need an authoring decision -- see NEEDS_AUTHORING: %s)"
               % (len(bad_ramps), ", ".join(bad_ramps)))
-    sp, sg = spiral_ramp((905.0, -720.0))
+    sp, sg = spiral_ramp(G.AIRPORT_BRIDGE[1])
     print(f"  spiral loop ramp   {len(sp):3d} pts  grade {sg*100:5.2f}%")
 
     assert len(RING) == len(G.MAIN_BASE)

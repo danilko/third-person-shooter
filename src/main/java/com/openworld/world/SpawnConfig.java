@@ -7,10 +7,10 @@ import com.openworld.ai.AIBehaviorConfig;
 import com.openworld.character.Faction;
 
 /**
- * One ambient-AI spawn group inside a {@link WorldZone} (PLAN.md Part E / E1).
+ * One ambient-AI spawn group inside a {@link Zone} (PLAN.md Part E / E1).
  *
  * <p>Describes "spawn N faction X AIs with behaviour Y, armed with weapon Z" — the recipe
- * {@code WorldZoneManager} replays when a zone loads. Anonymous/ambient AI all share the one
+ * {@code ZoneManager} replays when a zone loads. Anonymous/ambient AI all share the one
  * {@code AICharacter.tscn} archetype, so there is no per-config scene field here (named story
  * characters that need a specific scene use {@link NamedCharacterConfig} instead).
  *

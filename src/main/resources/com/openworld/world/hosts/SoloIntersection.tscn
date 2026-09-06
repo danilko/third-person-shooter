@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://bsolointersect0001"]
+[gd_scene load_steps=7 format=3 uid="uid://bsolointersect0001"]
 
 ; Fast INNER-LOOP walk/drive-test host for the intersection-prototype demo piece (mirrors
 ; SoloPiece.tscn's shape exactly). Instances the baked District_intersectiondemo.tscn (built by
@@ -10,9 +10,13 @@
 ; whatever it just baked -- run it again after re-exporting from Blender to refresh this scene.
 ; Run: open in editor + F6, or:  <godot-jvm> --path <root> res://…/world/hosts/SoloIntersection.tscn
 
+; NO PIECE WIRED. This host instanced `District_intersectiondemo`, a demo baked from the
+; RETIRED road model; it was archived on 2026-08-28 with the rest of the old world (see
+; `archive/README.md`). Re-point the `piece` ext_resource at a district baked from the
+; current road kit to use this host again.
+
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/District_intersectiondemo.tscn" id="piece"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/debug/DebugHarness.java" id="dbgh"]
 
 [sub_resource type="ProceduralSkyMaterial" id="skymat"]
@@ -34,8 +38,6 @@ environment = SubResource("env")
 transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.5, 0.75, -0.43301266, 0, 40, 0)
 light_energy = 1.0
 shadow_enabled = true
-
-[node name="Piece" parent="." instance=ExtResource("piece")]
 
 [node name="WorldSystems" parent="." instance=ExtResource("wsys")]
 

@@ -45,7 +45,7 @@ _PROFILE_FIX = (0.0, 0.0, 3.141592653589793)
 #: old sockets, and reusing it silently drops whatever the new stack tries to feed it -- which
 #: reads as "my change had no effect" rather than as an error. Stamped on each built group and
 #: checked on reuse.
-GROUP_VERSION = 1
+GROUP_VERSION = 3
 
 
 def _new_group(name):
@@ -241,6 +241,91 @@ def make_deck_group():
 
     setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (320, 0)
     L(ext.outputs["Mesh"], setm.inputs["Geometry"])
+    L(nin.outputs["Material"], setm.inputs["Material"])
+    L(setm.outputs["Geometry"], nout.inputs["Geometry"])
+    return ng
+
+
+def make_profile_group():
+    """GN_PointProfile -- sweep an ARTIST'S OWN cross-section along the carrier.
+
+    The band group's profile is a unit line scaled by a per-point width; this one's is whatever
+    curve object the road names, swept at its OWN authored size. That is the difference between
+    "how wide is the kerb" and "which kerb", and it is the second one designers ask for.
+
+    CONTINUOUS, NOT TILED, and that is the whole reason it is a sweep. The previous model
+    instanced rigid kit pieces along the edge: round a 9 m corner a 2 m piece sits ~12.7 deg from
+    its neighbour and opens a real ~7.8 cm gap at every joint -- an inherent limit of tiling rigid
+    geometry on a curve, not a phase bug, and the reason that whole style was eventually retired.
+    A swept section has no joints to open. Tiling still has its place, for things that ARE discrete
+    -- lamp posts, signs, bollards -- and that is `make_assets_group`.
+
+    `Curve to Mesh` DROPS the profile's materials (measured, Blender 5.2: zero slots on the
+    evaluated sweep, even from a two-material multi-spline profile), so `Material` is an input
+    here like everywhere else and `point_style.asset_material` reads it off the asset for the
+    caller to pass in. Shape and look still travel together; the addon carries the second one."""
+    ng, existed = _new_group("GN_PointProfile")
+    if existed:
+        return ng
+    ifc = ng.interface
+    ifc.new_socket("Geometry", in_out="INPUT", socket_type="NodeSocketGeometry")
+    ifc.new_socket("Profile", in_out="INPUT", socket_type="NodeSocketObject")
+    ifc.new_socket("Flip", in_out="INPUT", socket_type="NodeSocketBool")
+    ifc.new_socket("Material", in_out="INPUT", socket_type="NodeSocketMaterial")
+    ifc.new_socket("Geometry", in_out="OUTPUT", socket_type="NodeSocketGeometry")
+    nin = ng.nodes.new("NodeGroupInput"); nin.location = (-800, 0)
+    nout = ng.nodes.new("NodeGroupOutput"); nout.location = (600, 0)
+    L = ng.links.new
+
+    # Same deterministic, world-referenced frame the band uses. "Minimum Twist" derives the frame
+    # from the curve's own shape, so a profile's idea of "up" would depend on where the road bends
+    # and two layers on one carrier could disagree.
+    setn = ng.nodes.new("GeometryNodeSetCurveNormal"); setn.location = (-560, 0)
+    setn.inputs["Mode"].default_value = 'Z Up'
+    L(nin.outputs["Geometry"], setn.inputs["Curve"])
+
+    oi = ng.nodes.new("GeometryNodeObjectInfo"); oi.location = (-560, -240)
+    # RELATIVE, not original: the profile is swept in the road's frame, so the asset's own object
+    # transform must already be applied. With `Original` a kit piece rotated in its source file
+    # sweeps rotated, and nothing in the road says why.
+    oi.transform_space = 'RELATIVE'
+    L(nin.outputs["Profile"], oi.inputs["Object"])
+
+    # THE ARTIST DRAWS IT THE RIGHT WAY UP, and this is what makes that true. MEASURED, not
+    # assumed: a profile point at local +X 2 m comes out at world Y -2, and one at local +Y 5 m at
+    # world Z -5 -- so a section drawn "outward and up" sweeps "inward and down". Undone as a
+    # ROTATION of pi about the profile's own Z (determinant +1, winding preserved) and never as a
+    # mirror, which would leave every kerb inside-out and invisible under backface culling. The
+    # constant has been written down in this module since the beginning; nothing had ever used it.
+    fix = ng.nodes.new("GeometryNodeTransform"); fix.location = (-420, -240)
+    fix.inputs["Rotation"].default_value = _PROFILE_FIX
+    L(oi.outputs["Geometry"], fix.inputs["Geometry"])
+
+    # ...AND WHICH SIDE OF THE ROAD IT IS ON. An asymmetric section -- which is every real kerb --
+    # must face outward on BOTH flanks, and the two `__edges` carriers run the same way along the
+    # road (that is exactly why `edge_run_values` carries `sgn`), so the right-hand one needs the
+    # section mirrored. Mirroring inverts the winding, so `Flip Faces` puts the normals back;
+    # without it the whole right kerb of every road is backfacing.
+    mir = ng.nodes.new("GeometryNodeTransform"); mir.location = (-420, -460)
+    mir.inputs["Scale"].default_value = (-1.0, 1.0, 1.0)
+    L(fix.outputs["Geometry"], mir.inputs["Geometry"])
+    flipf = ng.nodes.new("GeometryNodeFlipFaces"); flipf.location = (-300, -460)
+    L(mir.outputs["Geometry"], flipf.inputs["Mesh"])
+    pick = ng.nodes.new("GeometryNodeSwitch"); pick.input_type = 'GEOMETRY'
+    pick.location = (-180, -300)
+    L(nin.outputs["Flip"], pick.inputs["Switch"])
+    L(fix.outputs["Geometry"], pick.inputs["False"])
+    L(flipf.outputs["Mesh"], pick.inputs["True"])
+
+    c2m = ng.nodes.new("GeometryNodeCurveToMesh"); c2m.location = (-40, 0)
+    c2m.inputs["Fill Caps"].default_value = False
+    L(setn.outputs["Curve"], c2m.inputs["Curve"])
+    L(pick.outputs["Output"], c2m.inputs["Profile Curve"])
+    # NO `Scale` LINK. The asset's authored size IS the size -- scaling it by a design width is
+    # what once put a 3.0 m footway piece where a 3.5 m one was assumed and opened a real gap.
+
+    setm = ng.nodes.new("GeometryNodeSetMaterial"); setm.location = (200, 0)
+    L(c2m.outputs["Mesh"], setm.inputs["Geometry"])
     L(nin.outputs["Material"], setm.inputs["Material"])
     L(setm.outputs["Geometry"], nout.inputs["Geometry"])
     return ng

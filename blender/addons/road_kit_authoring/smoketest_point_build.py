@@ -79,7 +79,7 @@ def main():
     # ---- the testbed builds, and the stack actually sweeps something ------------------------
     _wipe()
     net, mp, cp, rr = pv.build_testbed()
-    rep = pb.build_network(net, bpy.context.scene, sample_ground=False, cut=False)
+    rep = pb.build_network(net, bpy.context.scene, sample_ground=False)
     assert rep["roads"] == 3, rep
     # main and cross each split at the pad (2 + 2); the ramp is one.
     assert rep["runs"] == 5, rep
@@ -239,7 +239,7 @@ def main():
     _straight(net2, "main", 0.0, n=2, median_width=1.0, left_walk_width=3.0,
               right_walk_width=3.0)
     _straight(net2, "near", 10.0, n=1, length=600.0, x0=-100.0)
-    rep2 = pb.build_network(net2, bpy.context.scene, sample_ground=False, cut=False)
+    rep2 = pb.build_network(net2, bpy.context.scene, sample_ground=False)
     left = [o for o in bpy.data.objects if o.name.startswith("main" + pb.SUFFIX_EDGE + "_left")]
     right = [o for o in bpy.data.objects if o.name.startswith("main" + pb.SUFFIX_EDGE + "_right")]
     assert not left, [o.name for o in left]
@@ -296,7 +296,7 @@ def main():
     setback = max(math.hypot(net3.points[u].pos[0] - js.centre[0],
                              net3.points[u].pos[1] - js.centre[1]) for u in arms)
     assert setback < 100.0, ("setback ran away", setback)
-    rep3 = pb.build_network(net3, bpy.context.scene, sample_ground=False, cut=False)
+    rep3 = pb.build_network(net3, bpy.context.scene, sample_ground=False)
     assert rep3["pads"] == 1 and not rep3["not_star"], rep3
     check("a 15-degree skew crossing stays bounded by its own mouths "
           "(pad reach %.0f m <= limit %.0f m, setback %.0f m)" % (worst, limit, setback))
@@ -307,7 +307,7 @@ def main():
         _wipe()
         net4 = pm.NetworkData()
         _straight(net4, "via", 0.0, n=2, median_width=1.0, z=z)
-        pb.build_network(net4, bpy.context.scene, sample_ground=False, cut=False)
+        pb.build_network(net4, bpy.context.scene, sample_ground=False)
         surf = next(o for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_CARRIER))
         mods = {m.name for m in surf.modifiers}
         assert ("Pillars" in mods) == want_pillars, (z, mods)
@@ -323,7 +323,7 @@ def main():
     _straight(net5, "street", 0.0, n=2, median_width=1.0, left_walk_width=3.0,
               right_walk_width=3.0)
     ramp_road, rpts = _straight(net5, "sliproad", 200.0, n=1, ped_access=False)
-    rep5 = pb.build_network(net5, bpy.context.scene, sample_ground=False, cut=False)
+    rep5 = pb.build_network(net5, bpy.context.scene, sample_ground=False)
     cols = [o.name for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_COL)]
     assert any(pb.COL_ROAD in n for n in cols), cols
     assert any(pb.COL_WALK in n for n in cols), cols
@@ -336,11 +336,84 @@ def main():
 
     # ---- BUILD IS SAFE TO PRESS TWICE, and never touches ROAD_MANAGER ------------------------------
     before = {o.name for o in bpy.data.objects}
-    rep6 = pb.build_network(net5, bpy.context.scene, sample_ground=False, cut=False)
+    rep6 = pb.build_network(net5, bpy.context.scene, sample_ground=False)
     after = {o.name for o in bpy.data.objects}
     assert before == after, (before ^ after)
     assert rep6["runs"] == rep5["runs"] and rep6["colonly"] == rep5["colonly"]
     check("Build is idempotent -- a second press produces exactly the same objects")
+    ok += 1
+
+    # -- THE GROUND IS THE GROUND, not the first thing the ray hits ------------------------------
+    # Measured on the real district `Piece_3_1`: of 300 downward rays, 134 hit terrain, **96 hit
+    # buildings** (up to 66.2 m -- a rooftop) and 70 hit the district's previously baked road. A
+    # third of a road's stations would have taken their `ground_z` off a roof, and every support is
+    # derived from that number. Invisible on a synthetic network, which has neither buildings nor
+    # terrain -- so here is one that has both.
+    _wipe()
+    terrain = bpy.data.meshes.new("Terrain")
+    terrain.from_pydata([(-50, -50, 0), (50, -50, 0), (50, 50, 0), (-50, 50, 0)],
+                        [], [(0, 1, 2, 3)])
+    terrain.update()
+    tobj = bpy.data.objects.new("District_test_0_0_Terrain-col", terrain)
+    bpy.context.scene.collection.objects.link(tobj)
+    # A building standing ON it, in no terrain collection -- exactly a district's STREET content.
+    bm_ = bpy.data.meshes.new("Bldg")
+    verts = [(-10, -10, 0), (10, -10, 0), (10, 10, 0), (-10, 10, 0),
+             (-10, -10, 40), (10, -10, 40), (10, 10, 40), (-10, 10, 40)]
+    faces = [(0, 1, 2, 3), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    bm_.from_pydata(verts, [], faces)
+    bm_.update()
+    bobj = bpy.data.objects.new("District_test_0_0_Bldg_001_h40m", bm_)
+    bpy.context.scene.collection.objects.link(bobj)
+    bpy.context.view_layer.update()
+
+    assert pb.is_terrain(tobj) and not pb.is_terrain(bobj), "one owner of what terrain is"
+    names = [o.name for o in pb.terrain_objects(bpy.context.scene)]
+    assert names == [tobj.name], "the cut must find the district's ground: %s" % names
+    g = pb.ground_sampler(bpy.context.scene)
+    # Straight down the middle of the building -- the ray MUST punch through to the ground.
+    z_under = g(0.0, 0.0)
+    assert z_under is not None and abs(z_under) < 1e-3, \
+        "sampled the roof, not the ground: %r (the building is 40 m tall)" % z_under
+    # ...and beside it, where there is nothing to punch through.
+    z_open = g(30.0, 30.0)
+    assert z_open is not None and abs(z_open) < 1e-3, z_open
+    # ...and off the terrain entirely, where there IS no ground.
+    assert g(500.0, 500.0) is None, "off the terrain the sampler must say so, not invent a height"
+    print("OK: the sampler punches through a 40 m building to the ground beneath it, the cut finds "
+          "the district's own terrain, and off the edge it returns None")
+    ok += 1
+
+    # -- THE CORRIDORS THE TERRAIN CARVE IS DRIVEN FROM --------------------------------------
+    # The boolean cut this used to test is gone (see `point_build`'s "the ground cut lives
+    # ELSEWHERE"). What replaced it is `road_corridors`: the centreline and half-width of every
+    # surface just built, handed to `island_v3_terrain.Carve`. So what has to hold here is that
+    # the corridor a road reports IS the road -- a width read off the swept band, not the authored
+    # numbers read a second time.
+    _wipe()
+    ground = bpy.data.meshes.new("Terrain")
+    ground.from_pydata([(-200, -200, 0), (200, -200, 0), (200, 200, 0), (-200, 200, 0)],
+                       [], [(0, 1, 2, 3)])
+    ground.update()
+    gobj = bpy.data.objects.new("District_test_0_0_Terrain-col", ground)
+    bpy.context.scene.collection.objects.link(gobj)
+    net2, _mp2, _cp2, _rr2 = pv.build_testbed()
+    pb.build_network(net2, bpy.context.scene, sample_ground=True)
+    corr = pb.road_corridors(bpy.context.scene, net2)
+    assert corr, "a built network must report corridors for the terrain carve"
+    widest = 0.0
+    for line, _fallback in corr:
+        assert len(line) >= 2, "a corridor is a polyline"
+        for pt in line:
+            assert len(pt) == 4, "every station carries its own half-width"
+            widest = max(widest, pt[3])
+    assert widest > 1.0, "the half-width is read off the band, not left at zero: %.3f" % widest
+    # THE TERRAIN MESH IS UNTOUCHED, and now by construction rather than by discipline: nothing in
+    # the build writes to it at all any more.
+    assert len(gobj.data.vertices) == 4, "the build must not edit the terrain mesh"
+    assert not gobj.modifiers, "the build must leave no modifier on the terrain"
+    print("OK: %d corridor(s) reported for the terrain carve, widest half %.2f m, terrain mesh "
+          "and modifier stack untouched" % (len(corr), widest))
     ok += 1
 
     print("\nALL SMOKETESTS PASSED (%d)" % ok)

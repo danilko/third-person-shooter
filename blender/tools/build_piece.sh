@@ -10,7 +10,7 @@
 #   then: <godot-jvm> --path <repo> res://src/main/resources/com/openworld/world/hosts/SoloPiece.tscn
 #
 # The master never needs re-baking: its zones' geometry_path already point at these predictable
-# res://…/world/districts/District_<Name>.tscn files (resolved lazily at stream time).
+# res://…/world/pieces/District_<Name>.tscn files (resolved lazily at stream time).
 #
 # A district built with the (now-removed) procedural filler generator may still carry a
 # STREET_LOD_LOW collection from when it was created — if so this ALSO bakes a second,
@@ -37,7 +37,7 @@ source "$BP/tools/env.sh"
 # the headless dummy RS drops the transform buffers (instances collapse to origin).
 RUN=("$GODOT")
 command -v xvfb-run >/dev/null 2>&1 && RUN=(xvfb-run -a "$GODOT")
-RES_DIR="src/main/resources/com/openworld/world/districts"     # relative to res://
+RES_DIR="src/main/resources/com/openworld/world/pieces"     # relative to res://
 ABS_DIR="$REPO/$RES_DIR"
 mkdir -p "$ABS_DIR"
 
@@ -98,20 +98,32 @@ EOF
 # ITS OWN collision geometry) via a throwaway NavBaker host scene, same shape as bake_one() above.
 # STATIC_COLLIDERS parsing only reads PhysicsServer3D data (see NavBaker.java), so unlike
 # bake_one()'s MultiMesh step this runs --headless — no xvfb dependency, no RenderingServer needed.
+# NAV_HALF (env, optional): half-extent of the navmesh clip box in metres. Unset = NavBaker's own
+# 252 m district default. The island rebuild's BASE piece is the whole 1512 m world in one object,
+# and clipped to a district it got a navmesh over its middle 503 m and nothing else:
+#   NAV_HALF=756 blender/tools/build_piece.sh Island_base
 bake_nav() {
   local tscn_rel="$1"
-  echo "   navmesh -> res://$tscn_rel"
+  echo "   navmesh -> res://$tscn_rel${NAV_HALF:+  (clip half-extent ${NAV_HALF} m)}"
   local nav_tscn="$REPO/$RES_DIR/_navbake_$$_${RANDOM}.tscn"
   CLEANUP_FILES+=("$nav_tscn" "$nav_tscn.import")
-  cat > "$nav_tscn" <<EOF
+  {
+    cat <<EOF
 [gd_scene format=3 uid="uid://bnavbake${RANDOM}"]
 [ext_resource type="Script" path="res://src/main/java/com/openworld/world/NavBaker.java" id="1"]
 [node name="BakeNav" type="Node" unique_id=900001${RANDOM}]
 script = ExtResource("1")
 scene_path = "res://$tscn_rel"
+EOF
+    # WRITTEN AS A FLOAT, always. `clip_half_extent = 756` parses as an INT and the JVM binding
+    # then leaves the float property at its default -- the bake reported the district clip back
+    # with no error at all, which is the worst way for a number not to arrive.
+    [[ -n "${NAV_HALF:-}" ]] && printf 'clip_half_extent = %.1f\n' "$NAV_HALF"
+    cat <<EOF
 bake_on_ready = true
 quit_when_done = true
 EOF
+  } > "$nav_tscn"
   $GODOT --headless --path "$REPO" "res://$RES_DIR/$(basename "$nav_tscn")" 2>&1 \
       | grep -iE "NavBaker: baked" || true
   rm -f "$nav_tscn" "$nav_tscn.import" 2>/dev/null || true
@@ -140,11 +152,11 @@ fi
 
 echo "── 5/6 refresh binary district scenes (.tscn -> .scn)"
 # The runtime prefers a sibling .scn over the .tscn (WorldZoneManager.resolveGeometryPath) — a
-# stale .scn from a previous bake would silently shadow the scene just baked. ConvertDistricts
+# stale .scn from a previous bake would silently shadow the scene just baked. ConvertPieces
 # mtime-skips unchanged districts, so this only reconverts what this run touched. Same
 # non-headless/xvfb pattern as bake_one(): MultiMesh data doesn't survive the headless dummy RS.
-"${RUN[@]}" --path "$REPO" res://src/main/resources/com/openworld/world/hosts/ConvertDistricts.tscn 2>&1 \
-    | grep -iE "DistrictBinaryConverter: done" || true
+"${RUN[@]}" --path "$REPO" res://src/main/resources/com/openworld/world/hosts/ConvertPieces.tscn 2>&1 \
+    | grep -iE "PieceBinaryConverter: done" || true
 
 echo "── 6/6 point SoloPiece.tscn at $STEM.tscn"
 SOLO="$REPO/src/main/resources/com/openworld/world/hosts/SoloPiece.tscn"
@@ -152,8 +164,22 @@ python3 - "$SOLO" "res://$RES_DIR/$STEM.tscn" <<'PY'
 import re, sys
 p, path = sys.argv[1], sys.argv[2]
 s = open(p).read()
-s = re.sub(r'(\[ext_resource type="PackedScene" path=")[^"]*(" id="piece"\])',
-           lambda m: m.group(1) + path + m.group(2), s)
+ref = '[ext_resource type="PackedScene" path="%s" id="piece"]' % path
+node = '[node name="Piece" parent="." instance=ExtResource("piece")]'
+if 'id="piece"' in s:
+    s = re.sub(r'(\[ext_resource type="PackedScene" path=")[^"]*(" id="piece"\])',
+               lambda m: m.group(1) + path + m.group(2), s)
+else:
+    # SELF-HEALING. The host ships with NO piece wired -- there is no piece to wire it to until
+    # one is baked -- so a plain substitution would silently do nothing and leave the artist with
+    # a host that opens on an empty world. Insert the resource before the first other
+    # `ext_resource`, and the node that instances it before `WorldSystems` (which must stay last:
+    # its AutoLoads expect the world already in the tree).
+    s = re.sub(r'(\[ext_resource )', ref + "\n\\1", s, count=1)
+    if node not in s:
+        s = re.sub(r'(\[node name="WorldSystems")', node + "\n\n\\1", s, count=1)
+if 'id="piece"' not in s or node not in s:
+    sys.exit("build_piece.sh: could not wire %s into %s" % (path, p))
 open(p, 'w').write(s)
 PY
 

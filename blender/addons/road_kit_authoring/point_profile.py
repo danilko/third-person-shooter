@@ -19,6 +19,7 @@ the FORWARD lanes and is the side called "L". Keeping that verbatim is what lets
 here and one built from the legacy scalars be compared without a translation table.
 """
 
+import math
 import os
 import sys
 
@@ -309,11 +310,46 @@ def aux_slot_span(profile):
     return a, b, abs(b - a)
 
 
-def stations(points, is_loop=False):
+def run_end_axes(net, points):
+    """`{uid: (x, y)}` for a run's FIRST and LAST station -- the direction each of them faces
+    according to the CHAIN, which is not what a run alone can see.
+
+    A RUN IS NOT A ROAD, AND ITS END IS NOT AN END. `road_points.chain_tangents` falls back to the
+    one available chord at an open chain's end ("extrapolating a phantom neighbour invents
+    curvature the author did not author"), which is exactly right for a road that stops and
+    exactly wrong for a JUNCTION MOUTH: the road does not stop there, it carries on across the pad,
+    and the pad's cap is cut on `point_model.station_axis` -- the central difference over the
+    CHAIN, which reaches the mouth on the other side. So the two are two owners of "which way does
+    this station face", agreeing only while the road runs straight through the crossing.
+
+    Measured on the island before this existed: at Rinkai x Kuko the cap was cut at 16.07 deg and
+    the carriageway at 28.3 deg, leaving the road's own kerb line **2.23 m** off the pad corner it
+    has to meet -- a visible notch, at every crossing a road bends through. It is 8f.1's rule
+    ("direction has ONE owner: `station_axis`") applied to the last place that had not delegated.
+
+    Only the two ends are answered: every interior station's central difference is the same
+    calculation on the same neighbours, so `chain_tangents` already agrees there."""
+    out = {}
+    if net is None or len(points) < 2:
+        return out
+    for p in (points[0], points[-1]):
+        if p.tangent_mode != pm.AUTO:
+            continue                      # a MANUAL station already owns its direction
+        a = pm.station_axis(net, p.uid)
+        if a is not None:
+            out[p.uid] = (float(a[0]), float(a[1]))
+    return out
+
+
+def stations(points, is_loop=False, end_axes=None):
     """PointData chain -> `road_points.Station` chain: the one bridge from the authored model into
     the pure geometry libs. Export, solve and the gate all cross here, so the profile ids they see
-    are the same ids by construction."""
+    are the same ids by construction.
+
+    `end_axes` (`run_end_axes`) overrides the plan-view direction of the run's end stations, so a
+    run that ends at a junction mouth is cut on the same plane the pad's cap is."""
     profiles, _bases = chain_profiles(points, is_loop)
+    end_axes = end_axes or {}
     out = []
     for p, prof in zip(points, profiles):
         # THE BRIDGE. This line used to read `tangent = None`, unconditionally -- which made
@@ -321,7 +357,21 @@ def stations(points, is_loop=False):
         # honoured by `road_points`, and never reachable, so rotating a point did nothing.
         # `PointData.tangent` carries the Empty's own +Y (see `point_model.facing_of`), and it is
         # None on any point the artist has not shaped -- which is exactly AUTO's input.
-        out.append(rp.Station(p.pos, prof, tangent_mode=p.tangent_mode, tangent=p.tangent,
+        mode, tan = p.tangent_mode, p.tangent
+        ax = end_axes.get(p.uid)
+        if ax is not None:
+            # THE Z SLOPE IS THE RUN'S OWN. `station_axis` is a plan-view frame by design, and
+            # forcing a flat tangent here would put a kink in the vertical profile of every graded
+            # approach -- the bay bridge's, the touge's. So the XY comes from the chain and the
+            # climb comes from the chord this run actually leaves on.
+            dz = 0.0
+            other = points[1] if p is points[0] else points[-2]
+            d = (other.pos[0] - p.pos[0], other.pos[1] - p.pos[1], other.pos[2] - p.pos[2])
+            flat = math.hypot(d[0], d[1])
+            if flat > 1e-9:
+                dz = (d[2] / flat) * (1.0 if p is points[0] else -1.0)
+            mode, tan = pm.MANUAL, (ax[0], ax[1], dz)
+        out.append(rp.Station(p.pos, prof, tangent_mode=mode, tangent=tan,
                               roll=float(p.roll), name=p.uid,
                               handle_in=float(p.handle_in), handle_out=float(p.handle_out)))
     return out
@@ -375,7 +425,9 @@ def centreline_runs(net, step=None):
             if len(run) < 2:
                 continue
             is_loop = bool(road.is_loop) and len(runs) == 1
-            sts = stations([net.resolved(u) for u in run], is_loop)
+            rpts = [net.resolved(u) for u in run]
+            sts = stations(rpts, is_loop,
+                           end_axes=(None if is_loop else run_end_axes(net, rpts)))
             kw = {} if step is None else {"step": step}
             out.append((road.name, [s.pos for s in rp.resample(sts, is_loop, **kw)]))
     return out

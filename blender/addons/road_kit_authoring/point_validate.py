@@ -179,6 +179,25 @@ def check_chains(net, out):
                         "to it, so %s is two roads sharing one collection -- if that was not "
                         "intended, link them; otherwise Author > Repair > Tidy Roads files the "
                         "second one into its own road" % (b, name, name)))
+        # THE NAME ORDER AND THE LINK ORDER MUST BE THE SAME ORDER. The chain is read off the
+        # object names and the road is built off the links, so when a hand edit puts them at odds
+        # -- a rename, a duplicate, a point dragged between collections -- the build follows one
+        # while the artist reads the other, and nothing says so. A WARN, because the build is not
+        # wrong (the links are the truth and it follows them); what is wrong is that the file no
+        # longer reads the way it behaves, and the remedy is one button.
+        comps, tangled = pm.link_order(net, r)
+        if tangled:
+            out(Finding("chain_branched", WARN, tangled[0],
+                        "is in a stretch of %s whose links BRANCH, so it has no chain order at "
+                        "all -- three points meeting at one station is a junction, not a chain. "
+                        "Renumber Roads leaves it alone; disconnect the odd link or Make "
+                        "Intersection it" % name))
+        flat = [u for c in comps for u in c]
+        if flat and flat != [u for u in uids if u in set(flat)]:
+            out(Finding("chain_out_of_order", WARN, flat[0],
+                        "%s's points are named in a different order from the one its own links "
+                        "put them in, so the chain you read is not the chain that gets built -- "
+                        "Author > Repair > Renumber Roads renames them to match" % name))
         for u in uids:
             if not net.points[u].links:
                 out(Finding("point_stranded", ERROR, u,
@@ -194,6 +213,67 @@ def check_chains(net, out):
                 out(Finding("loop_lane_register", ERROR, name,
                             "the ring's lane numbering does not wrap (fwd %+d, rev %+d) -- a lane "
                             "dropped on one side and re-opened on the other" % (df, dr)))
+
+
+#: Two stations closer together than this are the same PLACE as far as a car is concerned: it is
+#: `CHAIN_TOL`, the distance beyond which one lane never chains into the next.
+MEET_TOL = CHAIN_TOL
+
+
+def check_meetings(net, out):
+    """A road that ENDS ON another road must be JOINED to it, and nothing else could see this.
+
+    Every other check in this file reads the authored graph and asks whether it is consistent. A
+    junction that was never authored at all is consistent with itself: two roads whose stations
+    sit at the IDENTICAL position with no link between them pass `check_links` (no link to be
+    asymmetric), `check_chains` (each chain is whole) and `check_junctions` (no clique to be
+    incomplete), and the only symptom is that no car can get from one to the other -- which is
+    invisible until you drive it.
+
+    That is not hypothetical. `WORLD_REBUILD_PLAN.md` `W14`: a float-comparison bug in
+    `seed_district_roads.seg_intersect` silently dropped four of the island's sixteen crossings,
+    and the island shipped with the airport link lying on Hama-dori's carriageway unattached and
+    the harbour apron as an unreachable component whose first station is exactly on Port road's
+    last one -- gate 0 errors, 0 warnings. This is the eye that was missing.
+
+    ONLY OPEN ENDS, and in 3D. A road that merely passes near another one is not a defect, and a
+    street that runs UNDER an expressway is separated in Z by the deck -- so the subject is a
+    point where a road STOPS (one SEGMENT link or none, and no junction or ramp business of its
+    own), and the test is a real distance, not a plan one. A WARN, like `chain_unlinked`, and for
+    the same reason: what is wrong is that the file no longer reads the way it behaves, and the
+    two remedies are both one button."""
+    ramp_heads = {t for _m, t in net.aux_pairs()}
+    owner = {}
+    for name in sorted(net.roads):
+        for u in net.roads[name].points:
+            owner[u] = name
+    ends = []
+    for uid in sorted(owner):
+        p = net.points.get(uid)
+        if p is None or uid in ramp_heads:
+            continue
+        if p.targets(pm.LINK_JUNCTION) or p.targets(pm.LINK_AUX):
+            continue
+        if len(p.targets(pm.LINK_SEGMENT)) <= 1:
+            ends.append(uid)
+    for uid in ends:
+        p = net.points[uid]
+        for other in sorted(owner):
+            if owner[other] == owner[uid] or other == uid:
+                continue
+            q = net.points.get(other)
+            if q is None or p.has_link(other) or q.has_link(uid):
+                continue
+            if math.dist(tuple(p.pos), tuple(q.pos)) > MEET_TOL:
+                continue
+            out(Finding("road_end_unjoined", WARN, uid,
+                        "is where %s stops, and it stands %.2f m from %s in %s with no link to "
+                        "it -- the two roads touch and no car can cross between them. Connect "
+                        "Selected (SEGMENT) if they are one corridor, or Make Intersection if "
+                        "this is a corner or a third arm meets here"
+                        % (owner[uid], math.dist(tuple(p.pos), tuple(q.pos)), other,
+                           owner[other])))
+            break
 
 
 # ------------------------------------------------------------------------------- taper
@@ -363,6 +443,60 @@ def check_junctions(net, out):
                                     "the approach will kink" % ang))
             if res.lanes_fwd <= 0 and res.lanes_bwd <= 0:
                 out(Finding("junction_no_lanes", ERROR, u, "a junction arm with no lanes"))
+
+
+#: How much clear carriageway a junction mouth needs beyond it, in metres, before the next
+#: station along its own run. It is `seed_district_roads.MIN_SPAN`, restated on this side of the
+#: fence: "anything closer is not a span, it is a duplicate point wearing a station's name".
+MIN_MOUTH_CLEAR = 10.0
+
+
+def check_mouth_clearance(net, out):
+    """A MOUTH NEEDS CLEAR ROAD BEYOND IT, and until now nothing could see when it did not.
+
+    The stop line is where the pad hands over to the street, so the first span of that street is
+    where the cross-section is interpolated from the junction's numbers to the road's. Put an
+    ordinary station a few centimetres past a mouth and that interpolation happens over nothing:
+    the two profiles are the same (an `INHERIT` station takes the road's base, and so does the
+    mouth), so `check_tapers` sees `dw == 0` and returns before it ever measures the span, and
+    `station_coincident` only fires at 1e-6. A 0.19 m span therefore passed the whole gate.
+
+    That is not hypothetical -- it is what the island shipped. `seed_district_roads` places every
+    mouth at a provisional 14 m and prunes the stations inside that window; `Auto Setback` then
+    solves the real distance (17.9-35.5 m on the island's ten pads) and moves the mouth out over
+    the top of stations that had survived a window computed from the wrong number. Rinkai-dori's
+    mouth at the Chuo crossing ended up 0.19 m from the next station along. The seeder now asks
+    `point_solve.solved_setback` for the same number, so it prunes the right window; this check is
+    what keeps that honest, and it also catches the hand-authored version (drag a mouth outward
+    and it walks over the station beyond it just the same).
+
+    Measured along the RUN, not the whole chain: a mouth's other neighbour is across the pad, and
+    the pad is exactly where a short gap is meant to be."""
+    try:
+        from . import point_solve as psolve
+    except ImportError:
+        import point_solve as psolve                                         # noqa: E402
+    junction = set()
+    for comp in net.junction_cliques():
+        junction.update(comp)
+    for name in sorted(net.roads):
+        r = net.roads[name]
+        for run in psolve.road_runs(net, r):
+            for a, b in zip(run, run[1:]):
+                if (a in junction) == (b in junction):
+                    continue        # pad-to-pad, or street-to-street: not a stop line
+                mouth, station = (a, b) if a in junction else (b, a)
+                if mouth not in net.points or station not in net.points:
+                    continue
+                span = _dist_xy(net.points[mouth].pos, net.points[station].pos)
+                if span >= MIN_MOUTH_CLEAR:
+                    continue
+                sev = ERROR if span < CHAIN_TOL else WARN
+                out(Finding("station_crowds_mouth", sev, station,
+                            "stands %.2f m beyond the junction mouth %s, which wants %.0f m of "
+                            "clear road -- the mouth was set back over the top of it. Delete this "
+                            "station, or lock the mouth (setback_locked) and place it by hand"
+                            % (span, mouth, MIN_MOUTH_CLEAR)))
 
 
 def check_ramps(net, out):
@@ -568,8 +702,121 @@ def check_pads(net, out):
 
 # ------------------------------------------------------------------------------- the gate
 
-CHECKS = (check_identity, check_links, check_chains, check_tapers, check_taper_routes,
-          check_junctions, check_pads, check_ramps, check_aux_slots, check_support)
+def check_style(net, out):
+    """Does every style slot name something this file actually has?
+
+    A NAME THAT RESOLVES TO NOTHING IS SILENT. `point_style.resolve` falls back to the layer's
+    default rather than building a black road or no kerb at all -- which is right, but means a
+    typo, a renamed material, or a `road_kit.blend` that failed to link produces a road that looks
+    merely wrong rather than broken. Warnings, not errors: falling back IS a working build, and a
+    district should not refuse to bake because someone renamed a material."""
+    try:
+        from . import point_style as _pstyle
+    except ImportError:
+        import point_style as _pstyle                                        # noqa: E402
+    for name, road in net.roads.items():
+        for slot, kind, missing in _pstyle.resolve(road).missing():
+            out(Finding("style_missing", WARN, name,
+                        "%s %s '%s' is not in this file -- the %s layer falls back to its default"
+                        % (slot, kind, missing, slot)))
+
+
+#: How far a profile asset's own width may differ from the width the solve reserves for it before
+#: it is reported, in metres. Tight: this shows up as a visible gap or an overhang, not as a
+#: tolerance question.
+ASSET_WIDTH_TOL = 0.05
+
+
+def check_asset_width(net, out):
+    """Does each profile asset's own width match the width the road reserves for it?
+
+    THE SECTION IS SWEPT AT ITS OWN SIZE, BUT THE SOLVE STILL PLACES THE NEXT LAYER FROM THE
+    AUTHORED ONE. So a 2.00 m footway section on a road whose `left_walk_width` reserves 3.00 m
+    leaves a real 1.00 m of slack between the pavement's edge and the barrier beyond it, and a
+    0.32 m kerb section overhangs a parametric 0.15 m kerb into where the footway begins. Measured
+    on the shipped kit.
+
+    This is the previous addon's round-2 defect one level up, and the reason it was worth an eye
+    rather than a silent fallback: nothing about the built geometry LOOKS broken -- each piece is
+    the right shape, correctly swept, in the right place for what it was told -- so the only
+    symptom is a gap the artist finds by flying up to it.
+
+    A WARNING, and the remedy is in the message: author the width to match the section you chose.
+    Only the FOOTWAY is checked -- see the table below for why the kerb cannot be.
+    (The structural fix -- the asset's measured width replacing the authored one inside
+    `solve_road`, at the ONE place lateral offsets are computed -- is not built; see
+    `point_style`'s module docstring.)"""
+    try:
+        from . import point_solve as _ps, point_style as _pstyle
+    except ImportError:
+        import point_solve as _ps                                            # noqa: E402
+        import point_style as _pstyle                                        # noqa: E402
+    for name, road in net.roads.items():
+        base = getattr(road, "base", None)
+        if base is None:
+            continue
+        style = _pstyle.resolve(road)
+        #: `slot -> (what the road reserves for it, the field the artist would edit)`.
+        #: THE FOOTWAY ONLY, and the omission is deliberate rather than an oversight. A kerb's
+        #: reserved width is DERIVED (`kerb_height * KERB_THICKNESS`), so there is no field whose
+        #: value would make a 0.32 m section fit -- "set kerb_height to 0.32" would be advice for a
+        #: 64 cm kerb, and a finding that names a remedy which makes things worse is worse than no
+        #: finding. The kerb case needs the structural fix (the section's width reaching
+        #: `solve_road`), not a warning; see `point_style`'s module docstring.
+        reserved = {
+            "footway": (max(float(getattr(base, "left_walk_width", 0.0)),
+                            float(getattr(base, "right_walk_width", 0.0))), "walk_width"),
+        }
+        for slot, (want, field) in reserved.items():
+            asset = style.asset(slot)
+            if asset is None or want <= 0.0:
+                continue
+            got = _pstyle.asset_width(asset)
+            if got <= 0.0 or abs(got - want) <= ASSET_WIDTH_TOL:
+                continue
+            out(Finding("asset_width_mismatch", WARN, name,
+                        "%s section '%s' is %.2f m wide but the road reserves %.2f m -- %.2f m of "
+                        "%s. Set %s to %.2f, or pick a section that fits."
+                        % (slot, asset.name, got, want, abs(got - want),
+                           "overhang" if got > want else "slack", field, got)))
+
+
+def check_path_fidelity(net, out):
+    """Does the exported Path3D actually follow the lane it represents?
+
+    THE ONE CHECK ABOUT WHAT SHIPS RATHER THAN WHAT IS AUTHORED, and it is here because the gate is
+    the only thing an artist is guaranteed to run. `WorldBaker` builds every `Curve3D` an ambient
+    car drives from the `curve` block of `.lanekit.json`, and that block is a FIT to the lane, not
+    the lane -- so it can be wrong while every point, link, taper and pad is right. It has been:
+    the Catmull refit this replaced ran 22.57 m off `demo_ramp_F0` on the addon's own sample
+    network, with the gate green and the geometry perfect.
+
+    Measured by `point_export.path_deviation`, the same function `Preview > Traffic Flow` draws
+    with and the export's own self-test asserts on -- so the picture, the finding and the test
+    cannot disagree about what shipped.
+
+    A late check, and a forgiving one: the fit subdivides until it is inside 0.05 m, so anything
+    reported here is a shape the fit could not follow at all, not a tuning matter."""
+    try:
+        from . import point_export as _pe
+    except ImportError:
+        import point_export as _pe                                           # noqa: E402
+    try:
+        doc = _pe.export_network(net)
+    except Exception as exc:                    # noqa: BLE001 -- reported, never raised
+        out(Finding("path_export_failed", WARN, "<network>",
+                    "the lane graph could not be exported to measure: %s" % (exc,)))
+        return
+    for lane_id, dev in _pe.deviating_lanes(doc):
+        sev = ERROR if dev > _pe.PATH_DEVIATION_ERROR else WARN
+        out(Finding("path_deviation", sev, lane_id,
+                    "the exported Path3D is %.2f m from the lane it represents -- cars will drive "
+                    "there, not on the road. Add a station where the bend actually is." % dev))
+
+
+CHECKS = (check_identity, check_links, check_chains, check_meetings, check_tapers,
+          check_taper_routes, check_junctions, check_mouth_clearance, check_pads, check_ramps,
+          check_aux_slots, check_support, check_path_fidelity, check_style, check_asset_width)
 
 
 def validate(net, checks=CHECKS):
@@ -918,6 +1165,24 @@ def self_test():
     tris = psolve.solve_junction(net, comp).fan
     assert tris, "a folded ring still yields triangles -- ear-clipped, never empty"
     print("OK: a pad whose ring folds past its centroid still builds, and WARNS, named by pad")
+    ok += 1
+
+    # -- a road that stops ON another road, with nothing joining them --------------------------
+    net, mp, cp, rr = build_testbed()
+    # `road_cross` is a through street; move its free south end onto `road_main`'s free west end.
+    # Nothing else changes: both chains are whole, no link is asymmetric, no clique is incomplete
+    # -- the network is perfectly consistent with itself and no car can get from one to the other.
+    net.points[cp[0].uid].pos = tuple(mp[0].pos)
+    codes = {x.code for x in validate(net)}
+    assert "road_end_unjoined" in codes, codes
+    assert not [x for x in errors(validate(net)) if x.code == "road_end_unjoined"], "a WARN"
+    net.link(cp[0].uid, mp[0].uid, pm.LINK_SEGMENT)
+    assert "road_end_unjoined" not in {x.code for x in validate(net)}, "linking clears it"
+    # ...and Z separates an underpass from a meeting: the same two points, one deck apart.
+    net.unlink(cp[0].uid, mp[0].uid)
+    net.points[cp[0].uid].pos = (mp[0].pos[0], mp[0].pos[1], mp[0].pos[2] + MEET_TOL + 1.0)
+    assert "road_end_unjoined" not in {x.code for x in validate(net)}, "a street under a deck"
+    print("OK: a road that ends ON another road with no link is named -- and an underpass is not")
     ok += 1
 
     print("\nALL SELF-TESTS PASSED (%d)" % ok)

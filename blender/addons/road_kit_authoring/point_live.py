@@ -35,12 +35,14 @@ import bpy
 from bpy.app.handlers import persistent
 
 try:
-    from . import point_build as pb, point_edges as pe, point_model as pm, point_solve as ps
+    from . import (point_build as pb, point_edges as pe, point_model as pm, point_solve as ps,
+                   point_style as pstyle)
 except ImportError:
     import point_build as pb                                                 # noqa: E402
     import point_edges as pe                                                 # noqa: E402
     import point_model as pm                                                 # noqa: E402
     import point_solve as ps                                                 # noqa: E402
+    import point_style as pstyle                                             # noqa: E402
 
 
 #: Seconds of quiet before a rebuild. Long enough that a G-drag's pauses do not fire it, short
@@ -168,6 +170,11 @@ def rebuild(road_names, scene=None):
         except ImportError:
             import point_ops as po
         po.sync_facings(scene)
+        # Every junction handle back onto its own centre. ON SETTLE, never per drag frame: moving
+        # a parent mid-modal fights the transform operator the artist is still holding -- the same
+        # line this module already draws for geometry. Inside `_building` with `sync_facings`
+        # because it too writes transforms, which re-enters the depsgraph handler.
+        po.recentre_all_junctions()
         net = pm.read_network(scene)
     finally:
         _building = False
@@ -191,8 +198,12 @@ def rebuild(road_names, scene=None):
             coll = pb.gen_group(name, scene)
             for i, s in enumerate(runs):
                 obj_name = name if len(runs) == 1 else "%s_%d" % (name, i)
-                surf = pb.build_carrier(s, coll, obj_name)
-                edges = pb.build_edges(s, bands, coll, obj_name)
+                style = pstyle.resolve(s.road, material_fn=pb.material)
+                surf = pb.build_carrier(s, coll, obj_name, style)
+                edges = pb.build_edges(s, bands, coll, obj_name, style)
+                # The paint too -- a live rebuild that quietly strips the markings teaches the
+                # artist that moving a point deletes them.
+                pb.build_marks(s, coll, obj_name, style)
                 pb.build_collision([surf], edges, coll, obj_name, bool(s.road.ped_access))
         if jsolves:
             jcoll = pb.gen_group(pm.JUNCTIONS, scene)

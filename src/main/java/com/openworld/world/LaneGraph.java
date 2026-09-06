@@ -23,7 +23,7 @@ import java.util.Map;
  * it's looking at.
  *
  * <p>Plain Java helper (like {@code SpawnPool}), not a {@code @Script} / AutoLoad. Cached per
- * scene via the scene-instance id (mirrors {@code WorldZoneManager.detectSceneReload}); routes are
+ * scene via the scene-instance id (mirrors {@code ZoneManager.detectSceneReload}); routes are
  * static scene content, so the graph is built once per scene and reused.
  */
 public final class LaneGraph {

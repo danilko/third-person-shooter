@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * Shared group awareness for a band of AI (PLAN.md Part E / E3). A squad is a node — placed in the
  * editor (members point an {@code @Export squadPath} at it) or created per {@code SpawnConfig} by
- * {@link com.openworld.world.WorldZoneManager}. Members {@link #register} on spawn and
+ * {@link com.openworld.world.ZoneManager}. Members {@link #register} on spawn and
  * {@link #unregister} on free.
  *
  * <p><b>What it buys:</b> when one member confirms a target (LoS in {@code AttackState}, or being shot),

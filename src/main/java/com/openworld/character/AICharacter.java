@@ -118,7 +118,7 @@ public class AICharacter extends Character {
     private double      lodTimer = 0.0;
     private AILodLevel  lodLevel = AILodLevel.ACTIVE;
 
-    /** Set the world-wide LOD-distance multiplier (WorldZoneManager.applyRegion). Clamped to a sane floor. */
+    /** Set the world-wide LOD-distance multiplier (ZoneManager.applyRegion). Clamped to a sane floor. */
     public static void setLodDistanceBias(float bias) {
         lodDistanceBias = bias > 0.1f ? bias : 0.1f;
     }
@@ -316,7 +316,7 @@ public class AICharacter extends Character {
         }
         if (lodLevel == AILodLevel.FROZEN) return;  // skip entire FSM + animation tick
         // Drop any target/bone references that have been freed or pulled out of the tree (e.g. a
-        // zone-streamed body despawned by WorldZoneManager.unload). Dereferencing such a node's
+        // zone-streamed body despawned by ZoneManager.unload). Dereferencing such a node's
         // global transform logs "Node not inside tree" and, once it is freed, segfaults — so the
         // FSM must never see a dangling target.
         validateCurrentTarget();
@@ -771,7 +771,7 @@ public class AICharacter extends Character {
     }
 
     /**
-     * Re-initialise this body for a (re)spawn — PLAN.md Part E / E1. Called by WorldZoneManager
+     * Re-initialise this body for a (re)spawn — PLAN.md Part E / E1. Called by ZoneManager
      * after the body is (re)added to the tree: repositions it, re-anchors the patrol center to the
      * new position, full-heals, clears all sensor caches + FSM memory, and re-registers in the
      * spatial grid. Safe on a fresh instance too (a harmless re-init over what {@code _ready} did).

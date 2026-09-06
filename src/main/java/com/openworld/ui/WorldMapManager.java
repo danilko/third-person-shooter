@@ -6,8 +6,8 @@ import com.openworld.character.Player;
 import com.openworld.game.PlayerRegistry;
 import com.openworld.game.WaypointStore;
 import com.openworld.world.SpatialEntityGrid;
-import com.openworld.world.WorldZoneManager;
-import com.openworld.world.WorldZoneMarker;
+import com.openworld.world.ZoneManager;
+import com.openworld.world.ZoneMarker;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
@@ -120,9 +120,9 @@ public class WorldMapManager extends Control {
         float scale = radiusPx / rangeMeters;
         Vector3 origin = player.getGlobalPosition();
 
-        WorldZoneManager wzm = WorldZoneManager.get();
+        ZoneManager wzm = ZoneManager.get();
         if (wzm != null) {
-            for (WorldZoneMarker m : wzm.getMarkers()) {
+            for (ZoneMarker m : wzm.getMarkers()) {
                 if (m == null || !godot.global.GD.isInstanceValid(m) || m.zone == null) continue;
                 Vector2 c = worldToScreen(m.getGlobalPosition(), origin, center, scale);
                 drawCircle(c, m.zone.loadRadius * scale, regionColor, false, 1f, true);

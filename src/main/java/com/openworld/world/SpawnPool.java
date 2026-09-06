@@ -9,7 +9,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 /**
- * Recycles {@link AICharacter} bodies for {@link WorldZoneManager} (PLAN.md Part E / E1).
+ * Recycles {@link AICharacter} bodies for {@link ZoneManager} (PLAN.md Part E / E1).
  *
  * <p>Plain (non-Godot-registered) helper — NOT {@code util.ObjectPool}, which is fixed-capacity,
  * throws on exhaustion, and is not tree-aware. Instantiating a full character scene is the
@@ -73,7 +73,7 @@ public class SpawnPool {
         else ai.queueFree();
     }
 
-    /** Free every pooled body — called from WorldZoneManager._exitTree() (leak discipline). */
+    /** Free every pooled body — called from ZoneManager._exitTree() (leak discipline). */
     public void clear() {
         for (AICharacter ai : idle) if (GD.isInstanceValid(ai)) ai.queueFree();
         idle.clear();

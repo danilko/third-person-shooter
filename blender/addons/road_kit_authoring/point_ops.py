@@ -412,8 +412,21 @@ class RKA_OT_insert_point(Operator):
 
     def execute(self, context):
         sel = selected_points(context)
+        if len(sel) == 1:
+            # ONE POINT IS ENOUGH, and it is the gesture an artist actually makes: "put another
+            # station after this one". The downstream neighbour is not a guess -- it is the point
+            # this one carries a SEGMENT link to that comes after it in the chain, which is exactly
+            # the span an insert splits. At the tail there is no such span, and `Extend Road` is
+            # the operator for growing the road instead of subdividing it.
+            a = sel[0]
+            b = _next_in_chain(a)
+            if b is None:
+                self.report({'ERROR'}, "no span after this point -- use Extend Road to grow the "
+                                       "road, or select both points of the span to split")
+                return {'CANCELLED'}
+            sel = [a, b]
         if len(sel) != 2:
-            self.report({'ERROR'}, "select exactly 2 linked points")
+            self.report({'ERROR'}, "select 1 point (splits the span after it) or 2 linked points")
             return {'CANCELLED'}
         a, b = sel
         coll = collection_of(a)
@@ -435,6 +448,25 @@ class RKA_OT_insert_point(Operator):
         sync_facings(context.scene)
         context.view_layer.objects.active = p
         return {'FINISHED'}
+
+
+def _next_in_chain(obj):
+    """The point after `obj` in its own road: its SEGMENT-linked neighbour with the higher chain
+    position. Derived from the links and the order together, because either alone is ambiguous --
+    the link says which points are joined and the order says which of the two is downstream."""
+    coll = collection_of(obj)
+    if coll is None:
+        return None
+    chain = points_in(coll)
+    if obj not in chain:
+        return None
+    i = chain.index(obj)
+    linked = {l.target for l in obj.rka_pt.links
+              if l.target is not None and l.type == pm.LINK_SEGMENT}
+    for o in chain[i + 1:]:
+        if o in linked:
+            return o
+    return None
 
 
 def _renumber(coll, after=None, inserted=None, before=None, at=None):
@@ -463,6 +495,210 @@ def _renumber(coll, after=None, inserted=None, before=None, at=None):
     for i, o in enumerate(pts):
         o.name = point_name(coll, i)
     return pts
+
+
+#: The pad handle's object-name prefix. One owner: `_junction_name` allocates them and
+#: `complete_junction_cliques` recognises them.
+JCT_PREFIX = "JCT_"
+
+
+def complete_junction_cliques(seed, context=None):
+    """Make every junction COMPONENT containing one of `seed` a proper pad again. Returns
+    `(links_written, roles_fixed, parented)`.
+
+    A PAD IS A CLIQUE, A MOUTH IS AN `INTERSECTION`, AND BOTH ARMS OF IT HANG OFF THE `JCT_*`.
+    `make_pad` writes all three together and is the only place that ever did -- so any OTHER
+    gesture that hands a point a JUNCTION link leaves a pad that is a component and not a clique,
+    with a mouth still typed `SEGMENT` and unparented. `point_solve.solve_junction` then builds one
+    pad as two overlapping ones and `Auto Setback` solves a clique that is not one.
+
+    `Merge Points` was that other gesture. It carries every link that left the collapsed run onto
+    the survivor -- correctly -- and stopped there: merging two stations of a road that meets a
+    4-arm crossing left the island's port junction a 4-node component with **3** edges, two mouths
+    typed `SEGMENT`, and 8 gate errors. Repairing it belongs here rather than in the operator so
+    `Repair Links` and any future gesture share one answer.
+    """
+    net = pm.read_network()
+    want = {o.rka_pt.uid for o in seed if is_point(o)}
+    by_uid = {}
+    for c in pm.road_collections():
+        for o in points_in(c):
+            by_uid[o.rka_pt.uid] = o
+    wrote = roles = parented = 0
+    for comp in net.junction_cliques():
+        if not (want & set(comp)):
+            continue
+        objs = [by_uid[u] for u in comp if u in by_uid]
+        for i, a in enumerate(objs):
+            for b in objs[i + 1:]:
+                if not any(x.target is b for x in a.rka_pt.links):
+                    link_objects(a, b, pm.LINK_JUNCTION)
+                    wrote += 1
+        # The pad's handle, if the crossing already has one. A mouth that is not parented to it
+        # does not turn with the crossing and is not counted by `junction_centre`, so G and R on
+        # the `JCT_*` would silently leave it behind.
+        jct = next((o.parent for o in objs if o.parent is not None
+                    and o.parent.name.startswith(JCT_PREFIX)), None)
+        for o in objs:
+            if o.rka_pt.role != pm.INTERSECTION:
+                o.rka_pt.role = pm.INTERSECTION
+                roles += 1
+            if jct is not None and o.parent is not jct:
+                world = o.matrix_world.copy()
+                o.parent = jct
+                o.matrix_parent_inverse = jct.matrix_world.inverted()
+                o.matrix_world = world
+                parented += 1
+        if jct is not None and context is not None:
+            recentre_junction(jct, context)
+    return wrote, roles, parented
+
+
+class RKA_OT_merge_points(Operator):
+    """Collapse the selected run of points into ONE, keeping every link that left the run"""
+    bl_idname = "rka.merge_points"
+    bl_label = "Merge Points"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    at_active: BoolProperty(
+        name="At Active",
+        description="Put the survivor on the active point instead of the centroid",
+        default=False)
+
+    def execute(self, context):
+        sel = selected_points(context)
+        if len(sel) < 2:
+            self.report({'ERROR'}, "select 2 or more points of one road")
+            return {'CANCELLED'}
+        coll = collection_of(sel[0])
+        if coll is None or any(collection_of(o) is not coll for o in sel):
+            # ONE ROAD, and this is a rule about the model rather than a limitation. Two points in
+            # DIFFERENT roads that ought to be the same place are not a merge -- a crossing is a
+            # clique of JUNCTION links between points that each stay in their own road, and
+            # collapsing them into one would delete the junction. `Connect Selected` and
+            # `Make Intersection` are that gesture.
+            self.report({'ERROR'}, "all selected points must be in the same road -- two points in "
+                                   "different roads are joined with Connect / Make Intersection")
+            return {'CANCELLED'}
+
+        chain = points_in(coll)
+        idx = sorted(chain.index(o) for o in sel)
+        if idx != list(range(idx[0], idx[0] + len(idx))):
+            # A CONTIGUOUS RUN, or the road would be spliced end to end. Merging p002 with p009
+            # is not "make these one station", it is "delete everything between them" wearing a
+            # friendlier name, and Delete Point already says that out loud.
+            self.report({'ERROR'}, "select points that are next to each other in the chain")
+            return {'CANCELLED'}
+        doomed = [chain[i] for i in idx]
+
+        # THE SURVIVOR IS THE FIRST OF THE RUN, so the merged station keeps a station's identity
+        # (its uid, its cross-section, its facing) rather than being a new point wearing an
+        # average of several. Only its POSITION moves, and the default is the centroid because
+        # "merge these into one" means one in the middle of them; `at_active` is for the case
+        # where one of them is the right place and the others are the mistake.
+        keep = doomed[0]
+        act = context.view_layer.objects.active
+        if self.at_active and is_point(act) and act in doomed:
+            keep = act
+        gone = [o for o in doomed if o is not keep]
+        if self.at_active:
+            pos = keep.matrix_world.translation.copy()
+        else:
+            pos = doomed[0].matrix_world.translation.copy()
+            for o in doomed[1:]:
+                pos = pos + o.matrix_world.translation
+            pos = pos / float(len(doomed))
+
+        # EVERY LINK THAT LEFT THE RUN COMES WITH IT. A merged station stands where several did, so
+        # whatever they joined -- the road either side, a junction clique, a ramp -- must still be
+        # joined to something, and the survivor is the only thing left to join it to. Links INSIDE
+        # the run are what is being collapsed and go.
+        moved = 0
+        for o in gone:
+            for l in list(o.rka_pt.links):
+                other, ltype = l.target, l.type
+                if other is None or other in doomed:
+                    continue
+                unlink_objects(o, other)
+                if not any(k.target is other for k in keep.rka_pt.links):
+                    link_objects(keep, other, ltype)
+                    moved += 1
+        for o in doomed:
+            for q in doomed:
+                if o is not q:
+                    unlink_objects(o, q)
+        # Strip inbound links the same way Delete Point does -- a merely unlinked point survives as
+        # a zero-collection zombie held by its referrers (1.2b).
+        dead = set(gone)
+        for c in pm.road_collections():
+            for o in points_in(c):
+                if o in dead:
+                    continue
+                for i in range(len(o.rka_pt.links) - 1, -1, -1):
+                    if o.rka_pt.links[i].target in dead:
+                        o.rka_pt.links.remove(i)
+        for o in gone:
+            bpy.data.objects.remove(o, do_unlink=True)
+
+        keep.matrix_world.translation = pos
+        # A MERGED STATION THAT INHERITED A JUNCTION LINK IS A MOUTH. Carrying the link over is
+        # only half of it: a pad is a clique, its members are `INTERSECTION`, and they hang off the
+        # `JCT_*` handle -- see `complete_junction_cliques` for what leaving that out cost.
+        # `matrix_world` is read in there, so the depsgraph has to catch up with the line above.
+        context.view_layer.update()
+        wrote, roles, parented = complete_junction_cliques([keep], context)
+        _renumber(coll)
+        sync_facings(context.scene)
+        context.view_layer.objects.active = keep
+        keep.select_set(True)
+        self.report({'INFO'}, "merged %d point(s) into %s (%d link(s) carried over)"
+                    % (len(doomed), keep.name, moved))
+        return {'FINISHED'}
+
+
+class RKA_OT_renumber_roads(Operator):
+    """Rename every road's points so the chain order is the order its own LINKS put them in"""
+    bl_idname = "rka.renumber_roads"
+    bl_label = "Renumber Roads"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        # THE ANSWER TO "is it okay to let points connect randomly after a manual edit". It is not:
+        # `point_model.read_network` sorts a road's points BY NAME and that order IS the chain, so
+        # a hand edit that breaks the naming (a rename, a Shift+D, a point dragged into another
+        # collection) silently reorders the road -- the links still say what is joined to what, and
+        # the build follows them, but the file no longer reads the way it behaves. Every gesture in
+        # this addon renumbers for you; this is the repair for the ones that are not gestures.
+        #
+        # It reads the LINKS and renames to match, never the other way round: links are authored
+        # and a name is derived, so when they disagree the name is the one that is wrong.
+        net = pm.read_network()
+        renamed, tangled_roads = 0, []
+        for name in sorted(net.roads):
+            coll = pm._local(bpy.data.collections, name)
+            if coll is None:
+                continue
+            comps, tangled = pm.link_order(net, net.roads[name])
+            if tangled:
+                tangled_roads.append(name)
+            order = [u for c in comps for u in c] + tangled
+            by_uid = {o.rka_pt.uid: o for o in points_in(coll)}
+            want = [by_uid[u] for u in order if u in by_uid]
+            if want == points_in(coll):
+                continue
+            # Two passes for the same reason `_renumber` uses them: renaming straight into a name
+            # another point still holds gets a `.001` suffix back from Blender, and a suffixed name
+            # sorts outside its own chain -- the one thing the order has to guarantee.
+            for i, o in enumerate(want):
+                o.name = "__tmp_%s_%03d" % (coll.name, i)
+            for i, o in enumerate(want):
+                o.name = point_name(coll, i)
+            renamed += len(want)
+        msg = "renumbered %d point(s)" % renamed
+        if tangled_roads:
+            msg += "; left %s alone (links branch)" % ", ".join(sorted(tangled_roads))
+        self.report({'INFO'}, msg)
+        return {'FINISHED'}
 
 
 class RKA_OT_split_road(Operator):
@@ -813,11 +1049,23 @@ class RKA_OT_tidy_roads(Operator):
                 split += 1
             _renumber(coll)
 
-        if not (moved or split):
+        # -- 3. the leavings ------------------------------------------------------------------------
+        # An empty road collection and a childless `JCT_*` still own their NAMES, and names are
+        # global -- so the next road or crossing with that name is created as `<name>.001` and
+        # every lookup by name finds the dead one instead. Exactly the defect that made a second
+        # `Add Sample Network` fail. It is a whole-scene tidy with no selection, which is what this
+        # operator is for.
+        empty_colls, dead_jcts = clear_debris()
+
+        if not (moved or split or empty_colls or dead_jcts):
             self.report({'INFO'}, "every point is already in the right road")
             return {'CANCELLED'}
-        self.report({'INFO'}, "%d point(s) re-filed, %d corridor(s) split into their own road"
-                    % (moved, split))
+        bits = ["%d point(s) re-filed" % moved, "%d corridor(s) split into their own road" % split]
+        if empty_colls:
+            bits.append("%d empty road collection(s) removed" % empty_colls)
+        if dead_jcts:
+            bits.append("%d junction parent(s) with no arms removed" % dead_jcts)
+        self.report({'INFO'}, ", ".join(bits))
         return {'FINISHED'}
 
 
@@ -885,9 +1133,9 @@ class RKA_OT_align_tangent(Operator):
 def _junction_name():
     used = {c.name for c in bpy.data.objects}
     i = 1
-    while ("JCT_%04d" % i) in used:
+    while ((JCT_PREFIX + "%04d") % i) in used:
         i += 1
-    return "JCT_%04d" % i
+    return (JCT_PREFIX + "%04d") % i
 
 
 def make_junction(context, points, fillet_radius=6.0):
@@ -905,9 +1153,17 @@ def make_junction(context, points, fillet_radius=6.0):
     jct.empty_display_type = 'SPHERE'
     jct.empty_display_size = 3.0
     jct.location = centre
-    # LOCKED. A stray R or S on the parent would rescale or spin every mouth at once, and a
-    # mouth's width is its lane count -- not something a transform may quietly restate.
-    jct.lock_rotation = (True, True, True)
+    # SCALE IS LOCKED, and so is rotation OUT OF PLANE -- but Z is not.
+    #
+    # Both used to be locked, under one justification: "a mouth's width is its lane count -- not
+    # something a transform may quietly restate." That is exactly right about SCALE and does not
+    # transfer to rotation. A mouth's DIRECTION is already a transform: the authored facing
+    # (`point_model.station_axis`), which 8f made the single owner of an arm's direction precisely
+    # so that rotating a mouth turns its cap, its fillets and its turn paths. Turning the whole
+    # crossing is that same gesture one level up, and the model already supports it -- `facing_of`
+    # reads `matrix_world`, so all N arms turn together and every derived thing follows with no new
+    # code. X/Y stay locked because the pad is solved in plan: tilting it has no meaning.
+    jct.lock_rotation = (True, True, False)
     jct.lock_scale = (True, True, True)
     _ensure_collection(pm.JUNCTIONS, ensure_roots()).objects.link(jct)
     # `matrix_world` is STALE until the depsgraph updates, and the next lines read the parent's.
@@ -928,7 +1184,79 @@ def make_junction(context, points, fillet_radius=6.0):
     for i, a in enumerate(points):
         for b in points[i + 1:]:
             link_objects(a, b, pm.LINK_JUNCTION)
+    # A no-op right here -- the Empty was just placed at that centroid. It runs anyway so that ONE
+    # function is the answer to "where does the handle sit", rather than this line being a second
+    # copy of it that the two can drift apart from. Which is exactly what happened.
+    recentre_junction(jct, context)
     return jct
+
+
+def junction_centre(jct):
+    """The live centroid of a `JCT_*`'s mouths, in world space, or None if it has none."""
+    kids = [c for c in jct.children if is_point(c)]
+    if not kids:
+        return None
+    acc = Vector((0.0, 0.0, 0.0))
+    for c in kids:
+        acc += c.matrix_world.translation
+    return acc / len(kids)
+
+
+def junction_drift(jct):
+    """How far the handle currently sits from the centre it should be on, in metres."""
+    centre = junction_centre(jct)
+    return 0.0 if centre is None else (jct.matrix_world.translation - centre).length
+
+
+def recentre_junction(jct, context=None):
+    """Move the `JCT_*` Empty's origin onto the LIVE centre of its mouths, moving no mouth.
+
+    THE HANDLE MUST SIT WHERE THE THING IT HANDLES IS. `make_junction` set this origin to the
+    mouths' centroid once, at creation, and nothing ever re-derived it -- while
+    `point_solve.JunctionSolve.centre` recomputes that centroid every solve and is what the pad,
+    the fillets, the turn paths and the export all use. Two owners of "where is this junction", one
+    of them frozen. Measured on the sample network: dragging a single mouth 42 m to widen its
+    approach left the Empty **10.44 m** from the real centre, so G and R pivoted around a point
+    with nothing there -- the artist's report, exactly. `Auto Setback` makes it worse by design,
+    since it moves every unlocked mouth, so the first thing the recommended workflow does after
+    `Make Intersection` slides the centre out from under the handle.
+
+    No geometry moves: the solve never reads this Empty's position. Only the grip changes.
+
+    Moving a parent moves its children, so each mouth's world transform is captured BEFORE and
+    restored after -- the same dance `make_junction` performs when it parents, and with the same
+    trap: `matrix_world` is stale until the depsgraph updates, so the parent inverse must be taken
+    after `view_layer.update()` and never in the same breath as the move.
+
+    Returns the distance the handle travelled."""
+    kids = [c for c in jct.children if is_point(c)]
+    centre = junction_centre(jct)
+    if centre is None:
+        return 0.0
+    moved = (jct.matrix_world.translation - centre).length
+    if moved <= 1e-6:
+        return 0.0
+    worlds = [c.matrix_world.copy() for c in kids]
+    jct.matrix_world.translation = centre
+    view = getattr(context or bpy.context, "view_layer", None)
+    if view is not None:
+        view.update()
+    for c, w in zip(kids, worlds):
+        c.matrix_parent_inverse = jct.matrix_world.inverted()
+        c.matrix_world = w
+    return moved
+
+
+def recentre_all_junctions(context=None):
+    """Every `JCT_*` in the file. `(count moved, worst drift)`."""
+    n, worst = 0, 0.0
+    for o in list(bpy.data.objects):
+        if o.parent is None and o.name.startswith("JCT_") and o.type == 'EMPTY':
+            d = recentre_junction(o, context)
+            if d > 1e-6:
+                n += 1
+                worst = max(worst, d)
+    return n, worst
 
 
 class RKA_OT_sync_facings(Operator):
@@ -1549,6 +1877,31 @@ class RKA_OT_export_lanekit(Operator):
         return {'FINISHED'}
 
 
+def clear_debris():
+    """Remove empty road collections and childless `JCT_*` parents. `(collections, junctions)`.
+
+    THE COMPANION TO "a road point with no collection is debris". These are the leavings of
+    deleting points: an empty collection still owns its NAME, and names are global, so the next
+    road called `demo_spur` is created as `demo_spur.001` and every lookup by name finds the stale
+    one. A childless junction parent is the same kind of leaving -- it still holds `JCT_0001`, so
+    the next crossing is `JCT_0002` and the outliner accumulates one dead Empty per press.
+
+    Safe to call at any time: it only ever removes something that holds nothing."""
+    colls = 0
+    for c in list(pm.road_collections()):
+        if pm.point_objects(c):
+            continue
+        bpy.data.collections.remove(c)
+        colls += 1
+    jcts = 0
+    for o in list(bpy.data.objects):
+        if (o.type == 'EMPTY' and o.name.startswith("JCT_") and o.parent is None
+                and not [c for c in o.children if is_point(c)]):
+            bpy.data.objects.remove(o, do_unlink=True)
+            jcts += 1
+    return colls, jcts
+
+
 class RKA_OT_demo_network(Operator):
     """Build a worked example THROUGH THE GESTURES: two streets crossing, an elevated highway
     with a weaving section, a ramp that leaves it and merges into the arterial, and a two-lane
@@ -1577,6 +1930,21 @@ class RKA_OT_demo_network(Operator):
                        and not o.users_collection]
             for o in doomed:
                 bpy.data.objects.remove(o, do_unlink=True)
+            # ...AND THE COLLECTIONS AND JUNCTION PARENTS THEY LEFT BEHIND, which is what made a
+            # second press fail (user-reported).
+            #
+            # Removing the points empties every road collection but does not remove one, so
+            # `demo_spur` was still there on the next press -- and object and collection NAMES ARE
+            # GLOBAL, so the freshly branched spur became `demo_spur.001` while `_local_road
+            # ("demo_spur")` kept handing back the stale empty one. The sample then tried to
+            # extend a road with no points in it (`IndexError`), left the network half-built, and
+            # the Build after it failed the gate on three unaligned ramp mouths -- with the FIRST
+            # iteration's geometry still standing in the viewport, so it read as "the roads built
+            # but the markings did not".
+            #
+            # Same rule as the line above, one level up: a road collection with no points is not
+            # authored data, it is debris. So is a `JCT_*` parent with no arms left.
+            clear_debris()
 
         # EVERY ROAD BELOW IS BUILT BY PRESSING THE BUTTONS AN ARTIST PRESSES. It used to write
         # the scene with the internal helpers, which made it a fixture for the DATA MODEL: the
@@ -1782,6 +2150,11 @@ class RKA_OT_auto_setback(Operator):
             self.report({'WARNING'}, "no junction selected -- select a mouth, or nothing, to "
                                      "solve every pad")
             return {'CANCELLED'}
+        # THIS operator is the biggest single source of handle drift -- it moves every unlocked
+        # mouth, which is exactly what moves the centre out from under the `JCT_*` Empty. It has to
+        # put the handle back on the centre it just created, or the recommended workflow
+        # (Make Intersection, then Auto Setback) ships a wrong grip by default.
+        recentre_all_junctions(context)
         # FINISHED even at zero, deliberately. This operator is what the pad findings tell the
         # artist to run, and a remedy that answers "moved 0 mouth(es)" AND reports CANCELLED reads
         # as "it did not work" when it means "they are already where I would put them".
@@ -1790,7 +2163,67 @@ class RKA_OT_auto_setback(Operator):
         return {'FINISHED'}
 
 
-CLASSES = (RKA_OT_new_road, RKA_OT_extend_road, RKA_OT_insert_point, RKA_OT_split_road,
+class RKA_OT_recentre_junctions(Operator):
+    """Put every intersection's handle back on the centre of its own mouths, moving no mouth
+
+    The `JCT_*` Empty is the grip for moving and turning a whole crossing, and its origin is what
+    G and R pivot around. It was written once, at Make Intersection, and never re-derived -- so
+    every mouth dragged since has left it behind. Build and Auto Setback now keep it honest; this
+    is the button for a file authored before they did"""
+    bl_idname = "rka.recentre_junctions"
+    bl_label = "Recentre Handles"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        n, worst = recentre_all_junctions(context)
+        if not n:
+            self.report({'INFO'}, "every junction handle is already on its centre")
+        else:
+            self.report({'INFO'}, "%d junction handle(s) recentred -- worst was %.2f m off"
+                        % (n, worst))
+        return {'FINISHED'}
+
+
+class RKA_OT_link_road_kit(Operator):
+    """Library-link the profile asset kit into this file, so roads can name a section
+
+    LINKED and not appended, deliberately: every district points at the one `road_kit.blend`, so
+    editing a kerb section there restyles every road in the world that names it. Appending would
+    make each district's copy drift"""
+    bl_idname = "rka.link_road_kit"
+    bl_label = "Link Road Kit"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        import os
+        from . import paths, point_style as pstyle
+        if pstyle.kit_collection() is not None:
+            self.report({'INFO'}, "%s is already in this file" % pstyle.KIT_COLLECTION)
+            return {'FINISHED'}
+        path = paths.ROAD_KIT_BLEND
+        if not os.path.exists(path):
+            self.report({'ERROR'}, "%s does not exist -- run blender/tools/build_road_kit.py"
+                        % path)
+            return {'CANCELLED'}
+        with bpy.data.libraries.load(path, link=True) as (src, dst):
+            if pstyle.KIT_COLLECTION not in src.collections:
+                dst.collections = []
+            else:
+                dst.collections = [pstyle.KIT_COLLECTION]
+        coll = pstyle.kit_collection()
+        if coll is None:
+            self.report({'ERROR'}, "%s holds no %s collection" % (path, pstyle.KIT_COLLECTION))
+            return {'CANCELLED'}
+        # Linked but NOT instanced into the scene: these are sections to sweep, not props to
+        # place, and an Empty full of cross-sections standing at the origin is one more thing in
+        # the viewport that looks like a mistake.
+        self.report({'INFO'}, "%d profile section(s) linked from %s"
+                    % (len(pstyle.kit_assets()), os.path.basename(path)))
+        return {'FINISHED'}
+
+
+CLASSES = (RKA_OT_new_road, RKA_OT_extend_road, RKA_OT_insert_point,
+           RKA_OT_merge_points, RKA_OT_renumber_roads, RKA_OT_split_road,
            RKA_OT_repair_links, RKA_OT_tidy_roads, RKA_OT_connect_selected,
            RKA_OT_disconnect_selected, RKA_OT_make_intersection, RKA_OT_align_ramp_to_aux,
            RKA_OT_make_ramp, RKA_OT_branch_ramp, RKA_OT_delete_point, RKA_OT_select_road,
@@ -1798,7 +2231,8 @@ CLASSES = (RKA_OT_new_road, RKA_OT_extend_road, RKA_OT_insert_point, RKA_OT_spli
            RKA_OT_apply_cross_section, RKA_OT_auto_setback, RKA_OT_demo_network,
            RKA_OT_save_record, RKA_OT_load_record, RKA_OT_validate,
            RKA_OT_export_lanekit, RKA_OT_jump_to_point, RKA_OT_align_tangent,
-           RKA_OT_sync_facings)
+           RKA_OT_sync_facings, RKA_OT_recentre_junctions,
+           RKA_OT_link_road_kit)
 
 
 def register():

@@ -113,7 +113,7 @@ def main():
     from road_kit_authoring import point_build as pb
     bpy.context.scene.rka_live_rebuild = True
     net = pm.read_network(bpy.context.scene)
-    pb.build_network(net, bpy.context.scene, sample_ground=False, cut=False)
+    pb.build_network(net, bpy.context.scene, sample_ground=False)
     gen = [o for o in bpy.data.objects if o.name.endswith(pb.SUFFIX_CARRIER)]
     assert gen, "nothing was built"
     for o in gen:

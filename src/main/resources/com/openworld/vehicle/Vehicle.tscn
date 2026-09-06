@@ -12,14 +12,10 @@
 [ext_resource type="Texture2D" uid="uid://ofwdiqxujlur" path="res://addons/kenney_prototype_textures/light/texture_01.png" id="6_jeqgg"]
 [ext_resource type="Script" uid="uid://dqhs0yfdyku6r" path="res://src/main/java/com/openworld/weapon/WeaponController.java" id="7_wc"]
 [ext_resource type="PackedScene" uid="uid://dxb5mxkmawr80" path="res://src/main/resources/com/openworld/ui/Nameplate.tscn" id="8_np"]
-[ext_resource type="Shader" path="res://src/main/resources/com/openworld/vehicle/SpeedLines.gdshader" id="9_sfx"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_x00le"]
 friction = 0.0
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_sfx"]
-shader = ExtResource("9_sfx")
-shader_parameter/intensity = 0.0
 
 [sub_resource type="Gradient" id="Gradient_dmgsmoke"]
 colors = PackedColorArray(0.25, 0.25, 0.25, 0.8, 0.45, 0.45, 0.45, 0)
@@ -218,6 +214,8 @@ material_override = SubResource("StandardMaterial3D_sut32")
 
 [node name="ActiveCamera" type="Camera3D" parent="." unique_id=1379134577]
 fov = 70.0
+near = 0.1
+far = 100000.0
 
 [node name="AimRay" type="RayCast3D" parent="ActiveCamera" unique_id=1379134578]
 target_position = Vector3(0, 0, -200)
@@ -268,19 +266,6 @@ amount = 32
 lifetime = 0.5
 process_material = SubResource("ParticleProcessMaterial_dmgfire")
 draw_pass_1 = SubResource("QuadMesh_dmgfire")
-
-[node name="SpeedFX" type="CanvasLayer" parent="." unique_id=1379134600]
-layer = -1
-visible = false
-
-[node name="SpeedLines" type="ColorRect" parent="SpeedFX" unique_id=1379134601]
-material = SubResource("ShaderMaterial_sfx")
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
 
 [connection signal="body_entered" from="EntranceArea" to="." method="on_entrance_body_entered"]
 [connection signal="body_exited" from="EntranceArea" to="." method="on_entrance_body_exited"]

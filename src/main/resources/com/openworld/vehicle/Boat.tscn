@@ -105,6 +105,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, -1.2)
 
 [node name="ActiveCamera" type="Camera3D" parent="."]
 fov = 70.0
+near = 0.1
+far = 100000.0
 
 [node name="AimRay" type="RayCast3D" parent="ActiveCamera"]
 target_position = Vector3(0, 0, -200)

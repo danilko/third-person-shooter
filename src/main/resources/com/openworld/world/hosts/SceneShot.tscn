@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://bsceneshot0001"]
+
+; One-shot in-engine screenshot host — see SceneShotHost.java. Override any property on the
+; command line by editing this file, or point another host at the same script.
+;   godot --path <repo> res://src/main/resources/com/openworld/world/hosts/SceneShot.tscn
+; NOT --headless: the dummy renderer captures an empty image.
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/debug/SceneShotHost.java" id="1"]
+
+[node name="SceneShot" type="Node3D"]
+script = ExtResource("1")

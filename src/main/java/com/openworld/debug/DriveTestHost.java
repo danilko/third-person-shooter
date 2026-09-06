@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Headless vehicle-physics test stand (the WorldBaker/ConvertDistricts one-shot host idiom):
+ * Headless vehicle-physics test stand (the WorldBaker/ConvertPieces one-shot host idiom):
  * builds a large flat ground slab, spawns Vehicle.tscn driven by a
  * {@link ScriptedDriveController}, logs speed/roll telemetry every 0.5 s, prints a per-phase
  * summary, and quits. Run with:

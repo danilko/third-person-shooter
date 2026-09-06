@@ -24,19 +24,20 @@ special-case inference the previous (mesh-graph) model needed for the same roads
 | `point_solve` | chain → carrier numbers; clique → pad, fillets, turn paths; `Auto Setback` | no | `python3` |
 | `point_edges` | the road **edge**: where kerbs open, from the paved footprints | no | `python3` |
 | `point_validate` | **the gate** — a build that fails it is a failed build | no | `python3` |
-| `point_export` | `.lanekit.json` **v2** — real bezier handles, `junctions[]`, explicit `spawnable` | no | `python3` |
-| `point_nodes` | the Geometry Nodes vocabulary: spine / band / deck / pillars / assets / finish | yes | — |
-| `point_build` | carrier + stack + pads + ground cut + collision; `ROAD_MANAGER_GEN` lifetime | yes | smoketest |
+| `point_style` | what a road is **made of**: a material or a swept profile asset, per layer | optional | `python3` |
+| `point_export` | `.lanekit.json` **v2** — bezier handles FITTED to the lane, `junctions[]`, `spawnable` | no | `python3` |
+| `point_nodes` | the GN vocabulary: spine / band / deck / **profile** / pillars / assets / finish | yes | — |
+| `point_build` | carrier + stack + pads + collision + the corridors the terrain carve reads; `ROAD_MANAGER_GEN` lifetime | yes | smoketest |
 | `point_ops` | the authoring gestures (§4.1) | yes | smoketest |
 | `point_panel` | the point **inspector** + the **Connections** list (deliberately not a stamping brush) | yes | smoketest |
 | `point_overlay` | the GPU overlay — what makes hundreds of points legible, and what follows a drag | yes | smoketest |
-| `point_preview` | the **traffic-flow preview** — the EXPORTED lane graph, its defects, and cars walking it | yes | smoketest |
+| `point_preview` | the **traffic-flow preview** — the exported **Path3D**, its defects, and cars walking it | yes | smoketest |
 | `point_live` | depsgraph dirty set + debounced rebuild; geometry on **settle** only | yes | smoketest |
 
 ## Verify
 
 ```bash
-blender/tools/check_roads.sh          # 17 checks — self-tests, the lanekit gate, the smoketests
+blender/tools/check_roads.sh          # 18 checks — self-tests, the lanekit gate, the smoketests
 blender/tools/check_roads.sh --quick  # pure-Python only, no Blender, ~2 s
 ```
 
@@ -140,6 +141,35 @@ width change at the station that owns the `AUX` link.
 Editing many points at once: select them, make the one you want to copy **from** active, then
 `Author ▸ Cross-section brush ▸ Apply Cross-Section` and tick **only** the group you mean.
 
+### 2a. One station too many, or one too few
+
+Two gestures, both in **Author ▸ Corridor**, and neither changes the road's shape on its own:
+
+**`Insert Point`** adds a station. Select **one** point and it splits the span *after* it; select
+**two** linked points and it splits the span between them. The new station's cross-section is
+inherited from the upstream one, so inserting changes nothing you can see — which is the point: you
+insert because you want somewhere to *put* a change, not to make one. At the tail there is no span
+to split and it says so; growing the road is `Extend Road`.
+
+**`Merge Points`** is the opposite. Select **two or more points that are next to each other in the
+chain** and they collapse into one station. The first of the run survives — it keeps its uid, its
+cross-section and its facing, so the merged station is a station and not an average of several —
+and only its position moves, to the centroid of the run (tick **At Active** in the redo panel to
+keep the active point's position instead). Every link that *left* the run comes with it: the road
+either side, a junction clique, a ramp. Links inside the run are what you are collapsing, so they
+go.
+
+Two refusals worth knowing, because both are the model talking:
+
+* **not next to each other** — merging `p002` with `p009` is "delete everything between them"
+  wearing a friendlier name, and `Delete Point` already says that out loud;
+* **not in the same road** — two points in *different* roads that ought to be the same place are
+  not a merge. A crossing is a clique of `JUNCTION` links between points that each stay in their
+  own road, and collapsing them into one would delete the junction. That gesture is
+  `Connect Selected` or `Make Intersection`.
+
+Both renumber the chain afterwards, so the name order still is the chain order.
+
 ### 3. Connect two points
 
 Two ways, and **the active point is always the source** in both:
@@ -227,6 +257,17 @@ Intersection`. That writes the full clique and parents every mouth to a `JCT_*` 
   the pavement wraps the crossing instead of every street's footway stopping dead at its mouth.
   A through-pair contributes none: the road runs straight on and its own edge run owns that
   stretch already.
+- **Move or turn the whole crossing by its handle.** The `JCT_*` Empty sits on the live centre of
+  its own mouths — it follows them, so dragging one mouth does not leave the grip behind. **G**
+  moves the junction; **R** turns it about **Z**, which turns every arm's facing together, and with
+  it the cap, the fillets, the turn paths and the corner pavement. (Scale stays locked: a mouth's
+  width is its lane count. So does rotation out of plane — the pad is solved in plan.) Turning the
+  pad does **not** count as hand-rotating its arms, so an `AUTO` mouth still follows its own road
+  afterwards.
+  Blender pivots about the scene's **Transform Pivot Point**: the default *Median Point* is the
+  handle's own origin and is what you want. Set to *3D Cursor* it turns about the cursor instead,
+  and the Junction panel says so. `Junction ▸ Recentre Handles` repairs a file authored before the
+  handle followed anything — Build and Auto Setback keep it honest from now on.
 - Rough placement is fine: `Junction ▸ Auto Setback` solves the whole clique and moves every
   unlocked mouth. Tick **Setback Locked** on a mouth you have placed by hand.
 - A through street contributes **two** mouths, and they are joined by the pad, not by carriageway
@@ -404,6 +445,29 @@ and the gap is nobody’s — see the nose cap in §5, “A ramp”.
 directed, with chevrons and its successor links. Turn on **Cars** and agents walk that graph,
 choosing successors by the exported weights.
 
+And it draws the **Path3D**, not the lane — which are not the same object either. `WorldBaker`
+builds every `Curve3D` an ambient car drives from the `curve` block, a fitted bezier through the
+stations; the lane polyline is where the asphalt is. The `Geometry` dropdown picks which you see:
+
+| Geometry | Draws |
+|---|---|
+| **Path3D (export)** *(default)* | the bezier Godot will drive. The cars walk this one |
+| Lane polyline | the sampled lane centreline — where the asphalt is |
+| Both | the lane in its own colour, the Path3D in white over it, **orange rungs** where they part |
+
+A lane whose path wanders more than 0.5 m from it is drawn **orange** and named in `Flow Report`
+as `path_off_road`, in metres. The gate says the same thing from the same function
+(`path_deviation`, a warning at 0.5 m and an error at 2 m), so the picture and the finding cannot
+disagree.
+
+This is not hypothetical. The export used to refit each lane's handles from the chord through its
+neighbours, throwing away the authored tangents the road is actually built from — and at an open
+end that chord sat **70°** off the true heading. On this addon's own sample network the shipped
+Path3D ran **22.57 m** from the ramp it was supposed to be, with a green gate, perfect geometry
+and nothing able to see it. The handles are now fitted to the lane itself (direction from its own
+tangent, length by least squares, subdividing only where a cubic genuinely cannot follow), which
+brings the same network to **0.09 m**.
+
 That is a different object from everything else in the sidebar, and the difference is the point. A
 road can be built, gate-green, and still export a lane nothing can reach — which is exactly what
 the sample's exit ramp did until this landed. In game it reads only as "that ramp is always
@@ -439,6 +503,113 @@ rows of a pair disagree about type, the more explicit gesture wins: `AUX` over `
 `SEGMENT`.
 
 **`Tidy Roads`** — files every point into the road its connections say it belongs to. See §1.
+
+**`Renumber Roads`** — renames every road's points so the chain order is the order its own *links*
+put them in. This is the answer to "is it alright to just move things about by hand?": **the chain
+order IS the object-name order** (the reader sorts a road's points by name), so a rename, a
+`Shift+D`, or a point dragged into another collection silently reorders the road — the links still
+say what is joined to what and the build follows them, but the file no longer reads the way it
+behaves. Every gesture in this addon renumbers for you; this is the repair for the edits that are
+not gestures. It reads the links and renames to match, never the other way round: links are
+authored and a name is derived, so when they disagree the name is the one that is wrong. It is
+idempotent — running it on a tidy scene renames nothing — and it leaves a stretch whose links
+*branch* alone, because three points meeting at one station is a junction and has no chain order to
+restore. The gate names both cases: **`chain_out_of_order`** and **`chain_branched`**.
+
+### 6d. What the road is MADE OF — materials, markings and profile assets
+
+Everything above is the road's *shape*. The **Road ▸ Style** box is what it is made of, and it is
+authored **per road**: a stretch of the same road paved differently is a different road, so there
+is no per-station material to keep in sync.
+
+Each row is one layer, with a **material** and — where it makes sense — an **asset**:
+
+| Layer | Material slot | Asset? |
+|---|---|---|
+| surface | the carriageway, the pads and the gores | — |
+| median | the divide (see below) | yes |
+| deck | the structure and its piers | — |
+| kerb | every open edge | **yes** — the common one |
+| footway | the pavement | yes |
+| barrier | the parapet / fence | yes |
+| mark w / mark y | the paint | — |
+
+Blank means the layer's default. A name that resolves to nothing **falls back and says so** —
+in the build report and as a gate warning (`style_missing`) — because a silently wrong material
+looks exactly like a shading mistake.
+
+**Where a default comes from: `assets/world_source/kit/road_kit.blend`.** The same kit file that
+holds the profile sections is also the repo's **material library** — every `M_*` datablock, with a
+fake user. `kit_common.mat()` *links* from it rather than building its own copy in the district, so
+there is exactly one `M_Asphalt` in the world: the deck's, the kerb section's, and a car park's are
+the same datablock, and re-shading it in the kit restyles everything at once. Precedence is one
+line — a material of that name already in your file wins (so a local hand-edit survives a rebuild),
+otherwise the kit's, otherwise it is built from `kit_common`'s own table as a bootstrap for a
+checkout where `blender/tools/build_road_kit.py` has not been run yet. Nothing to press: the link
+happens on the first material a build asks for.
+
+**The median is a style, not a width.** `median_width` still says how wide the divide is, per
+station, and can taper to nothing; `median_style` says what it *is*:
+
+| `median_style` | Builds |
+|---|---|
+| `NONE` | nothing, whatever the width says |
+| `PAINT_DOUBLE_Y` | a flush double-yellow, `M_LineY`, no island |
+| `RAISED` *(default)* | the island, its top at kerb height |
+| `WALL` | the island, with the barrier standing on it |
+
+**The white strips are automatic.** Every painted boundary — the dashes between lanes, the solid
+edge of a gore, the double yellow where two carriageways meet with no median — comes from the
+cross-section itself (`Slot.mark_left`), so a line appears when a lane opens, moves outward as a
+median widens, and stops when a ramp departs, with nothing to author. Dashes are real geometry
+(3 m on, 6 m off) laid on **one clock per run**: every boundary breaks at the same cross-sections,
+so a lane that opens in the middle of a run joins the grid the lines either side of it are already
+on instead of starting its own (measured before that: an aux lane opening 4.00 m in was 4.00 m off
+a 9.00 m period — half a period, which reads as that lane's paint being wrong). It also keeps them
+square through a bend, where the outer line's own length runs ahead of the inner one's. The paint
+is lifted 1 cm clear of the asphalt, and it is deliberately **not collidable** — a proxy per stripe would put a paper-thin body under every dashed line in the world.
+Turn it off per road with **Markings**.
+
+#### A profile asset: authoring the section itself
+
+Naming an asset **replaces** that layer's parametric band with a cross-section you modelled, swept
+continuously along the road — so a kerb can have a real chamfer, a barrier can be a New Jersey
+section, and changing either is editing one curve rather than a builder.
+
+`Road ▸ Style ▸ Link Road Kit` library-links `assets/world_source/kit/road_kit.blend`, which
+ships six sections (`RKA_PROFILE_kerb_std`, `_kerb_granite`, `_gutter_dish`, `_wall_parapet`,
+`_wall_jersey`, `_footway_slab`). Linked, so editing that one file restyles every road in the
+world that names it. `blender/tools/build_road_kit.py` rebuilds it.
+
+**To author your own:** draw the section in the XY plane, **+X outward from the road, +Y up**,
+with the origin on the line the road hands it — the kerb line for a kerb, the foot for a barrier,
+the top of the kerb for a footway. Give it a material. Name it `RKA_PROFILE_<layer>_<variant>`.
+Three things happen for you and are worth knowing:
+
+- **You draw it the right way up.** `Curve to Mesh` sweeps a section drawn outward-and-up as
+  inward-and-down (measured: profile +X → world −Y, +Y → −Z); the group corrects it, so what you
+  draw is what you get. It also mirrors the section on the road's right-hand flank, so an
+  asymmetric kerb faces outward on **both** sides.
+- **Its own size wins — for the sweep.** The section is swept at the dimensions you authored,
+  never scaled to a design number. **But the solve does not know that yet:** it still places
+  whatever sits outboard of the section from the *authored* width, so a 2.00 m footway section on
+  a road reserving 3.00 m leaves a real 1.00 m gap before the barrier. Author the width to match
+  the section you picked — the gate warns with both numbers (`asset_width_mismatch`). Until that
+  is wired, a district authored with **materials only** avoids the question entirely.
+- **It is gated like the layer it replaces.** Naming a barrier asset on an at-grade street with
+  pedestrian access still builds no barrier, because `ped_access` and the road's height are what
+  decide *where* a wall stands — the asset only decides what it looks like.
+
+**Shape only, though:** `Curve to Mesh` drops a profile's materials (measured — zero slots on the
+sweep, even from a two-material section), so the addon reads the material off the asset and feeds
+it to the layer. One asset is one material is one layer; a section that genuinely needs two
+materials is not expressible, and would want one sweep per spline group.
+
+**Sections, not tiles.** These are swept, never instanced along the edge. Tiling rigid pieces
+round a 9 m corner puts each ~12.7° from its neighbour and opens a real ~7.8 cm gap at every joint
+— inherent to the geometry, not a phase bug, and the reason the previous model's asset style was
+retired. Tiling is right for things that *are* discrete (lamp posts, signs, bollards); that is
+`GN_PointAssets`' job, not this one.
 
 ### 7. Build, check, export
 

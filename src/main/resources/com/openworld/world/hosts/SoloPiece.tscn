@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://bsolopiece00001"]
+[gd_scene load_steps=7 format=3 uid="uid://bsolopiece00001"]
 
 ; Fast INNER-LOOP test host for a single district piece (BLENDER_CONVENTIONS "district piece").
 ; Instances ONE piece at origin + a Player + environment — no 4 km streaming — so you can walk the
@@ -7,9 +7,14 @@
 ; Run: open in editor + F6, or:  <godot-jvm> --path <root> res://…/world/SoloPiece.tscn
 ; (The whole streamed world is the separate WorldMaster host, run less often.)
 
+; NO PIECE WIRED. `tools/build_piece.sh <name>` rewrites the `piece` ext_resource below and
+; points this host at whatever it just baked -- so this scene is only ever wired while a
+; piece exists to wire it to. The 6x6 district pieces were archived on 2026-08-28 (see
+; `archive/README.md`); build a piece for the new island world and this host picks it up.
+
+[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/pieces/Island_base.tscn" id="piece"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/character/Player.tscn" id="player"]
 [ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/WorldSystems.tscn" id="wsys"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/world/districts/Piece_5_5.tscn" id="piece"]
 [ext_resource type="Script" uid="uid://dj0ch24xgin8d" path="res://src/main/java/com/openworld/debug/DebugHarness.java" id="dbgh"]
 
 [sub_resource type="ProceduralSkyMaterial" id="skymat"]

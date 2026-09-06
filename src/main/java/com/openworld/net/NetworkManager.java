@@ -2081,7 +2081,7 @@ public class NetworkManager extends Node {
     /**
      * Server → all: announce a runtime-streamed ambient-traffic vehicle (I3b) so every client
      * reconstructs it. The vehicle counterpart of {@link #announceSpawn} — used by
-     * {@code WorldZoneManager} when a zone streams traffic in. Despawn rides the generic
+     * {@code ZoneManager} when a zone streams traffic in. Despawn rides the generic
      * {@link #announceDespawn} (vehicles share the "characters" id space).
      */
     public void announceVehicleSpawn(com.openworld.carrier.vehicle.Vehicle vehicle) {

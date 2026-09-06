@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://b6convertdistricts"]
+
+; Resave every baked district .tscn (multi-MB text scenes — the stream-in parse cost) as a
+; sibling binary .scn, which ZoneManager auto-prefers at stream time. One-shot batch job,
+; same idiom as BakeWorldMaster.tscn:
+;   • CLI (WINDOWED or xvfb-run — NOT --headless, MultiMesh buffers drop on the dummy renderer):
+;       <godot-jvm-binary> --path <root> res://src/main/resources/com/openworld/world/hosts/ConvertPieces.tscn
+;   • Editor: open this scene, F6 ("Run Current Scene").
+; Unchanged districts are skipped by mtime; re-run after any district re-bake. The .scn files
+; are derived artifacts — delete-and-regenerate safe, .tscn stays the source of truth.
+
+[ext_resource type="Script" path="res://src/main/java/com/openworld/world/PieceBinaryConverter.java" id="1_conv"]
+
+[node name="ConvertPieces" type="Node"]
+script = ExtResource("1_conv")
+convert_on_ready = true
+quit_when_done = true

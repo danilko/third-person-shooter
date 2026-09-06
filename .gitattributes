@@ -13,12 +13,12 @@
 # keep normal git diffing; these are machine-generated per bake and never hand-edited anyway.
 # (*.blend1 is gitignored entirely — never committed, no LFS rule needed for it.)
 assets/world_source/plateau/data/*.json filter=lfs diff=lfs merge=lfs -text
-src/main/resources/com/openworld/world/districts/*.gltf filter=lfs diff=lfs merge=lfs -text
-src/main/resources/com/openworld/world/districts/*.bin filter=lfs diff=lfs merge=lfs -text
-src/main/resources/com/openworld/world/districts/*.tscn filter=lfs diff=lfs merge=lfs -text
+src/main/resources/com/openworld/world/pieces/*.gltf filter=lfs diff=lfs merge=lfs -text
+src/main/resources/com/openworld/world/pieces/*.bin filter=lfs diff=lfs merge=lfs -text
+src/main/resources/com/openworld/world/pieces/*.tscn filter=lfs diff=lfs merge=lfs -text
 # .scn = binary resave of the district .tscn (DistrictBinaryConverter — faster stream-in parse).
 # Derived + regenerable, but LFS-committed so a fresh checkout streams fast without a converter run.
-src/main/resources/com/openworld/world/districts/*.scn filter=lfs diff=lfs merge=lfs -text
+src/main/resources/com/openworld/world/pieces/*.scn filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/master/*.gltf filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/master/*.bin filter=lfs diff=lfs merge=lfs -text
 src/main/resources/com/openworld/world/master/*.tscn filter=lfs diff=lfs merge=lfs -text

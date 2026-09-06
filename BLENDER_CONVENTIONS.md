@@ -60,8 +60,8 @@ already consumes, so finer granularity costs nothing architecturally — it *is*
 | Tier | Code type | What it is | Authored as | Placed into the tier above by |
 |:-----|:----------|:-----------|:------------|:------------------------------|
 | **Asset** (building / prop / road tile) | (none — a plain scene) | The finest reusable piece. | Its own `.blend` → its own `.tscn`, **at origin** (e.g. `world/buildings/Door.tscn`, `world/roads/Road2LaneStraight.tscn`). | **Instancing** — the zone chunk holds an `instance=` reference + a transform, not duplicated mesh. |
-| **Zone** | `WorldZone` + `WorldZoneMarker` | The **streaming unit**: a spawn box (`size`) + AI/traffic population + an optional `geometry` PackedScene (the chunk = ground + instanced buildings + roads for that cell). Marker world position = zone **center**. | A `.tres` (the data) on a `WorldZoneMarker` (the placed node); the chunk it streams is a `.tscn` assigned to `WorldZone.geometry`. | Placed in the world / world-layout (drag the marker; the chunk streams in around it). |
-| **Region** | `RegionConfig` | **A tuning profile, NOT a spatial container.** Faction rules + AI/vehicle density + AI-LOD bias + lighting/fog/music. The *active* zone's region drives global ambience; per-zone densities scale that zone's own spawns. | A `.tres`, assigned to one **or shared by many** zones (`WorldZone.regionConfig`). | Referenced by zones — a "downtown" region `.tres` shared by every downtown zone. |
+| **Zone** | `Zone` + `ZoneMarker` | The **streaming unit**: a spawn box (`size`) + AI/traffic population + an optional `geometry` PackedScene (the chunk = ground + instanced buildings + roads for that cell). Marker world position = zone **center**. | A `.tres` (the data) on a `ZoneMarker` (the placed node); the chunk it streams is a `.tscn` assigned to `Zone.geometry`. | Placed in the world / world-layout (drag the marker; the chunk streams in around it). |
+| **Region** | `RegionConfig` | **A tuning profile, NOT a spatial container.** Faction rules + AI/vehicle density + AI-LOD bias + lighting/fog/music. The *active* zone's region drives global ambience; per-zone densities scale that zone's own spawns. | A `.tres`, assigned to one **or shared by many** zones (`Zone.regionConfig`). | Referenced by zones — a "downtown" region `.tres` shared by every downtown zone. |
 
 > **Key mental model:** Region (tuning, 1→many) ⊃ Zone (streaming chunk, *contains* assets) ⊃
 > Buildings/props/roads (instanced at-origin assets). A "region" is **not** a bigger box you model
@@ -79,9 +79,9 @@ Wall.tscn / Door.tscn             ← LEAF: real geometry + collision (the only 
    ↑ instanced by
 Building.tscn                     ← references only
    ↑ instanced by
-Zone.tscn (= WorldZone.geometry)  ← references only; the streaming unit
+Zone.tscn (= Zone.geometry)  ← references only; the streaming unit
    ↑ placed / streamed by
-City / World                      ← WorldZoneMarkers + AutoLoads (placement, NOT resident geometry)
+City / World                      ← ZoneMarkers + AutoLoads (placement, NOT resident geometry)
    ⟂ Region (RegionConfig)        ← cross-cutting tuning tag on zones, not a geometry tier
 ```
 
@@ -90,8 +90,8 @@ City / World                      ← WorldZoneMarkers + AutoLoads (placement, N
   building → zone → everywhere.
 - **zone → city/world = the streaming + placement layer, NOT a resident mega-scene.** A flat
   `City.tscn` that instances every zone would load the whole map and defeat E1 streaming. The top tier
-  is the set of `WorldZoneMarker`s (cheap); each marker's heavy geometry rides in its streamed
-  `WorldZone.geometry` and is instanced on demand by `WorldZoneManager`.
+  is the set of `ZoneMarker`s (cheap); each marker's heavy geometry rides in its streamed
+  `Zone.geometry` and is instanced on demand by `ZoneManager`.
 - **Region is not a geometry tier** — it's a `RegionConfig` profile several zones share; it cross-cuts
   the chain. Don't model it as a mesh.
 - **The only geometry NOT instanced:** the leaf kit pieces (one shared copy) and the per-zone
@@ -231,7 +231,7 @@ What is exchanged is **layout data (instance transforms)**, not geometry. For th
 1. **Export the building as its own at-origin asset** → `world/buildings/<Name>.tscn` (footprint center
    at ground contact, +Z forward). Add `-col` collision proxies; keep it self-contained.
 2. **Instance it into the zone chunk(s)** that need it — the chunk `.tscn` (which becomes a
-   `WorldZone.geometry`) references the building + a transform. Placing it five times across a district
+   `Zone.geometry`) references the building + a transform. Placing it five times across a district
    = five instances of the one asset.
 3. **The chunk is one zone cell** — sized to the grid, honouring the seam contract, carrying its own
    ground mesh + navmesh + instanced buildings/roads.
@@ -252,11 +252,11 @@ an integer multiple of the tier below, so pieces tile and abut** (same rule as r
 | Wall / floor module | wall segment | **4 m** wide × **3 m** floor height × 0.2 m thick; floor/roof tile 4×4 m | building dims = multiples of 4 m |
 | Building footprint | building | multiples of 4 m (e.g. 8×8, 12×8) | fits inside a road-bounded lot |
 | Road tile | road | **7 m** (lane 3.5 m) — existing kit | — |
-| Zone cell | chunk | **56 m** (= 8 road tiles = 14 wall modules); `WorldZone.size = (56,10,56)` | multiple of **both** 7 m and 4 m |
+| Zone cell | chunk | **56 m** (= 8 road tiles = 14 wall modules); `Zone.size = (56,10,56)` | multiple of **both** 7 m and 4 m |
 | City | zone grid | N×N zone cells, 56 m spacing | — |
 
 56 m is the smallest clean cell that tiles **both** the 7 m road grid (×8) and the 4 m wall grid (×14)
-— use it for the test (the `WorldZone.size` default of 60 is fine if you don't need road tiling, but 56
+— use it for the test (the `Zone.size` default of 60 is fine if you don't need road tiling, but 56
 keeps everything on-grid). Pivots are already set per asset class (grid tiles: footprint center at
 ground; free-standing: center at ground contact; **+Z = forward**; 1 unit = 1 m).
 
@@ -281,7 +281,7 @@ builds the `CollisionShape3D` automatically (no hand-editing the leaf scene); th
 | Leaf kit visual | normal name, **own Collection** (`Wall_4m`, `Door_Single`) | exported `kit/.../Wall_4m.tscn` |
 | Leaf collision proxy | `<Name>-colonly` / `-col` | `CollisionShape3D` inside that leaf |
 | Placement of a kit piece / building / zone | empty `instance_<assetId>` (or custom prop `asset_path = res://…`) | scene **instance** (baker swap) |
-| Zone / region anchor | `zone_<id>` / `region_<id>` (+ size/radii/region meta) | `WorldZoneMarker` + `WorldZone` (+ `RegionConfig`) |
+| Zone / region anchor | `zone_<id>` / `region_<id>` (+ size/radii/region meta) | `ZoneMarker` + `Zone` (+ `RegionConfig`) |
 | Spawn / lane / water / junction | `spawn_<faction>_<n>` / `lane_<route>_<n>` / `water_<id>` / `intersection_<id>` (I6a table) | gameplay nodes |
 | LOD | rely on Godot 4 auto-mesh-LOD on import; only hero assets need hand `_LOD0/_LOD1` | — |
 
@@ -301,7 +301,7 @@ pieces, not placeholder boxes:
    `lib/recycled_buildings.py`) — the working building-tier template, see this file's "Nested
    instancing" section above and `AUTHORING_GUIDE.md` §10.
 3. **Zone** — real district pieces (`District_city_1_1`/Shibuya, `District_city_2_1`, `District_resid_1_2`)
-   with working `-colonly` ground, real `WorldZone` streaming.
+   with working `-colonly` ground, real `Zone` streaming.
 4. **Region** — `RegionConfig` per theme (`city`/`resid`/`rural`/`mtn`/`snow`/`harbor`), assigned via
    `world_grid.THEMES`.
 5. **City/World abutting chunks** — Shibuya/`city_2_1`/`resid_1_2` are real ADJACENT districts (not
@@ -329,7 +329,7 @@ scenes afterward. Proposed scheme — confirm before the first real zone is buil
 
 | Authored as (Blender) | Converts to (Godot) | Used by |
 |:-----------------------|:--------------------|:--------|
-| Empty named `spawn_<faction>_<n>` | `Marker3D` + `SpawnConfig` entry | E1 `WorldZone` |
+| Empty named `spawn_<faction>_<n>` | `Marker3D` + `SpawnConfig` entry | E1 `Zone` |
 | Empty named `portal_<zoneA>_<zoneB>` | `PortalTrigger` (`Area3D`) | I2 `InteriorZone` |
 | Empty named `water_<id>` (bounding box) | `Area3D` in group `"water"` | I1 `SwimState` |
 | Empty named `lane_<route>_<n>` | `Marker3D` child of a `VehicleRoute` | I3 traffic lane (pure pursuit, **not** navmesh) |
@@ -343,13 +343,13 @@ this document exists to avoid — lock the prefix scheme down first.
 
 ## Zone chunking
 
-- `WorldZoneManager` (PLAN.md E1) streams geometry per `WorldZone` based on
+- `ZoneManager` (PLAN.md E1) streams geometry per `Zone` based on
   `loadRadius` / `unloadRadius` (hysteresis). Author and export geometry in chunks
   matching the chosen zone-grid size — **not** as one monolithic scene — or E1 has
-  nothing to stream in/out. The chunk is assigned to the `WorldZone.geometry`
+  nothing to stream in/out. The chunk is assigned to the `Zone.geometry`
   PackedScene field (it instances on **every peer**, host and client — geometry is
   cosmetic/local, only AI bodies are host-authoritative). A mesh placed as a child
-  of the `WorldZoneMarker` is static scene furniture and does **not** stream.
+  of the `ZoneMarker` is static scene furniture and does **not** stream.
 - Decide the zone-grid size *before* any real geometry is modeled; it constrains
   border layout, road continuity (I3), and region-transition placement (I4).
 
@@ -357,22 +357,22 @@ this document exists to avoid — lock the prefix scheme down first.
 
 1. **Pick a zone-grid cell size** (e.g. 60–120 m square) and model/export each
    geometry chunk to those exact extents so chunks **abut** (see below). This is
-   the value `WorldZone.size` (X/Z) should match — the spawn box is meant to cover
+   the value `Zone.size` (X/Z) should match — the spawn box is meant to cover
    the authored chunk footprint; Y is the vertical spawn band (~10 m is plenty for
    ground AI).
-2. **Place a `WorldZoneMarker`** (a plain `Node3D` + `WorldZoneMarker` script — the current
+2. **Place a `ZoneMarker`** (a plain `Node3D` + `ZoneMarker` script — the current
    codebase places these via `assets/world_source/towns/build_world.py`'s `region_<theme>_<gx>_<gy>`
    markers, baked by `WorldBaker`, rather than hand-duplicating a scene) at the chunk **center** —
-   the marker's world position *is* the zone center — and assign a `WorldZone` `.tres`/resource
+   the marker's world position *is* the zone center — and assign a `Zone` `.tres`/resource
    with `size` = the chunk extents.
 3. **Set the trigger radii** (both measured from the center, independent of `size`):
    `loadRadius ≈ size/2 + pre-spawn lead (~150 m)` so AI stream in *before* the player
    reaches the box, and `unloadRadius ≈ loadRadius + hysteresis margin (~150 m)`. The
    invariant `unloadRadius > loadRadius > max(size.x,size.z)/2` must hold or the zone
-   flickers / unloads while the player is still on it (`WorldZoneManager.warnIfMisSized`
+   flickers / unloads while the player is still on it (`ZoneManager.warnIfMisSized`
    logs a debug warning otherwise). Neighbour zones' `loadRadius` should reach past the
    `unloadRadius` you're leaving so there's no dead frame with nothing loaded.
-4. **Assign the chunk mesh to `WorldZone.geometry`** (the PackedScene field) so it streams
+4. **Assign the chunk mesh to `Zone.geometry`** (the PackedScene field) so it streams
    with the zone. A mesh dropped as a *child of the marker* is static furniture and never
    streams. Populate `spawnConfigs` (ambient AI) and `namedCharacters` (story AI).
 
@@ -472,7 +472,7 @@ imported scene into a native `.tscn`.** No hand-placement of roads/lanes/zones i
   (`EditorScenePostImport`/`EditorPlugin` are absent from every dependency jar), so a Java post-import
   script is impossible, and a GDScript one breaks the no-GDScript rule + can't reuse the Java converters.
   Instead `world/WorldBaker.java` loads the imported `.blend`/`.glb` scene, walks it, converts **named**
-  objects → gameplay nodes (reusing `VehicleRoute`, `WorldZone`, etc.), sets `owner` on every node, and
+  objects → gameplay nodes (reusing `VehicleRoute`, `Zone`, etc.), sets `owner` on every node, and
   `PackedScene.pack` + `ResourceSaver.save`s a native `.tscn`. Re-bake when the `.blend` changes (manual,
   not auto-on-reimport — the one trade-off vs. a post-import hook, accepted to stay all-Java).
 - **Three ways to trigger the bake** (all bake `source_scene_path` → `output_scene_path`):
@@ -513,7 +513,7 @@ imported scene into a native `.tscn`.** No hand-placement of roads/lanes/zones i
 |:---------------|:------------|:----------------|
 | Lane centerline empties | `lane_<route>_<n>` (ordered) | one `VehicleRoute` per `<route>` + ordered `Marker3D` children |
 | Ambient spawn | `spawn_<faction>_<n>` (+ `count` meta) | `SpawnConfig` on the nearest `zone_` |
-| Zone / region anchor | `zone_<id>` / `region_<id>` (+ size/radii meta) | `WorldZoneMarker` + `WorldZone` (+ `RegionConfig`) |
+| Zone / region anchor | `zone_<id>` / `region_<id>` (+ size/radii meta) | `ZoneMarker` + `Zone` (+ `RegionConfig`) |
 | Water volume | `water_<id>` | `Area3D` (+ `CollisionShape3D`) in group `"water"` (I1) |
 | Junction | `intersection_<id>` | `IntersectionZone` (`Area3D`, I3b) |
 | Collision proxy | mesh suffix `-col` | `CollisionShape3D` (Godot importer, on import) |
@@ -558,7 +558,7 @@ A ready-made demo source lives beside the baker — start from it, or from the r
   (`intersection_<id>` → `Road4Way`'s `IntersectionZone`, `spawn_*`, `water_*`, `zone_*`, …).
 - **Stays Godot-side (don't move to Blender):** pedestrian `NavigationRegion3D` bake (scriptable on
   import, but Godot's bake; lanes need none), all networking/gameplay logic (Java), final `.tscn`
-  assembly + AutoLoads, `WorldZone` streaming wiring (chunks exported per grid cell per "Zone chunking").
+  assembly + AutoLoads, `Zone` streaming wiring (chunks exported per grid cell per "Zone chunking").
 - **Caveats:** glTF triangulates curves (use the empties/JSON bridge); GN can emit geometry for export
   but not real empties (use a Python script for marker/curve data); the whole pipeline hinges on the
   **stable naming scheme** — lock names before volume grows (the retrofit cost this doc exists to avoid).

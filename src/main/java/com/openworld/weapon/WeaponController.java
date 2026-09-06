@@ -255,7 +255,7 @@ public class WeaponController extends Node {
    * {@code _exitTree} alone is unreliable when the whole body subtree is freed at once, because the
    * sibling {@code WeaponAudio} node can exit the tree before this {@code _exitTree} runs, leaking the
    * playback (see CLAUDE.md audio-leak quirk). E1 zone-unload now frees armed AI mid-session, so the
-   * remover (WorldZoneManager) calls this first.
+   * remover (ZoneManager) calls this first.
    */
   public void silenceAudio() {
     if (weaponAudio != null && GD.isInstanceValid(weaponAudio)) weaponAudio.stop();

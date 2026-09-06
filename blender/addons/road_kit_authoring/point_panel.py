@@ -21,7 +21,7 @@ overlay glyphs it too.
 import bpy
 
 try:
-    from . import (point_build as pb, point_model as pm, point_ops as po,
+    from . import (point_build as pb, point_model as pm, point_ops as po, point_style as pstyle,
                    point_preview as pv3, point_profile as pp, point_solve as ps,
                    point_validate as pv)
 except ImportError:
@@ -31,6 +31,7 @@ except ImportError:
     import point_preview as pv3                                              # noqa: E402
     import point_profile as pp                                               # noqa: E402
     import point_solve as ps                                                 # noqa: E402
+    import point_style as pstyle                                             # noqa: E402
     import point_validate as pv                                              # noqa: E402
 
 
@@ -204,8 +205,11 @@ class RKA_PT_author(bpy.types.Panel):
         r.enabled = act is not None
         r.operator("rka.extend_road", icon='TRACKING_FORWARDS_SINGLE')
         r = box.row()
-        r.enabled = (n == 2)
+        r.enabled = (n in (1, 2))
         r.operator("rka.insert_point", icon='ADD')
+        r = box.row()
+        r.enabled = (n >= 2)
+        r.operator("rka.merge_points", icon='AUTOMERGE_ON')
         r = box.row()
         r.enabled = bool(sel)
         r.operator("rka.split_road", icon='UNLINKED')
@@ -220,6 +224,7 @@ class RKA_PT_author(bpy.types.Panel):
         # artist cannot see in the outliner, so needing to select it first would be circular.
         box.operator("rka.repair_links", icon='LIBRARY_DATA_BROKEN')
         box.operator("rka.tidy_roads", icon='OUTLINER_COLLECTION')
+        box.operator("rka.renumber_roads", icon='SORTSIZE')
         box.label(text="whole scene -- no selection needed", icon='INFO')
 
         box = col.box()
@@ -295,8 +300,12 @@ class RKA_PT_author(bpy.types.Panel):
 def _hint(n, act):
     if act is None:
         return "no active point -- New Road starts one"
+    if n == 1:
+        return "1 selected: Insert Point splits the span AFTER it"
     if n == 2:
-        return "2 selected: Insert Point splits their link"
+        return "2 selected: Insert Point splits their link, Merge makes them one"
+    if n > 2:
+        return "%d selected: Merge collapses a run into one station" % n
     return "active: %s" % act.name
 
 
@@ -484,6 +493,22 @@ class RKA_PT_junction(bpy.types.Panel):
         box.prop(p, "setback_locked", toggle=True, icon='LOCKED' if p.setback_locked
                  else 'UNLOCKED')
         box.operator("rka.auto_setback", icon='MOD_SIMPLIFY')
+        box = col.box()
+        box.label(text="Handle", icon='ORIENTATION_GIMBAL')
+        box.operator("rka.recentre_junctions", icon='PIVOT_BOUNDBOX')
+        if jct is not None:
+            off = po.junction_drift(jct)
+            if off > 0.5:
+                box.label(text="handle is %.1f m off centre" % off, icon='ERROR')
+        box.label(text="Grab the JCT_* Empty to move or turn the whole crossing (Z only)",
+                  icon='INFO')
+        # THE ONE THING NO CODE HERE CAN FIX. Blender rotates about the scene's Transform Pivot
+        # Point; with the default Median Point and the handle selected alone, that IS its origin,
+        # which is what `Recentre Handles` makes correct. Set to 3D Cursor it will pivot on the
+        # cursor no matter where the handle sits, and the artist has to know that is theirs.
+        if getattr(context.scene.tool_settings, "transform_pivot_point", '') == 'CURSOR':
+            box.label(text="pivot is 3D Cursor -- it will turn about the cursor, not the centre",
+                      icon='ERROR')
         col.operator("rka.select_junction", icon='RESTRICT_SELECT_OFF')
 
 
@@ -525,6 +550,33 @@ class RKA_PT_road(bpy.types.Panel):
         box.prop(r, "taper_factor", text="Taper Factor")
         box.label(text="1.0 = the real merge-taper standard; lower it for a compressed map",
                   icon='INFO')
+
+        # ---- WHAT THE ROAD IS MADE OF ------------------------------------------------------------
+        # Per road, not per point: a stretch of the same road paved differently is a different
+        # road. Each row is a NAME, so `<stem>.roads.json` round-trips it; blank takes the layer's
+        # default. An asset REPLACES its layer's parametric band with the artist's own swept
+        # section -- and carries its own material with it.
+        col.label(text="Style -- material, or an asset that brings its own shape")
+        box = col.box()
+        box.prop(r, "median_style", text="Median")
+        box.prop(r, "markings", toggle=True,
+                 icon='CHECKBOX_HLT' if r.markings else 'CHECKBOX_DEHLT')
+        kit = pstyle.kit_collection()
+        for slot, mat_field, asset_field, default_key in pstyle.SLOTS:
+            row = box.row(align=True)
+            row.label(text=slot.replace("_", " "))
+            row.prop_search(r, mat_field, bpy.data, "materials", text="", icon='MATERIAL')
+            if asset_field:
+                sub = row.row(align=True)
+                sub.enabled = kit is not None
+                if kit is not None:
+                    sub.prop_search(r, asset_field, kit, "all_objects", text="", icon='OUTLINER_OB_CURVE')
+                else:
+                    sub.label(text="", icon='OUTLINER_OB_CURVE')
+        if kit is None:
+            box.operator("rka.link_road_kit", icon='LINKED')
+            box.label(text="link the kit to name a swept section instead of a material",
+                      icon='INFO')
         col.operator("rka.select_road", icon='RESTRICT_SELECT_OFF')
 
 
@@ -549,6 +601,9 @@ class RKA_PT_preview(bpy.types.Panel):
         r = col.row(align=True)
         r.prop(scene, "rka_preview_flow", toggle=True, icon='FORCE_WIND')
         r.prop(scene, "rka_preview_cars", toggle=True, icon='AUTO')
+        # WHICH geometry, first -- because "the lane" and "the Path3D Godot drives" are two
+        # different objects and the difference is the thing this panel is for.
+        col.prop(scene, "rka_preview_geometry", text="")
         col.prop(scene, "rka_preview_labels", toggle=True, icon='SYNTAX_OFF')
         r = col.row(align=True)
         r.enabled = bool(getattr(scene, "rka_preview_cars", False))
@@ -573,6 +628,10 @@ class RKA_PT_preview(bpy.types.Panel):
             box.label(text="ramp unreachable: %s" % lane, icon='ERROR')
         for lane, near in rep["broken"][:4]:
             box.label(text="%s -> nothing (touches %s)" % (lane, near[0]), icon='ERROR')
+        # The Path3D is not the lane. Named in metres, because the number IS the severity: 0.6 m is
+        # a car half off its lane and 22 m is a car in a building.
+        for lane, dev in (rep.get("path_off_road") or ())[:4]:
+            box.label(text="path %.2f m off road: %s" % (dev, lane), icon='ERROR')
         others = [l for l in rep["unreached"] if l not in rep["ramp_orphans"]]
         if others:
             box.label(text="%d lane(s) with no predecessor" % len(others), icon='QUESTION')
@@ -581,6 +640,8 @@ class RKA_PT_preview(bpy.types.Panel):
                       icon='CHECKMARK')
         if not rep["ramp_orphans"] and not rep["broken"]:
             box.label(text="every chain closes", icon='CHECKMARK')
+        if not rep.get("path_off_road"):
+            box.label(text="every Path3D tracks its lane", icon='CHECKMARK')
 
 
 class RKA_PT_build(bpy.types.Panel):

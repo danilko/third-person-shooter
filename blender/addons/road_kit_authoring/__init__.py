@@ -22,12 +22,13 @@ bl_info = {
 #
 #   point_model    the authored schema + the git-diffable .roads.json; the Empties are a VIEW of it
 #   point_profile  station -> lane_profile.Profile; the slot-id vocabulary (F0.., R0.., AF0.., MED)
-#   point_solve    chain -> carrier numbers; clique -> pad, fillets, turns; Auto Setback
+#   point_solve    chain -> carrier numbers; clique -> pad, fillets, turns; markings; Auto Setback
 #   point_edges    the road EDGE: where kerbs open, from the paved footprints
 #   point_validate the gate (5) -- a build that fails it is a failed build
-#   point_nodes    the Geometry Nodes vocabulary: spine, band, deck, pillars, assets, finish
+#   point_nodes    the GN vocabulary: spine, band, deck, profile, pillars, assets, finish
 #   point_build    carrier + stack + pads + ground cut + collision; ROAD_MANAGER_GEN lifetime
-#   point_export   .lanekit.json v2 -- real bezier handles, junctions[], explicit `spawnable`
+#   point_style    what a road is MADE OF: a material or a swept profile asset, per layer
+#   point_export   .lanekit.json v2 -- bezier handles FITTED to the lane, junctions[], `spawnable`
 #   point_ops      the authoring gestures
 #   point_panel    the point INSPECTOR (deliberately not a stamping brush)
 #   point_overlay  the GPU overlay -- what makes hundreds of points legible, and what follows a
@@ -45,6 +46,7 @@ bl_info = {
 
 from . import paths  # noqa: F401  (sets up sys.path to lib/, exposes KIT_BLEND / WORLD_SOURCE)
 from . import point_nodes  # noqa: F401  (node-group vocabulary; no operators of its own)
+from . import point_style  # noqa: F401  (style slots; pure resolution, no operators)
 from . import point_edges  # noqa: F401  (the road edge; pure geometry, no operators)
 from . import point_ops
 from . import point_build

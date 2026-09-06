@@ -84,36 +84,267 @@ def arm_name(road_name, run_index, n_runs):
 
 # ------------------------------------------------------------------------------- bezier
 
-def _catmull_handles(ctrl):
-    """Catmull-Rom through `ctrl` -> per-point `(in, out)` bezier handles, RELATIVE to the point
-    (which is what `Curve3D.addPoint` wants).
+def _unit(v):
+    n = math.sqrt(sum(x * x for x in v))
+    return [x / n for x in v] if n > 1e-12 else [0.0, 0.0, 0.0]
 
-    The standard conversion: the handle either side of `P_i` is `+/- (P_{i+1} - P_{i-1}) / 6`. At
-    an open end the single available chord is used -- extrapolating a phantom neighbour invents
-    curvature nobody authored, the same rule `road_points.chain_tangents` follows."""
-    n = len(ctrl)
+
+def _tangents_at(points, i):
+    """`(in_tangent, out_tangent)` of the sampled polyline AT index `i`.
+
+    ONE-SIDED ON PURPOSE. A central difference would smooth across a `SHARP` station, which is the
+    one place the road is genuinely allowed to corner -- and the whole reason the handles are
+    per-side in the first place."""
+    n = len(points)
+    fwd = _unit([points[min(i + 1, n - 1)][k] - points[i][k] for k in range(3)])
+    bwd = _unit([points[i][k] - points[max(i - 1, 0)][k] for k in range(3)])
+    if i <= 0:
+        bwd = fwd
+    if i >= n - 1:
+        fwd = bwd
+    return bwd, fwd
+
+
+def _arc_handle(chord, t0, t1):
+    """Handle length for a cubic spanning `chord` that leaves along `t0` and arrives along `t1`.
+
+    EXACT FOR A CIRCULAR ARC: a cubic matching an arc of turn angle `theta` and chord `c` wants
+    `h = (4/3) tan(theta/4) c / (2 sin(theta/2))`, degenerating to the familiar `c/3` as
+    `theta -> 0` -- a straight span, where the cubic is a straight line and the fit is exact too.
+    This is the STARTING POINT and the fallback; `_fit_span` refines it against the real samples."""
+    dot = max(-1.0, min(1.0, sum(t0[k] * t1[k] for k in range(3))))
+    theta = math.acos(dot)
+    if theta < 1e-4 or theta > math.pi - 1e-4:
+        return chord / 3.0
+    return (4.0 / 3.0) * math.tan(theta / 4.0) * chord / (2.0 * math.sin(theta / 2.0))
+
+
+#: How far the exported cubic may sit from the sampled lane it represents, in metres, before the
+#: export puts another control point in. Well under a paint stripe, and nearly three orders of
+#: magnitude under the 22.57 m the Catmull refit reached -- see `curve_points`.
+CURVE_FIT_TOL = 0.05
+
+#: Ceiling on control points per lane, as a multiple of its stations. A pathological shape must
+#: cost a bigger file, not an unbounded one.
+CURVE_FIT_MAX_FACTOR = 6
+
+#: Cubic samples per span when measuring the fit. The error is taken at these, so it bounds what a
+#: car driving the curve actually experiences, not what the control points promise.
+FIT_SAMPLES = 24
+
+
+def _cubic(p0, h0, h1, p1, n=FIT_SAMPLES):
+    """Sampled cubic bezier from `p0` with ABSOLUTE control points `h0`, `h1` to `p1`."""
     out = []
-    for i in range(n):
-        prev = ctrl[i - 1] if i > 0 else ctrl[i]
-        nxt = ctrl[i + 1] if i + 1 < n else ctrl[i]
-        d = [(nxt[k] - prev[k]) / 6.0 for k in range(3)]
-        out.append(([-d[0], -d[1], -d[2]], list(d)))
+    for j in range(n + 1):
+        t = j / float(n); u = 1.0 - t
+        out.append(tuple(u*u*u*p0[k] + 3*u*u*t*h0[k] + 3*u*t*t*h1[k] + t*t*t*p1[k]
+                         for k in range(3)))
     return out
+
+
+def _dist_to_polyline(p, poly):
+    best = float("inf")
+    for i in range(len(poly) - 1):
+        a, b = poly[i], poly[i + 1]
+        d = [b[k] - a[k] for k in range(3)]
+        L = sum(x * x for x in d)
+        t = 0.0 if L < 1e-12 else max(0.0, min(1.0, sum((p[k] - a[k]) * d[k] for k in range(3)) / L))
+        best = min(best, math.dist(p, [a[k] + d[k] * t for k in range(3)]))
+    return best
+
+
+def _chord_params(sub):
+    """Chord-length parameterisation of a sub-polyline, normalised to [0, 1]."""
+    acc, out = 0.0, [0.0]
+    for i in range(len(sub) - 1):
+        acc += math.dist(sub[i], sub[i + 1])
+        out.append(acc)
+    return [u / acc for u in out] if acc > 1e-9 else [i / float(max(1, len(sub) - 1))
+                                                     for i in range(len(sub))]
+
+
+def _fit_span(sub, t0, t1):
+    """Least-squares handle lengths for one cubic through `sub`, with the END TANGENTS FIXED.
+
+    `t0` leaves `sub[0]`; `t1` arrives at `sub[-1]` (pointing forward, so the handle is
+    subtracted). Returns `(alpha, beta)`, the two handle lengths in metres.
+
+    WHY FIT AND NOT JUST COMPUTE. `_arc_handle` is exact for a circular arc, and a road span is
+    only approximately one -- the Hermite `road_points.resample` builds from the authored tangents
+    puts more of its turn near whichever end has the longer handle. Fitting the two lengths is a
+    2-unknown linear least squares (Schneider's classic form: the tangent DIRECTIONS are already
+    known and correct, so only how far to reach along them is in question), which is a closed form
+    and costs nothing. Without it the fit is driven entirely by subdivision, and subdivision that
+    is compensating for a wrong handle length slivers instead of converging."""
+    n = len(sub)
+    if n < 3:
+        return None
+    p0, p3 = sub[0], sub[-1]
+    us = _chord_params(sub)
+    c00 = c01 = c11 = x0 = x1 = 0.0
+    for i in range(n):
+        u = us[i]; v = 1.0 - u
+        b0, b1 = v*v*v, 3.0*v*v*u
+        b2, b3 = 3.0*v*u*u, u*u*u
+        a0 = [t0[k] * b1 for k in range(3)]
+        a1 = [-t1[k] * b2 for k in range(3)]
+        tmp = [sub[i][k] - (p0[k]*(b0 + b1) + p3[k]*(b2 + b3)) for k in range(3)]
+        c00 += sum(a0[k]*a0[k] for k in range(3))
+        c01 += sum(a0[k]*a1[k] for k in range(3))
+        c11 += sum(a1[k]*a1[k] for k in range(3))
+        x0 += sum(a0[k]*tmp[k] for k in range(3))
+        x1 += sum(a1[k]*tmp[k] for k in range(3))
+    det = c00*c11 - c01*c01
+    if abs(det) < 1e-12:
+        return None
+    alpha = (x0*c11 - x1*c01) / det
+    beta = (c00*x1 - c01*x0) / det
+    chord = math.dist(p0, p3)
+    # A negative or wild handle is a fit that has run away (near-collinear data, a cusp in an
+    # offset lane). Reject it and let the arc form stand -- never ship a curve that loops.
+    if not (1e-6 < alpha < chord * 3.0) or not (1e-6 < beta < chord * 3.0):
+        return None
+    return alpha, beta
+
+
+def _span_handles(points, i0, i1, t_out, t_in):
+    """The two ABSOLUTE handle points for the cubic over `points[i0:i1]`."""
+    sub = points[i0:i1 + 1]
+    chord = math.dist(points[i0], points[i1])
+    fit = _fit_span(sub, t_out, t_in)
+    if fit is None:
+        h = _arc_handle(chord, t_out, t_in)
+        a = b = h
+    else:
+        a, b = fit
+    return ([points[i0][k] + t_out[k] * a for k in range(3)],
+            [points[i1][k] - t_in[k] * b for k in range(3)])
+
+
+def _span_error(points, i0, i1, h_out, h_in):
+    """`(worst deviation, index to split at)` for the cubic over `points[i0:i1]`.
+
+    MEASURED CURVE-TO-LANE, NOT LANE-TO-CURVE, and the direction is the whole point. Those two are
+    not the same number: a cubic that bulges wide and comes back still passes near every sample
+    (so lane-to-curve reads small) while sitting metres off the road in between -- and it is the
+    car, driving the curve, that ends up in the wrong place. Measured on the sample network the
+    two disagreed by 1.4 m on `demo_ramp_b_F1`, which is a whole lane.
+
+    The split BISECTS. Splitting at the worst sample is the classic curve-fit choice, but when the
+    worst point sits near an end -- which is what a mis-set handle looks like -- it shaves off a
+    one-sample sliver, the span stays worst, and the next iteration shaves another. Measured: 21 of
+    36 control points on `demo_ramp_b_F1` went into three such runs while two 90 m spans were never
+    split at all, and the budget ran out. Halving cannot do that."""
+    if i1 - i0 < 2:
+        return 0.0, -1
+    sub = points[i0:i1 + 1]
+    worst = max(_dist_to_polyline(q, sub) for q in _cubic(points[i0], h_out, h_in, points[i1]))
+    return worst, (i0 + i1) // 2
 
 
 def curve_points(points, indices):
     """`[{p, in, out}]` at the chosen sample indices -- the v2 lane geometry.
 
-    Control points are placed at the STATIONS, not at every 4 m sample: the stations are where the
-    author put the shape, so they are where a spline's control points belong, and the handles
-    reconstruct everything between them."""
+    Control points start at the STATIONS: that is where the author put the shape, so that is where
+    a spline's control points belong. Extra ones are added ONLY where a cubic cannot follow the
+    lane to `CURVE_FIT_TOL`.
+
+    THE HANDLES COME FROM THE SAMPLED CURVE, NOT FROM THE CHORD THROUGH THE NEIGHBOURS. This was a
+    Catmull-Rom refit, `+/- (P_{i+1} - P_{i-1}) / 6` -- a SECOND owner of the road's shape, and a
+    worse-informed one. The centreline is a Hermite per span, built by `road_points.resample` from
+    the station's AUTHORED facing (`station_axis` -- the R-key bend gesture) and its
+    `handle_in`/`handle_out` lengths in metres; refitting from neighbour POSITIONS discards all of
+    it, so the artist's bend reached the asphalt and never reached Godot. Measured on the addon's
+    own sample network, the exported Path3D -- which is what `WorldBaker` turns into every
+    `Curve3D` the ambient cars drive -- ran up to **22.57 m** off the lane it is supposed to BE
+    (`demo_ramp_F0`), because at an open end the refit took a chord sitting **70.3 deg** off the
+    true heading. Gate green, geometry perfect, and no existing check could see it.
+
+    So each handle's DIRECTION is the polyline's own one-sided tangent at that station, its LENGTH
+    is least-squares-fitted against the real samples, and the span subdivides if that still is not
+    enough. A lane centreline is an OFFSET curve whose tangent genuinely differs from the road
+    centreline's on any bend, so all of it is read from the LANE's own samples -- the same reason
+    `GN_PointSpine` stores one shared `rka_lat` rather than letting each layer re-derive a frame."""
     idx = sorted(set(i for i in indices if 0 <= i < len(points)))
     if len(idx) < 2:
         idx = [0, len(points) - 1]
-    ctrl = [points[i] for i in idx]
-    handles = _catmull_handles(ctrl)
-    return [{"p": godot(p), "in": godot(h[0]), "out": godot(h[1])}
-            for p, h in zip(ctrl, handles)]
+    budget = max(4, len(idx) * CURVE_FIT_MAX_FACTOR)
+    handles = _all_handles(points, idx)
+    while len(idx) < budget:
+        worst_k, worst_err, worst_at = -1, CURVE_FIT_TOL, -1
+        for k in range(len(idx) - 1):
+            err, at = _span_error(points, idx[k], idx[k + 1], handles[k][1], handles[k + 1][0])
+            if err > worst_err:
+                worst_k, worst_err, worst_at = k, err, at
+        if worst_k < 0 or worst_at <= idx[worst_k] or worst_at >= idx[worst_k + 1]:
+            break
+        idx.insert(worst_k + 1, worst_at)
+        handles = _all_handles(points, idx)
+    return [{"p": godot(points[i]),
+             "in": godot([handles[k][0][j] - points[i][j] for j in range(3)]),
+             "out": godot([handles[k][1][j] - points[i][j] for j in range(3)])}
+            for k, i in enumerate(idx)]
+
+
+def _all_handles(points, idx):
+    """Per control point, `[in, out]` as ABSOLUTE positions. One owner of the arithmetic; each
+    SPAN owns both of its own handles -- the `out` of the station it leaves and the `in` of the
+    one it arrives at -- which is what lets two spans of different length meet at one station
+    without either restating the other's curvature."""
+    tans = [_tangents_at(points, i) for i in idx]
+    hs = [[list(points[i]), list(points[i])] for i in idx]
+    for k in range(len(idx) - 1):
+        a, b = _span_handles(points, idx[k], idx[k + 1], tans[k][1], tans[k + 1][0])
+        hs[k][1], hs[k + 1][0] = a, b
+    return hs
+
+
+#: A lane whose exported Path3D sits further than this from the lane itself is REPORTED -- by the
+#: gate (`point_validate.path_deviation`), by `Preview > Flow Report`, and in the viewport. A third
+#: of a car's width: far enough to be a real mistake, close enough to catch one before it is 22 m.
+PATH_DEVIATION_WARN = 0.5
+
+#: ...and past this it is an ERROR. A car a full lane off the road is not a tuning problem.
+PATH_DEVIATION_ERROR = 2.0
+
+
+def curve_polyline(lane, samples_per_span=FIT_SAMPLES):
+    """The exported `curve` block evaluated the way Godot's `Curve3D` will, in GODOT space.
+
+    THE ONE OWNER of "where will the car actually be". `point_preview` draws this, the gate
+    measures with it, and `self_test` asserts on it -- so the picture, the finding and the test
+    cannot disagree about what shipped, which is the whole reason the preview exists."""
+    c = lane.get("curve") or []
+    if len(c) < 2:
+        return [tuple(p) for p in lane.get("points", [])]
+    out = []
+    for k in range(len(c) - 1):
+        p0, p1 = tuple(c[k]["p"]), tuple(c[k + 1]["p"])
+        h0 = [p0[j] + c[k]["out"][j] for j in range(3)]
+        h1 = [p1[j] + c[k + 1]["in"][j] for j in range(3)]
+        seg = _cubic(p0, h0, h1, p1, samples_per_span)
+        out.extend(seg if not out else seg[1:])
+    return out
+
+
+def path_deviation(lane):
+    """How far the exported Path3D wanders from the lane polyline it represents, in metres.
+
+    Curve-to-lane, never the reverse -- see `_span_error`. Zero for a lane with no `curve` block
+    (a v1 lane IS its polyline)."""
+    pts = [tuple(p) for p in lane.get("points") or []]
+    if len(pts) < 2 or len(lane.get("curve") or []) < 2:
+        return 0.0
+    return max(_dist_to_polyline(q, pts) for q in curve_polyline(lane))
+
+
+def deviating_lanes(doc, threshold=PATH_DEVIATION_WARN):
+    """`[(lane_id, deviation)]` over `threshold`, worst first."""
+    out = [(l["id"], path_deviation(l)) for l in doc.get("lanes") or []]
+    out = [(i, d) for i, d in out if d > threshold]
+    out.sort(key=lambda r: -r[1])
+    return out
 
 
 def _station_indices(samples):
@@ -195,7 +426,10 @@ def build_run(net, road, uids, arm, n_runs):
         return RunLanes(road, arm, uids, [], [], [])
     pts = [net.resolved(u) for u in uids]
     is_loop = road.is_loop and len(road.points) == len(uids)
-    stations = pp.stations(pts, is_loop)
+    # Same end-of-run rule the sweep uses, or the exported lane leaves the mouth on a different
+    # heading from the tarmac under it (`point_profile.run_end_axes`).
+    stations = pp.stations(pts, is_loop,
+                          end_axes=(None if is_loop else pp.run_end_axes(net, pts)))
     samples = rp.resample(stations, is_loop)
     routes = rp.lane_taper_route(stations, samples, is_loop)
     st_idx = _station_indices(samples)
@@ -508,6 +742,62 @@ def wire_ramps(net, lanes, by_uid):
 
 # ------------------------------------------------------------------------------- assembly
 
+#: A joint's lanes must line up this closely to be wired end to end -- `LaneGraph.JUNCTION_RADIUS`,
+#: the same distance the runtime would use if it fell back to proximity.
+JOINT_TOL = 4.5
+
+
+def wire_joints(net, lanes, by_uid):
+    """`{lane_id: successor_id}` across a SEGMENT link that leaves its road -- a corner JOINT.
+
+    A RUN NEVER SPANS TWO ROADS, so two arterials that meet end to end export two lane sets that
+    stop at each other and nothing joins them. `W15`: with the corner rounded (`seed_district_roads
+    .fillet_corner`) the two stations are coincident and the lanes physically meet, and the flow
+    report's verdict moved from `open_end` (running off the edge of the network) to `broken` (a
+    tail sitting on a head with no edge between them) -- the geometry fixed and the graph still
+    silent. The runtime would recover it: `LaneGraph` derives a proximity edge inside
+    `JUNCTION_RADIUS`. That is exactly the reason to emit it here instead. §8f.4's rule is that
+    reachability is not geometry and needs its own eye; leaving the one road-to-road hand-over in
+    the world to a distance test is leaving it where no check can see it, and it would go silently
+    wrong the day a corner is authored a little wider than the radius.
+
+    Matched by GEOMETRY, not by lane index: which of the two chains runs which way is an accident
+    of how the plan was authored, and the pairing that is always true is that a lane's tail and its
+    successor's head are the same physical point.
+    """
+    out = {}
+    seen = set()
+    for uid in sorted(net.points):
+        road = net.road_of(uid)
+        for other in net.points[uid].targets(pm.LINK_SEGMENT):
+            if other not in net.points or (uid, other) in seen:
+                continue
+            seen.add((uid, other))
+            seen.add((other, uid))
+            if net.road_of(other) is road:
+                continue                      # an ordinary span inside one road
+            for a, b in ((uid, other), (other, uid)):
+                for src in by_uid.get((a, "in"), ()):
+                    tail = _end_xyz(src, -1)
+                    best, bd = None, JOINT_TOL
+                    for dst in by_uid.get((b, "out"), ()):
+                        d = _dist3(tail, _end_xyz(dst, 0))
+                        if d < bd:
+                            best, bd = dst, d
+                    if best is not None:
+                        out[src["id"]] = best["id"]
+    return out
+
+
+def _end_xyz(lane, i):
+    pts = lane.get("points") or []
+    return tuple(pts[i]) if pts else (0.0, 0.0, 0.0)
+
+
+def _dist3(a, b):
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+
+
 def export_network(net):
     """The whole `.lanekit.json` v2 document."""
     runs, lanes, arms = [], [], []
@@ -533,6 +823,7 @@ def export_network(net):
 
     junctions, connectors = build_junctions(net, by_uid, lanes)
     ramp_links = wire_ramps(net, lanes, by_uid)
+    joint_links = wire_joints(net, lanes, by_uid)
 
     # Wire each inbound lane to the connectors that leave it, straight-biased.
     out_of = {}
@@ -557,6 +848,12 @@ def export_network(net):
             nxt.append(ramp_links[l["id"]])
             wts.append(RAMP_WEIGHT if cs else 1.0)
             kinds.append("ramp")
+        if l["id"] in joint_links and joint_links[l["id"]] not in nxt:
+            # THE CORNER HAND-OVER. Like the ramp edge, added to whatever else this lane feeds --
+            # a joint can sit on a junction approach the same way a gore can.
+            nxt.append(joint_links[l["id"]])
+            wts.append(1.0 if not cs else RAMP_WEIGHT)
+            kinds.append("chain")
         if nxt:
             l["next"], l["next_weights"], l["next_kinds"] = nxt, wts, kinds
         elif l["_merge_into"]:
@@ -642,6 +939,27 @@ def self_test():
         "a turn connector's handles must be non-zero, or the curve is not a curve"
     print("OK: %d control points replace %d polyline points on a mainline lane; handles non-zero"
           % (len(straight["curve"]), len(straight["points"])))
+    ok += 1
+
+    # -- THE PATH3D IS THE LANE (8m regression) -----------------------------------------------------
+    # This is the check that did not exist while the export ran 22.57 m off the road. It measures
+    # the thing that ships -- the `curve` block, evaluated as `Curve3D` will evaluate it -- against
+    # the lane it claims to be, and it is pure Python so it runs in `check_roads.sh --quick`.
+    worst_id, worst = max(((l["id"], path_deviation(l)) for l in through), key=lambda r: r[1])
+    assert worst <= CURVE_FIT_TOL * 2.0, \
+        "exported Path3D is %.3f m off lane %s -- a car drives the CURVE, not the polyline" \
+        % (worst, worst_id)
+    # A bend must actually cost control points, or the fit is passing by being straight.
+    bendy = max(through, key=lambda l: len(l["curve"]))
+    assert len(bendy["curve"]) > 2, "the testbed's ramp must exercise the fit"
+    # ...and a dead straight lane must NOT: two control points, because a cubic through two points
+    # with collinear handles IS the straight line, and paying for more would bloat every district.
+    flat = min((l for l in through if len(l["points"]) > 8), key=lambda l: len(l["curve"]))
+    assert len(flat["curve"]) == 2, \
+        "a straight lane wants 2 control points, got %d on %s" % (len(flat["curve"]), flat["id"])
+    assert not deviating_lanes(doc), deviating_lanes(doc)
+    print("OK: exported Path3D tracks its lane to %.3f m (worst: %s); a straight lane still costs "
+          "2 control points" % (worst, worst_id))
     ok += 1
 
     # -- junction movements come from lane_movements and nowhere else --------------------------------

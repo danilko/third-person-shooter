@@ -871,7 +871,7 @@ public final class NetMessageCodec {
     // initial facing (the snapshot corrects orientation within a tick).
     //
     // `ephemeral` is the persistent/ephemeral split (PLAN.md netcode WS3 fix): true ONLY for
-    // runtime-streamed ambient traffic (WorldZoneManager), which the client tags into STREAMED_GROUP
+    // runtime-streamed ambient traffic (ZoneManager), which the client tags into STREAMED_GROUP
     // so the ghost-reconcile may free it on a snapshot-timeout (missed despawn cleanup). Scene-placed
     // / player-driven vehicles re-supplied via the late-join baseline are ephemeral=false: they are
     // NEVER reconcile-eligible, so a momentary snapshot gap (e.g. traffic-volume pressure) can never

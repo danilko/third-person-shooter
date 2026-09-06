@@ -14,9 +14,9 @@ area) and is the source of constant "what is an overlay, where does this go" con
 artist. The one existing island+bridge case (Haneda + Rainbow Bridge) was hand-hacked as raw
 coordinate constants in `world_grid.py` and never wired to a real streamed zone.
 
-Verified before planning: **the Godot runtime has zero grid dependency.** `WorldZone` is an AABB
-`size` + `loadRadius`/`unloadRadius`; `WorldZoneMarker` is a plain `Node3D` at an arbitrary world
-position; `WorldZoneManager` treats every marker as an independent point, no lattice math anywhere;
+Verified before planning: **the Godot runtime has zero grid dependency.** `Zone` is an AABB
+`size` + `loadRadius`/`unloadRadius`; `ZoneMarker` is a plain `Node3D` at an arbitrary world
+position; `ZoneManager` treats every marker as an independent point, no lattice math anywhere;
 `WorldBaker` copies whatever position the source Blender empty already has. The grid — and the
 overlay/district split itself — is purely a Blender-authoring-side convention. No `src/main/java`
 change is anticipated anywhere in this plan.
@@ -243,7 +243,7 @@ via `piece_registry.set_piece()` (no grid cell, no district naming, floated abov
 spawn point purely so a headless run could observe it loading without a scripted walk-in), rebuilt
 `world_master.blend` (`freestanding=2` — bridge + spike), baked via `build_piece.sh
 Piece_SpikeTest` (worked unmodified) and `build_world.sh` (`zones=38`). **Verified via headless
-`WorldMasterDebug.tscn`:** `WorldZoneManager` streamed in `District_city_1_1`,
+`WorldMasterDebug.tscn`:** `ZoneManager` streamed in `District_city_1_1`,
 `Overlay_RainbowBridge` (now genuinely distance-triggered, not hardcoded — ~913 m from spawn,
 inside its 1149 m `load_radius`), and `Piece_SpikeTest` (0.5 m from spawn, inside its 250 m
 `load_radius`), each logged with the exact same `streaming IN zone '<id>'…` / `LOADED zone
@@ -315,7 +315,7 @@ to design against.
   a file is opened directly; re-running `link_neighbors.py` (already fixed for the new layout)
   against it refreshes the reference. `NEIGHBOR_REF` is dropped before export, so this never
   reaches the game.
-- **Phase 2:** headless `WorldMasterDebug.tscn` run, watch `WorldZoneManager.debugLog` for the new
+- **Phase 2:** headless `WorldMasterDebug.tscn` run, watch `ZoneManager.debugLog` for the new
   freestanding zone's load/unload lines and the traffic health summary. **PASSED** (see above) —
   load lines confirmed for both new freestanding pieces; the run only covered LOAD (piece placed
   near spawn so a short headless run could observe it, no scripted walk-away), not a full
@@ -375,9 +375,9 @@ piece, always falling back to `(0,0,0)`).
 through `build_piece.sh` uniformly and nothing can pass `build_overlay.sh`'s `Overlay_*` prefix
 gate anymore) — its stale output directory (`world/overlays/`) deleted too. **The bridge's
 permanent `OverlayRainbowBridge` node in `hosts/WorldMaster.tscn`** (the pre-redesign
-always-resident model, superseded back in Phase 1 once the bridge got a normal `WorldZoneMarker`
+always-resident model, superseded back in Phase 1 once the bridge got a normal `ZoneMarker`
 but never actually removed until now) **was also removed** — leaving it in would have double-
-rendered/double-collided the bridge once its `WorldZoneMarker` started streaming it in normally.
+rendered/double-collided the bridge once its `ZoneMarker` started streaming it in normally.
 
 **"Add Piece" now auto-suggests** (`RKA_OT_place_piece_anchor.invoke`): pre-fills `piece_id`/
 `theme` from `grid_cell_of`/`suggest_piece_id`/`theme_at` at the dropped cursor position (still
