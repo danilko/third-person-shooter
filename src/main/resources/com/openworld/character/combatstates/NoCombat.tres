@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_a50dc")
 camera_distance = 2.5
-camera_shoulder_offset = 0.15
+camera_shoulder_offset = -0.15

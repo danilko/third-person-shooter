@@ -1,12 +1,15 @@
 package com.openworld.ui;
 
+import com.openworld.character.Character;
 import com.openworld.weapon.WeaponController;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.*;
+import godot.core.Color;
 import godot.core.VariantArray;
 import godot.core.Vector2;
+import godot.core.Vector3;
 import godot.global.GD;
 
 /**
@@ -63,7 +66,35 @@ public class Crosshair extends Control {
      */
     @Export public float maxSpreadPixels = 90f;
 
+    /**
+     * The character whose seated aim the reticle should follow, when there is one.
+     *
+     * <p>On foot this stays unused and the reticle sits dead centre, because on foot the aim point
+     * IS the camera ray's hit — centre of screen and the world point are the same pixel. In a seat
+     * they come apart: the camera is free (an arcade chase camera, deliberately) while the weapon
+     * is held inside the seat's firing sector, so a centre-screen dot would be a lie about where
+     * the bullet goes. Anchoring the reticle to the world point is how GTA says the same thing —
+     * the reticle sticks at the edge of the sector and drags along it as you keep pushing.
+     */
+    public Character aimCharacter;
+
+    /**
+     * How far off centre the anchored reticle may travel, as a fraction of the smaller viewport
+     * dimension. Past this it is pinned (still pointing the right way) rather than allowed off
+     * screen, which is the ordinary case in third person when the camera swings behind the car.
+     */
+    @Export public float maxAnchorOffsetFraction = 0.42f;
+
+    /** Alpha applied while the seat's firing sector is holding the aim back. */
+    @Export public float clampedAlpha = 0.55f;
+
+    /** Anchor follow speed (per second). Fast enough to read as attached, slow enough not to jitter. */
+    @Export public double anchorFollowSpeed = 25.0;
+
     private VariantArray<Node> lines;
+    private Node2D centerNode;
+    private Node2D reticleNode;
+    private Vector2 anchorOffset = Vector2.Companion.getZERO();
     private float positionX = 0f;
 
     /** External override — still usable but overwritten next frame if weaponController is set. */
@@ -85,6 +116,34 @@ public class Crosshair extends Control {
     @Override
     public void _ready() {
         lines = getNode("Reticle/Lines").getChildren();
+        if (getNodeOrNull("Center")  instanceof Node2D c) centerNode  = c;
+        if (getNodeOrNull("Reticle") instanceof Node2D r) reticleNode = r;
+    }
+
+    /**
+     * Where the reticle belongs this frame, in this control's own space — (0,0) is the screen
+     * centre, which is where it stays unless a seated occupant's aim has been clamped away from it.
+     *
+     * <p>A point BEHIND the camera has no projection, and {@code unprojectPosition} on one returns
+     * a mirrored position that swings the reticle the wrong way — a real case here, since the chase
+     * camera can sit behind the car looking at the boot while the driver aims out of the window. So
+     * it is handled explicitly: keep the direction, pin the magnitude.
+     */
+    private Vector2 resolveAnchorOffset() {
+        if (aimCharacter == null || !aimCharacter.isSeatedAimAnchored()) return Vector2.Companion.getZERO();
+        Camera3D cam = getViewport() != null ? getViewport().getCamera3d() : null;
+        if (cam == null) return Vector2.Companion.getZERO();
+
+        Vector3 world = aimCharacter.getAimTargetPosition();
+        Vector2 screen = cam.unprojectPosition(world);
+        Vector2 offset = screen.minus(getGlobalPosition());
+        if (cam.isPositionBehind(world)) offset = offset.times(-1f);
+
+        Vector2 size = getViewportRect().getSize();
+        float limit = (float) (maxAnchorOffsetFraction * Math.min(size.getX(), size.getY()));
+        float len = (float) offset.length();
+        if (len > limit && len > 1e-3f) offset = offset.times(limit / len);
+        return offset;
     }
 
     @Register
@@ -104,6 +163,20 @@ public class Crosshair extends Control {
             float frac = weaponController.getCrosshairSpreadFraction();
             positionX = minSpreadPixels + frac * (maxSpreadPixels - minSpreadPixels);
         }
+
+        // Anchor the whole reticle (dot + arms) on the point the weapon can actually reach, so what
+        // the player is told is what the bullet does. Unclamped this is exactly (0,0) — an ordinary
+        // shot from a seat looks the way it always did.
+        Vector2 wanted = resolveAnchorOffset();
+        double aw = Math.min(1.0, anchorFollowSpeed * delta);
+        anchorOffset = anchorOffset.lerp(wanted, (float) aw);
+        if (centerNode  != null) centerNode.setPosition(anchorOffset);
+        if (reticleNode != null) reticleNode.setPosition(anchorOffset);
+        boolean clamped = aimCharacter != null && aimCharacter.isSeatedAimAnchored()
+                && aimCharacter.isSeatAimClamped();
+        Color tint = getModulate();
+        tint.setA(clamped ? clampedAlpha : 1.0f);
+        setModulate(tint);
 
         // Target: 0 when hidden (arms collapse to centre), positionX when shown.
         float target = showCrosshair ? positionX : 0f;

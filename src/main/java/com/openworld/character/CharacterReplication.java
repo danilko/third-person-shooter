@@ -57,11 +57,13 @@ final class CharacterReplication {
      * runs on a puppet, so {@code changed_movement_direction} / {@code set_cam_rotation} never fire
      * for it — without this the AnimationController's walk/strafe blend stays frozen (the "AI
      * animation not synced" bug). Movement direction is derived from the interpolated horizontal
-     * velocity (the same world-space convention the owner's own signal carries); facing yaw is pushed
-     * in as camRotation so the combat strafe blend rotates correctly. Movement *type* (walk vs sprint)
-     * is applied separately and discretely via {@link #applyMovementType(int)}.
+     * velocity (the same world-space convention the owner's own signal carries). The strafe blend
+     * resolves that against {@code MeshRoot}'s own facing, which {@link #applyFacing} has already
+     * written from the SAME replicated yaw this frame (Character.applyReplicated* calls facing
+     * first) — so no yaw needs pushing in here. Movement *type* (walk vs sprint) is applied
+     * separately and discretely via {@link #applyMovementType(int)}.
      */
-    void applyLocomotion(Vector3 velocity, double yaw) {
+    void applyLocomotion(Vector3 velocity) {
         Vector3 flat = new Vector3(velocity.getX(), 0, velocity.getZ());
         if (flat.lengthSquared() > 0.01) {
             owner.movementDirection = flat.normalized();
@@ -74,8 +76,6 @@ final class CharacterReplication {
             owner.movementDirection = Vector3.Companion.getZERO();
             owner.changedMovementDirection.emit(owner.movementDirection);
         }
-        Node acNode = owner.getNodeOrNull("AnimationController");
-        if (acNode instanceof AnimationController ac) ac.onSetCamRotation(yaw);
     }
 
     /** Applies a replicated movement type (IDLE/WALK/SPRINT) on a puppet — emits changed_movement_state so the blend speed/pose updates exactly like the local path. */

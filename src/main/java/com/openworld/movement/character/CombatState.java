@@ -19,8 +19,19 @@ public class CombatState extends Resource {
   @Export
   public double cameraDistance = 2.0f;
 
+  /**
+   * Sideways camera offset in metres, along the CAMERA's own right — so positive is the right
+   * shoulder and negative the left. The game ships LEFT (the authored states are negative).
+   *
+   * <p>The sign only started meaning anything with AIM_PLAN.md W3. Before it, the offset was
+   * applied along the Yaw node's X under a rig carrying an uncancelled 180-degree flip, so it went
+   * the opposite way from the camera's right and a positive number produced a left-shoulder camera.
+   * Removing the flip made the axis honest, which mirrors the framing — so the authored values were
+   * negated to keep the shipped side. Flipping them back is now a one-character change per state,
+   * and it means what it says.
+   */
   @Export
-  public double cameraShoulderOffset = 0.1f;
+  public double cameraShoulderOffset = -0.1f;
 
   /**
    * Vertical camera adjustment applied ON TOP of the current stance's camera height while in

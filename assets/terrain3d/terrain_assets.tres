@@ -1,0 +1,68 @@
+[gd_resource type="Terrain3DAssets" format=3 uid="uid://cw1uwlgqh32wj"]
+
+[ext_resource type="Texture2D" uid="uid://crv6u0oc6b78h" path="res://assets/terrain3d/textures/rock023_alb_ht.png" id="1_rock_alb"]
+[ext_resource type="Texture2D" uid="uid://dyq1ptldw7acn" path="res://assets/terrain3d/textures/rock023_nrm_rgh.png" id="2_rock_nrm"]
+[ext_resource type="Texture2D" uid="uid://dkauleejabecs" path="res://assets/terrain3d/textures/ground037_alb_ht.png" id="3_grass_alb"]
+[ext_resource type="Texture2D" uid="uid://cansxn8j7wahy" path="res://assets/terrain3d/textures/ground037_nrm_rgh.png" id="4_grass_nrm"]
+[ext_resource type="Texture2D" uid="uid://byim4u4pfoerv" path="res://assets/terrain3d/textures/sand_alb_ht.png" id="5_sand_alb"]
+[ext_resource type="Texture2D" uid="uid://eyvje88u6ulp" path="res://assets/terrain3d/textures/sand_nrm_rgh.png" id="6_sand_nrm"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dstje"]
+transparency = 4
+cull_mode = 2
+vertex_color_use_as_albedo = true
+backlight_enabled = true
+backlight = Color(0.5, 0.5, 0.5, 1)
+distance_fade_mode = 1
+distance_fade_min_distance = 128.0
+distance_fade_max_distance = 96.0
+
+[sub_resource type="Terrain3DMeshAsset" id="Terrain3DMeshAsset_pysb7"]
+generated_type = 1
+height_offset = 0.5
+material_override = SubResource("StandardMaterial3D_dstje")
+last_lod = 0
+last_shadow_lod = 0
+lod0_range = 128.0
+
+[sub_resource type="Terrain3DTextureAsset" id="Tex_grass"]
+name = "Grass"
+albedo_color = Color(0.67451, 0.74902, 0.686275, 1)
+albedo_texture = ExtResource("3_grass_alb")
+normal_texture = ExtResource("4_grass_nrm")
+normal_depth = 1.0
+ao_strength = 2.0
+uv_scale = 0.2
+detiling_rotation = 0.161
+
+[sub_resource type="Terrain3DTextureAsset" id="Tex_cliff"]
+name = "Cliff"
+id = 1
+albedo_texture = ExtResource("1_rock_alb")
+normal_texture = ExtResource("2_rock_nrm")
+normal_depth = 1.0
+ao_strength = 2.0
+roughness = -0.05
+
+[sub_resource type="Terrain3DTextureAsset" id="Tex_sand"]
+name = "Sand"
+id = 2
+albedo_texture = ExtResource("5_sand_alb")
+normal_texture = ExtResource("6_sand_nrm")
+ao_strength = 0.8
+uv_scale = 0.28
+detiling_rotation = 0.11
+
+[sub_resource type="Terrain3DTextureAsset" id="Tex_seabed"]
+name = "Seabed"
+id = 3
+albedo_color = Color(0.42, 0.47, 0.5, 1)
+albedo_texture = ExtResource("1_rock_alb")
+normal_texture = ExtResource("2_rock_nrm")
+normal_depth = 1.0
+ao_strength = 2.0
+uv_scale = 0.07
+
+[resource]
+mesh_list = Array[Terrain3DMeshAsset]([SubResource("Terrain3DMeshAsset_pysb7")])
+texture_list = Array[Terrain3DTextureAsset]([SubResource("Tex_grass"), SubResource("Tex_cliff"), SubResource("Tex_sand"), SubResource("Tex_seabed")])

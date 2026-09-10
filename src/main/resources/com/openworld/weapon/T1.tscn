@@ -12,10 +12,10 @@ size = Vector3(0.1, 0.1, 0.3)
 [sub_resource type="BoxShape3D" id="BoxShape3D_ifxot"]
 size = Vector3(0.1, 0.1, 0.3)
 
-[node name="T1" type="RigidBody3D" unique_id=507572094]
-collision_layer = 4
-continuous_cd = true
+[node name="T1" type="Node3D" unique_id=507572094]
+world_body_continuous_cd = true
 script = ExtResource("1_ti")
+weapon_pose_index = 8
 projectile_scene = ExtResource("2_proj")
 explosion_radius = 10.0
 weapon_id = "T1"

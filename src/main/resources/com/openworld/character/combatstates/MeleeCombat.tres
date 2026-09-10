@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_meleec")
 combat = true
-camera_shoulder_offset = 0.3
+camera_shoulder_offset = -0.3
 camera_fov = 65.0

@@ -63,20 +63,47 @@ public class MovementController extends Node {
   @Export
   public double stepReach = 0.45;
 
+  /**
+   * The same body as {@link #player}, but the JVM instance Godot actually bound the script to.
+   *
+   * <p>A node reference exported through the scene (`node_paths=PackedStringArray("player")`) is
+   * resolved when the scene is instantiated, and godot-kotlin-jvm 0.17 hands back a SECOND JVM
+   * wrapper for that engine object — same `get_instance_id()`, different Java object, and none of
+   * the state the body's own `_ready()` wrote. Engine calls (`isOnFloor`, `getGlobalPosition`,
+   * `moveAndSlide`) go through the bridge and are correct on either wrapper, which is why this hid
+   * for so long; Java fields are NOT. Reading `getAimTargetPosition()` off the exported reference
+   * therefore got a Character whose `aimTarget` marker was null, so it returned the BODY's own
+   * position, `aimYaw()` failed its own "too close to yaw toward" guard, and every aiming character
+   * faced `camRotation` — the camera rig's LOCAL yaw, which is not a world direction at all.
+   * Measured: the mesh 90 degrees off the aim point in every stance
+   * (`world/hosts/AimDebugAuto.tscn`).
+   *
+   * <p>Resolving the SAME path at runtime returns the live instance, so this keeps the export as
+   * the one owner of "which body" and only fixes which wrapper we hold.
+   */
+  private Character bodyCharacter;
+  private boolean bodyCharacterResolved;
+
+  /** The live {@link Character} for {@link #player}, or null if this body is not one. */
+  private Character body() {
+    if (bodyCharacterResolved && bodyCharacter != null && GD.isInstanceValid(bodyCharacter)) {
+      return bodyCharacter;
+    }
+    bodyCharacterResolved = true;
+    bodyCharacter = null;
+    if (player == null) return null;
+    Node live = getNodeOrNull(player.getPath());
+    if (live instanceof Character c) bodyCharacter = c;
+    else if (player instanceof Character c) bodyCharacter = c;   // not in a tree yet: better than nothing
+    return bodyCharacter;
+  }
+
   private double jumpGravity = fallGravity;
   private Vector3 direction = new Vector3();
   private Vector3 velocity = new Vector3();
   private double acceleration = 0.0;
   private double speed = 0.0;
-  /**
-   * When true the incoming movementDirection is already in world space (Enemy/AI).
-   * When false it is in camera-relative input space and is rotated by camRotation (Player).
-   */
-  @Export
-  public boolean worldSpaceMovement = false;
-
   private double camRotation = 0.0;
-  private double playerInitRotation = 0.0;
   private boolean combat = false;
   private double combatSpeedFactor = 1.0;
   private double combatAccelerationFactor = 1.0;
@@ -146,14 +173,6 @@ public class MovementController extends Node {
 
   @Register
   @Override
-  public void _ready() {
-    if (player != null) {
-      playerInitRotation = player.getRotation().getY();
-    }
-  }
-
-  @Register
-  @Override
   public void _physicsProcess(double delta) {
     if (player == null || meshRoot == null) return;
     // Non-authority bodies (NetworkController-driven remote peers/AI on a client) must
@@ -167,8 +186,9 @@ public class MovementController extends Node {
     // targetRotation, fighting applyReplicatedFacing's writes. That tug-of-war between
     // local physics and replicated state is what produced "wrong position/direction"
     // and the apparent multi-second catch-up lag (round 5 manual-test report).
-    if (player instanceof Character c) {
-      Controller ctrl = c.getController();
+    Character self = body();
+    if (self != null) {
+      Controller ctrl = self.getController();
       if (ctrl != null && !ctrl.isAuthority()) return;
     }
 
@@ -214,7 +234,7 @@ public class MovementController extends Node {
       // speeds — held jump rises at swimAscendSpeed (clearly faster than the gentle passive cap),
       // easing in near the surface so it never breaches; held crouch/crawl dives at swimDiveSpeed.
       // The stance reverts (in Character.applyInput) only when the swimmer rests on shallow ground.
-      boolean combat = (player instanceof Character c) && c.isCombat();
+      boolean combat = self != null && self.isCombat();
       double settleDepth = combat ? swimState.getAimSubmersionDepth() : swimState.getSubmersionDepth();
       double targetY = waterSurfaceY - settleDepth;
       double bodyY = player.getGlobalPosition().getY();
@@ -262,10 +282,10 @@ public class MovementController extends Node {
             && appliedVelocityY < -fallDamageThreshold) {
       float fallSpeed = -appliedVelocityY;
       float damage = (fallSpeed - fallDamageThreshold) * fallDamageScale;
-      if (player instanceof Character c && c.healthNode != null) {
-        String attackerName    = (c.characterInfo != null) ? c.characterInfo.displayName : "";
-        String attackerFaction = (c.characterInfo != null) ? c.characterInfo.faction     : "";
-        c.healthNode.takeDamage(null, damage, "Fall", null, attackerName, attackerFaction);
+      if (self != null && self.healthNode != null) {
+        String attackerName    = (self.characterInfo != null) ? self.characterInfo.displayName : "";
+        String attackerFaction = (self.characterInfo != null) ? self.characterInfo.faction     : "";
+        self.healthNode.takeDamage(null, damage, "Fall", null, attackerName, attackerFaction);
       }
     }
 
@@ -274,6 +294,12 @@ public class MovementController extends Node {
     // for a -Z-forward mesh (Godot convention).  The old formula atan2(dx, dz) was
     // correct for a +Z-forward mesh; negating both components shifts it by π, which
     // is the rotation needed to flip from +Z to -Z facing convention.
+    // meshRoot is a CHILD of the body, so its local yaw is (world facing - the body's own yaw).
+    // Read the body's yaw every frame rather than caching it in _ready(): a body that is rotated
+    // after add_child() -- which is what every code spawn path and AimDebugHost do -- would
+    // otherwise keep compensating for a rotation it no longer has, and the mesh renders off by
+    // exactly that difference (measured: 88 degrees, tools/godot/probe_camera_frame.gd case B).
+    double bodyYaw = player.getRotation().getY();
     double targetRotation;
     if (combat) {
       // Face where the shot actually goes, not where the camera looks. The TPS camera sits off the
@@ -282,10 +308,10 @@ public class MovementController extends Node {
       // Aiming the body at the same point the spine IK and the bullet converge on
       // (Character.getAimTargetPosition, the AimRay's world hit point) keeps all three honest, which
       // is what makes FirearmItem's muzzle trace read as fair rather than arbitrary.
-      targetRotation = aimYaw() - playerInitRotation;
+      targetRotation = aimYaw() - bodyYaw;
     } else if (direction.lengthSquared() > 0.001) {
       // Face movement direction (only when actually moving)
-      targetRotation = atan2(-direction.getX(), -direction.getZ()) - playerInitRotation;
+      targetRotation = atan2(-direction.getX(), -direction.getZ()) - bodyYaw;
     } else {
       targetRotation = meshRoot.getRotation().getY(); // hold current facing
     }
@@ -351,19 +377,28 @@ public class MovementController extends Node {
   private static final double AIM_FACING_MIN_DIST_SQ = 0.25;
 
   /**
-   * World-space yaw from the body toward its current aim point. Falls back to the raw camera yaw
-   * when there is no usable point — a non-Character body, or a point directly overhead/underfoot.
+   * World-space yaw from the body toward its current aim point. Falls back to the camera yaw when
+   * there is no usable point — a non-Character body, or a point directly overhead/underfoot. Since
+   * AIM_PLAN.md W3 that fallback is a world direction too, so it degrades instead of inverting.
    */
   private double aimYaw() {
-    if (!(player instanceof Character c)) return camRotation;
+    Character c = body();
+    if (c == null) return camRotation;
     Vector3 aim = c.getAimTargetPosition();
     Vector3 pos = player.getGlobalPosition();
     double dx = aim.getX() - pos.getX();
     double dz = aim.getZ() - pos.getZ();
+    // The fallback DEGRADES now, which it did not before AIM_PLAN.md W3: `camRotation` is the rig's
+    // yaw, and the rig's world basis is stated outright every frame, so it is a genuine world
+    // direction and this reads "face where the camera looks". It used to be a LOCAL yaw under a
+    // frame frozen by `setAsTopLevel`, i.e. off by whatever the body's spawn rotation was —
+    // measured at 90 degrees for a player, and accidentally right for an AI only because
+    // AICameraController drives that same yaw toward the AI's aim target. Getting here is still
+    // meant to be rare (a point directly overhead/underfoot); reaching it used to mean a defect,
+    // because the aim point had resolved to the body's own position off a stale JVM wrapper — see
+    // `body()`.
     if (dx * dx + dz * dz < AIM_FACING_MIN_DIST_SQ) return camRotation;
-    // Same -Z-forward mapping as the movement branch: camRotation is this very expression evaluated
-    // on the camera's own forward vector, so the two agree when the aim point is straight down the
-    // camera line and diverge only by the shoulder offset's parallax.
+    // Same -Z-forward mapping as the movement branch.
     return atan2(-dx, -dz);
   }
 

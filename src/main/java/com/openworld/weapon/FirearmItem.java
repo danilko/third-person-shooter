@@ -273,6 +273,18 @@ public class FirearmItem extends WeaponItem {
    * Falls back to the ray's far end when it hits nothing.
    */
   private Vector3 resolveSightPoint(RayCast3D ray) {
+    // A SEATED shooter aims through the carrier's firing sector, not through the camera. The camera
+    // is free to look anywhere (it is a chase camera; in third person it may be behind the car
+    // entirely), so its ray is not this shot's direction -- the clamped aim point is, and it is
+    // already the point the gun is visibly pointing at (Character.applySeatedAimTarget). Reading it
+    // here is what makes the two agree; before this the gun stopped at the seat's limit and the
+    // bullet carried on to whatever the camera had found, which is the drive-by bug.
+    if (owningCharacter instanceof Character c && c.isSeatedAimAnchored()) {
+      Vector3 seated = c.getAimTargetPosition();
+      // getAimTargetPosition falls back to the body origin when the marker is missing; a shot
+      // toward our own feet is worse than the camera ray, so fall through on a degenerate point.
+      if (seated.minus(c.getGlobalPosition()).lengthSquared() > 0.25) return seated;
+    }
     ray.forceRaycastUpdate();
     Vector3 origin = ray.getGlobalPosition();
     if (ray.isColliding()

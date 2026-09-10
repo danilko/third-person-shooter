@@ -122,8 +122,9 @@ public class NetworkController extends Controller {
             c.applyReplicatedTransform(new Vector3((float) p.x(), (float) p.y(), (float) p.z()), velocity);
             c.applyReplicatedFacing((float) out.yaw());
             // Drive the locomotion blend from the interpolated state, so the puppet's legs
-            // animate walk/strafe.
-            c.applyReplicatedLocomotion(velocity, out.yaw());
+            // animate walk/strafe. AFTER applyReplicatedFacing: the strafe blend resolves the
+            // world-space velocity against MeshRoot's facing, which that call has just written.
+            c.applyReplicatedLocomotion(velocity);
         }
     }
 

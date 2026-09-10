@@ -356,7 +356,7 @@ addon (mesh-first road pieces + lane connectivity export). Requires Blender **4.
 | **Reload**                                     | `R`                          |
 | **Switch Weapon (cycle)**                      | `G`                          |
 | **Select Weapon Slot (quick-switch)**          | `0` – `6` (see table below)  |
-| **Drop Weapon**                                | `F`                          |
+| **Drop Weapon**                                | `X`                          |
 | **Equip/Use/Enter**                            | `E`                          |
 | **Swap Camera Shoulder (Third Person)**        | `Q`                          |
 | **View Change to FPS/TPS**                      | `V`                          |

@@ -6,6 +6,7 @@ import godot.annotation.Script;
 import godot.api.Curve3D;
 import godot.api.Node3D;
 import godot.api.Path3D;
+import godot.core.NodePath;
 import godot.core.PackedVector3Array;
 import godot.core.Vector3;
 import godot.global.GD;
@@ -154,6 +155,24 @@ public class PathLaneRoute extends Node3D implements Lane {
 
     private static final String PATH_CHILD_NAME = "Path3D";
 
+    /**
+     * Optional explicit source {@link Path3D}, instead of the {@code "Path3D"} child.
+     *
+     * <p>Added for the road-generator bridge: that addon's {@code RoadLane} <b>is</b> a
+     * {@code Path3D}, generated as a child of a {@code RoadPoint} by the plugin and re-created
+     * whenever the road rebuilds — so it can neither be renamed to {@code "Path3D"} nor reparented
+     * under a lane node without fighting the generator. Pointing at it costs one indirection and
+     * leaves every consumer ({@code LaneGraph}, {@code VehicleAIController}, {@code ZoneManager})
+     * untouched, which a second {@link Lane} implementation would not have.
+     *
+     * <p>Empty (the default) keeps the original behaviour exactly: the {@code "Path3D"} child.
+     */
+    @Export public NodePath sourcePath = new NodePath("");
+
+    public NodePath getSourcePath() { return sourcePath; }
+
+    public void setSourcePath(NodePath value) { sourcePath = value; }
+
     private Curve3D curve;
     private Vector3[] bakedGlobal;   // baked points pre-converted to world space (identity-transform fast path still correct)
     private double[]  cum;
@@ -164,8 +183,8 @@ public class PathLaneRoute extends Node3D implements Lane {
     @Register
     @Override
     public void _ready() {
-        var pathNode = getNodeOrNull(PATH_CHILD_NAME);
-        if (pathNode instanceof Path3D p3d) curve = p3d.getCurve();
+        Path3D p3d = pathChild();
+        if (p3d != null) curve = p3d.getCurve();
         ensureBaked();
         ZoneManager mgr = ZoneManager.get();
         if (mgr != null) mgr.registerRoute(this);
@@ -177,10 +196,19 @@ public class PathLaneRoute extends Node3D implements Lane {
         if (mgr != null) mgr.unregisterRoute(this);
     }
 
-    /** The backing {@link Curve3D}, or null if the expected "Path3D" child is missing/unset. */
+    /** The backing {@link Curve3D}, or null if neither {@link #sourcePath} nor the "Path3D" child
+     *  resolves to a {@link Path3D}. */
     public Curve3D getCurveResource() { return curve; }
 
+    /**
+     * The {@link Path3D} this lane follows — {@link #sourcePath} when set, else the {@code
+     * "Path3D"} child. Every geometry read goes through here, so the two sources cannot diverge.
+     */
     private Path3D pathChild() {
+        if (sourcePath != null && !sourcePath.getPath().isEmpty()) {
+            var ext = getNodeOrNull(sourcePath);
+            if (ext instanceof Path3D p3d) return p3d;
+        }
         var n = getNodeOrNull(PATH_CHILD_NAME);
         return n instanceof Path3D p3d ? p3d : null;
     }

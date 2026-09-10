@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.UUID;
 import com.openworld.ai.vehicle.VehicleAIController;
+import com.openworld.camera.CameraMode;
 import com.openworld.camera.VehicleCameraController;
 import com.openworld.control.Controllable;
 import com.openworld.control.Controller;
@@ -224,6 +225,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         if (seatNodes.isEmpty() && driverSeatNode != null) seatNodes.add(driverSeatNode);
         if (!seatNodes.isEmpty()) driverSeatNode = seatNodes.get(0);
         seatOccupants = new Character[Math.max(1, seatNodes.size())];
+        seatRearPosture = new boolean[seatOccupants.length];
+        seatRearSide    = new int[seatOccupants.length];
+        seatPostureYawApplied = new double[seatOccupants.length];
 
         Node cam = getNodeOrNull(vehicleCamPath.getPath());
         if (cam instanceof Camera3D c) vehicleCamera = c;
@@ -426,9 +430,20 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
             }
             Node3D anchor = seat < seatNodes.size() ? seatNodes.get(seat) : driverSeatNode;
             if (anchor == null) continue;
-            rider.setGlobalPosition(anchor.getGlobalPosition());
+            // POSTURE: the body may be turned round in its seat to aim behind (see
+            // updateSeatPosture). Both halves of that ride on the pin that was already here — the
+            // yaw offset on the rotation it writes every tick, the slide across on the position —
+            // so there is no second place that decides where a seated occupant is.
+            double postureHeading = updateSeatPosture(seat, rider, delta);
+            Vector3 seatPos = anchor.getGlobalPosition();
+            double shift = seatPostureShift(seat);
+            if (shift != 0.0) {
+                Vector3 right = getGlobalTransform().getBasis().getColumn(0);
+                seatPos = seatPos.plus(right.times((float) shift));
+            }
+            rider.setGlobalPosition(seatPos);
             Vector3 occRot = rider.getGlobalRotation();
-            occRot.setY((float) getGlobalRotation().getY());
+            occRot.setY((float) (getGlobalRotation().getY() + yawForHeading(postureHeading)));
             rider.setGlobalRotation(occRot);
         }
 
@@ -908,6 +923,283 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     // the same event (no client-originated MSG_OWNERSHIP anymore). Single-player routes
     // requestEnter/requestExit straight to tryEnter/tryExit — zero behavioural diff.
 
+    /** Below this range (m) an aim point has no usable bearing from a seat — see clampSeatAim. */
+    private static final double AIM_MIN_RANGE = 2.0;
+
+    // ── Drive-by posture (how the body reaches the sector) ────────────────────
+
+    /** Per-seat: is this occupant currently turned round to fire rearward (latched, hysteretic). */
+    private boolean[] seatRearPosture = new boolean[1];
+    /**
+     * Per-seat: WHICH way the rear posture turned, -1 left / +1 right, latched for as long as the
+     * posture is held.
+     *
+     * <p>Latched rather than re-derived, because the side comes from the sign of the aim heading and
+     * that sign FLIPS across the rear: -179 and +179 are a degree apart in the world and opposite in
+     * the number. Re-deriving it every frame makes a body facing directly backwards snap between
+     * turning left and turning right. Hysteresis on "am I turned round" alone does not cover that —
+     * the direction needs its own latch.
+     */
+    private int[]     seatRearSide = new int[1];
+    /**
+     * Per-seat: the posture's HEADING this frame, degrees, eased toward the target — the same space
+     * as the sweep ({@link #headingDegrees}), converted to a Godot yaw only at the pin by
+     * {@link #yawForHeading}. Keeping it in heading space is what stops the two conventions from
+     * being mixed here: a posture that faces the rear-LEFT is -150 in this field, like the sweep
+     * bound it exists to reach.
+     */
+    private double[]  seatPostureYawApplied = new double[1];
+
+    /**
+     * Decides and eases this seat's POSTURE, returning the HEADING (degrees, + right) the body
+     * should face — see {@link #yawForHeading} for the conversion the pin applies.
+     *
+     * <p><b>Why a posture exists at all.</b> A seated body cannot yaw, so an aim heading has to be
+     * paid for entirely out of spine and collarbones, and there is a hard ceiling on what those can
+     * sell before the shoulder reads as dislocated. Past that ceiling the human answer is not more
+     * twist — it is to turn round in the seat and shift across it, which is what a real drive-by
+     * shooter does and what GTA authors as a separate rear clip set. Doing it this way means the
+     * bones are only ever asked for the RESIDUAL between the aim and whichever way the body now
+     * faces, so the rear sector costs the arms no more than a forward one.
+     *
+     * <p>It is <b>continuous</b> ({@code VehicleConfig.postureHoldDeg}) and needs no hysteresis for
+     * that reason — there is no step for the body to chatter across. The version this replaced had
+     * an enter/exit threshold pair and a FIXED body angle, and a player feels both faults at once: a
+     * band where the body sits pinned at 150 degrees while the aim is near 80, and a latched side
+     * that leaves the body facing the wrong way once the aim crosses the rear. It is still
+     * <b>eased</b> at {@code postureTurnSpeed} rather than snapped, so it reads as a person turning.
+     *
+     * <p>The aim modifiers need no knowledge of any of this: {@code ShoulderAimModifier} clamps
+     * against {@code MeshRoot}'s forward, and {@code MeshRoot} follows the body, so "the residual"
+     * is simply what they already measure.
+     */
+    private double updateSeatPosture(int seat, Character rider, double delta) {
+        if (seat < 0 || seat >= seatPostureYawApplied.length) return 0.0;
+        VehicleConfig cfg = getConfig();
+        double target = 0.0;
+        if (cfg != null && cfg.rearAimBodyYaw != 0.0 && rider.isSeatedAimAnchored()) {
+            // Measured against the CAR, not against the body: the heading the player is asking for
+            // must not depend on the posture the last frame chose, or the two feed each other.
+            Vector3 toAim = rider.getAimTargetPosition().minus(rider.getGlobalPosition());
+            if (toAim.length() < AIM_MIN_RANGE) return seatPostureYawApplied[seat];  // hold
+            double heading = headingDegrees(toAim);
+            double mag     = Math.abs(heading);
+
+            // THE RULE, and it is CONTINUOUS: the bones carry `postureHoldDeg` of the aim and the
+            // body turns by exactly the excess, capped at what a belted body can manage. So the
+            // residual left to the spine and collarbones is flat all the way round and the body
+            // tracks the aim, instead of snapping to a fixed angle and sitting there.
+            int side = (heading < 0.0) ? -1 : 1;
+            // ...except directly behind, where +179 and -179 are a degree apart in the world and
+            // opposite in the number. Holding the side already turned to is stable there and costs
+            // nothing, because the two poses are very nearly the same one.
+            if (mag > cfg.postureSideLatchDeg && seatRearSide[seat] != 0) side = seatRearSide[seat];
+
+            double want = Math.min(Math.max(0.0, mag - cfg.postureHoldDeg),
+                                   Math.abs(cfg.rearAimBodyYaw)) * side;
+
+            // A posture may not face somewhere this seat is not allowed to shoot: a sweep that stops
+            // at +20 must not be answered by a body turned to +150. Clamped into the sweep rather
+            // than swapped to the other side — the other side may be illegal too, and a posture that
+            // turns AWAY from the target helps nothing.
+            double[] sweep = seatAimSweep(seat);
+            if (sweep != null) want = Math.max(sweep[0], Math.min(sweep[1], want));
+
+            target = want;
+            seatRearSide[seat]    = (want == 0.0) ? 0 : (want < 0.0 ? -1 : 1);
+            seatRearPosture[seat] = want != 0.0;
+        } else {
+            seatRearPosture[seat] = false;
+            seatRearSide[seat]    = 0;
+        }
+        double speed = (cfg != null) ? cfg.postureTurnSpeed : 360.0;
+        double cur = seatPostureYawApplied[seat];
+        double step = speed * delta;
+        seatPostureYawApplied[seat] = Math.abs(target - cur) <= step
+                ? target : cur + Math.copySign(step, target - cur);
+        return seatPostureYawApplied[seat];
+    }
+
+    /**
+     * A seated occupant must be invisible to the carrier's OWN aim ray. That ray starts at the
+     * cockpit camera — inside the driver's head — and `Vehicle.tscn` masks the HITBOX layer, so
+     * without this it reports a hit on the occupant's own ragdoll bone 0.3 m out and the aim point
+     * (and therefore the shot, via `FirearmItem.resolveSightPoint`) lands inside the shooter.
+     * Applied on every enter and undone on every exit, for the driver and for a passenger alike:
+     * the passenger fires through the same carrier ray in PASSENGER_WEAPON mode.
+     */
+    private void setOccupantAimExceptions(Character c, boolean add) {
+        if (c == null) return;
+        RayCast3D camRay = (camController != null) ? camController.getAimRayNode() : null;
+        RayCast3D wpnRay = (vehicleWeaponController != null) ? vehicleWeaponController.getAimRay() : null;
+        if (add) {
+            c.addAimExceptionsTo(camRay);
+            if (wpnRay != camRay) c.addAimExceptionsTo(wpnRay);
+        } else {
+            c.removeAimExceptionsFrom(camRay);
+            if (wpnRay != camRay) c.removeAimExceptionsFrom(wpnRay);
+        }
+    }
+
+    /** Forget a seat's posture so the next occupant starts facing forward. */
+    private void resetSeatPosture(int seat) {
+        if (seat < 0 || seat >= seatPostureYawApplied.length) return;
+        seatRearPosture[seat] = false;
+        seatRearSide[seat]    = 0;
+        seatPostureYawApplied[seat] = 0.0;
+    }
+
+    /**
+     * Warn once, on entry, when the carrier's authored firing sector reaches further than the
+     * posture + the body can follow — the band between them is where the gun visibly lags the
+     * reticle, and it is silent otherwise.
+     *
+     * <p>Two independently-authored numbers that must relate is the shape {@code ZoneManager
+     * .warnIfMisSized} already handles this way, and for the same reason: neither can own the
+     * other (one is the car's, one is the rig's), so the honest thing is to say so at the moment
+     * they meet.
+     */
+    private void warnIfAimSectorUnreachable(Character c) {
+        VehicleConfig cfg = getConfig();
+        if (cfg == null || c == null) return;
+        double reach = c.seatedAimReachDegrees();
+        if (reach <= 0.0) return;
+        double outer = Math.max(Math.abs(cfg.drivebyAimMin), Math.abs(cfg.drivebyAimMax));
+        double covered = (cfg.rearAimBodyYaw != 0.0) ? Math.abs(cfg.rearAimBodyYaw) + reach : reach;
+        if (outer > covered + 1.0) {
+            GD.printErr(String.format(
+                    "[Vehicle] %s: firing sector reaches %.0f deg but posture+rig cover %.0f "
+                    + "(rearAimBodyYaw %.0f + stance aimYawLimit %.0f) — the gun will lag the "
+                    + "reticle beyond that.",
+                    getName(), outer, covered, cfg.rearAimBodyYaw, reach));
+        }
+        if (cfg.postureHoldDeg > reach + 1.0) {
+            GD.printErr(String.format(
+                    "[Vehicle] %s: postureHoldDeg %.0f exceeds the rig's reach %.0f — the bones are "
+                    + "being asked to carry more than they can before the body starts turning.",
+                    getName(), cfg.postureHoldDeg, reach));
+        }
+    }
+
+    /** How far across the seat this occupant has slid, metres — scaled by how far the turn has got. */
+    private double seatPostureShift(int seat) {
+        VehicleConfig cfg = getConfig();
+        if (cfg == null || cfg.rearAimSeatShift == 0.0 || cfg.rearAimBodyYaw == 0.0) return 0.0;
+        if (seat < 0 || seat >= seatPostureYawApplied.length) return 0.0;
+        double applied = seatPostureYawApplied[seat];
+        double progress = Math.abs(applied) / Math.abs(cfg.rearAimBodyYaw);
+        // Lean the way the body is turning — a shooter twisting right braces to the right — so the
+        // slide follows the posture rather than a fixed side of the car. `applied` is a HEADING, so
+        // its sign is already "+ = right" (see headingDegrees).
+        double side = Math.signum(applied);
+        return side * cfg.rearAimSeatShift * Math.min(1.0, progress);
+    }
+
+    // ── Drive-by aim sweep (the seat's firing sector) ─────────────────────────
+
+    /**
+     * Signed heading of a world direction relative to this carrier's forward: degrees, positive to
+     * the RIGHT, measured about world up. Elevation is deliberately dropped — the sweep is a yaw
+     * sector, and {@code Stance.aimPitchMax/Min} already owns elevation (W5).
+     */
+    private double headingDegrees(Vector3 worldDir) {
+        // Projected onto the carrier's OWN right and forward axes, never assembled out of two
+        // world-space atan2 calls. The difference-of-atan2 form this replaces returned -90 for a
+        // direction pointing RIGHT while every comment on it said +90 — so a left-hand-drive seat's
+        // sweep opened the whole RIGHT side of the car and shut the driver's own window, which is
+        // exactly how it was reported. Dot products against the basis cannot express that mistake:
+        // column 0 IS right and -column 2 IS forward, by definition of the transform.
+        Basis b = getGlobalTransform().getBasis();
+        double x = worldDir.dot(b.getColumn(0));
+        double z = worldDir.dot(b.getColumn(2).times(-1f));
+        return Math.toDegrees(Math.atan2(x, z));   // 0 = straight ahead, +90 = straight right
+    }
+
+    /**
+     * The Godot Y rotation that faces a body at {@code heading} (see {@link #headingDegrees}).
+     *
+     * <p>A NEGATION, and it needs saying once in one place: a positive Godot Y rotation turns
+     * LEFT (counter-clockwise seen from above) while a positive heading is to the RIGHT. Every
+     * mixing of the two spaces goes through here.
+     */
+    private static double yawForHeading(double headingDeg) {
+        return -Math.toRadians(headingDeg);
+    }
+
+    /**
+     * The firing sector for a seat, as {@code {minDeg, maxDeg}} about this carrier's forward,
+     * positive to the right — or {@code null} when this carrier authors none (no clamp at all,
+     * i.e. exactly the behaviour before the sweep existed).
+     *
+     * <p>The authored pair on {@link VehicleConfig} describes a LEFT-side seat and is MIRRORED for
+     * a right-side one, with the side read off the seat marker's own local X — the same fact
+     * {@link #seatExitPosition} already reads to decide which way an occupant steps out. So a car
+     * needs one authored pair however many seats it has, and a seat cannot end up with a sector
+     * that disagrees with the door it gets out of.
+     */
+    public double[] seatAimSweep(int seatIndex) {
+        VehicleConfig cfg = getConfig();
+        if (cfg == null || cfg.drivebyAimMax <= cfg.drivebyAimMin) return null;
+        Node3D anchor = seatIndex >= 0 && seatIndex < seatNodes.size()
+                ? seatNodes.get(seatIndex) : driverSeatNode;
+        boolean rightSide = anchor != null && anchor.getPosition().getX() > 0f;
+        return rightSide
+                ? new double[] { -cfg.drivebyAimMax, -cfg.drivebyAimMin }
+                : new double[] {  cfg.drivebyAimMin,  cfg.drivebyAimMax };
+    }
+
+    /**
+     * Where {@code occupant} may actually aim, given where they asked to: the desired point turned
+     * back into this seat's own firing sector, at the SAME DISTANCE.
+     *
+     * <p>Distance-preserving on purpose. It makes the clamp the identity whenever the target is
+     * legal — so an ordinary drive-by is bit-for-bit what it was before this existed — and where it
+     * does bite, the returned point is still a plausible depth, which is what lets the reticle sit
+     * on it instead of guessing one. No raycast: the shot's own stage-2 trace
+     * ({@code FirearmItem.resolveShot}) already extends along this direction to full range and hits
+     * whatever is really there, so a second query here would only produce a second answer.
+     *
+     * <p>Clamped about WORLD UP, so elevation survives untouched — the same reason
+     * {@code ShoulderAimModifier} clamps about that axis rather than the reference bone's.
+     */
+    public Vector3 clampSeatAim(Character occupant, Vector3 desired) {
+        if (occupant == null || desired == null) return desired;
+        double[] sweep = seatAimSweep(findSeatOf(occupant));
+        if (sweep == null) return desired;
+
+        Vector3 from = occupant.getGlobalPosition();
+        Vector3 to   = desired.minus(from);
+        // A point inside the car has no meaningful bearing FROM the seat -- a metre-long vector's
+        // heading is dominated by where the occupant happens to sit -- so it is left alone rather
+        // than clamped on noise. 2 m, not centimetres: the old 0.5 m threshold let a point 0.8 m
+        // away (the carrier's own origin, which getAimTarget used to return) through as if it were
+        // a target, and its heading read 64 degrees off the camera's.
+        if (to.length() < AIM_MIN_RANGE) return desired;
+
+        double heading = headingDegrees(to);
+        double capped  = Math.max(sweep[0], Math.min(sweep[1], heading));
+        if (capped == heading) return desired;
+
+        Vector3 up = new Vector3(0.0, 1.0, 0.0);
+        return from.plus(new Basis(up, yawForHeading(capped - heading)).times(to));
+    }
+
+    /**
+     * Is this carrier currently rendering from behind {@code c}'s own eyes? True only for the
+     * DRIVER, only in the cockpit view, and only while the carrier's camera is the one on screen.
+     *
+     * <p>Asked by {@code Character.refreshHeadVisibility}, and it lives here because the answer is
+     * the carrier's to give — the character cannot know which of the carrier's three views is up.
+     * A passenger is never covered by this: they keep their own camera when they sit down, so
+     * their head is decided by their own {@code isFpsMode} exactly as it is on foot.
+     */
+    public boolean isViewInsideOccupantHead(Character c) {
+        if (c == null || camController == null) return false;
+        if (occupant != c) return false;                       // driver seat only
+        if (vehicleCamera == null || !vehicleCamera.isCurrent()) return false;
+        return camController.isCockpitView();
+    }
+
     // ── Seat accessors (multi-seat) ───────────────────────────────────────────
 
     public int getSeatCount() { return seatOccupants.length; }
@@ -1010,6 +1302,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
 
         c.enterDriveState(mode, this);
         c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
+        resetSeatPosture(0);
+        setOccupantAimExceptions(c, true);
+        if (mode == VehicleWeaponMode.PASSENGER_WEAPON) warnIfAimSectorUnreachable(c);
 
         // PLAN.md I3c: an AI-driven traffic car already has its lane-follow brain
         // (VehicleAIController) on the vehicle, and the seated AI is a non-driving visible occupant —
@@ -1047,7 +1342,17 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
 
         if (localDriver) {
-            if (camController != null) camController.setPassengerAimMode(mode == VehicleWeaponMode.PASSENGER_WEAPON);
+            if (camController != null) {
+                camController.setPassengerAimMode(mode == VehicleWeaponMode.PASSENGER_WEAPON);
+                // The player's view preference follows them into the seat. Without this the two
+                // rigs were independent latches -- the character's `isFpsMode` and the carrier's
+                // own `cameraMode`, which defaulted to TPS and remembered whatever this particular
+                // car was last left in -- so getting into a car silently discarded the choice the
+                // player had just made on foot, and getting out silently restored a different one.
+                // WHICH first-person mount (cockpit vs bonnet) is deliberately NOT carried: that
+                // is a fact about this carrier, not about the player.
+                camController.setCameraMode(c.isFpsMode ? CameraMode.FPS : CameraMode.TPS);
+            }
             if (vehicleCamera != null) vehicleCamera.makeCurrent();
             emitEnterPrompt(false);
         }
@@ -1069,6 +1374,9 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
                 ? VehicleWeaponMode.PASSENGER_WEAPON : VehicleWeaponMode.NONE;
         c.enterDriveState(mode, this, false);
         c.setGlobalRotation(new Vector3(0f, (float) getGlobalRotation().getY(), 0f));
+        resetSeatPosture(seatIndex);
+        setOccupantAimExceptions(c, true);
+        if (mode == VehicleWeaponMode.PASSENGER_WEAPON) warnIfAimSectorUnreachable(c);
         Node busNode = getNodeOrNull("/root/EventBus");
         if (busNode instanceof EventBus bus) bus.vehicleEntered.emit(this, c.characterInfo);
         nameplateChanged.emit();
@@ -1088,6 +1396,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         Character c = occupant;
         occupant = null;
         seatOccupants[0] = null;
+        resetSeatPosture(0);
+        setOccupantAimExceptions(c, false);
 
         boolean localDriver = controller instanceof PlayerController;
 
@@ -1111,7 +1421,14 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
         }
 
         if (localDriver) {
-            if (camController != null) camController.setPassengerAimMode(false);
+            if (camController != null) {
+                camController.setPassengerAimMode(false);
+                // ...and back out again: a player who switched to a first-person driving view is
+                // still in first person when they step out. Write it back BEFORE the character's
+                // camera is made current, so the on-foot rig's first frame is already the right
+                // one -- setCameraMode also re-derives head visibility.
+                c.setCameraMode(camController.getCameraMode() == CameraMode.FPS);
+            }
             c.makeCameraActive();
         }
         activeCollisions.add(c);
@@ -1124,6 +1441,8 @@ public class Vehicle extends RigidBody3D implements Controllable, NameplateTarge
     private void exitPassenger(int seatIndex) {
         Character c = seatOccupants[seatIndex];
         seatOccupants[seatIndex] = null;
+        resetSeatPosture(seatIndex);
+        setOccupantAimExceptions(c, false);
         c.setGlobalPosition(seatExitPosition(seatIndex));
         c.exitDriveState();
         activeCollisions.add(c);

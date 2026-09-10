@@ -8,12 +8,15 @@ import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
 import godot.api.Area3D;
+import godot.api.CollisionShape3D;
 import godot.api.Input;
 import godot.api.Node;
 import godot.api.Node3D;
-import godot.api.RigidBody3D;
 import godot.core.NodePath;
 import godot.core.StringName;
+import godot.core.Transform3D;
+import godot.core.Vector3;
+import godot.global.GD;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,20 +27,29 @@ import com.openworld.weapon.WeaponController;
 import com.openworld.weapon.WeaponItem;
 
 /**
- * World-space physics pickup. RigidBody3D provides physical presence (falls, rests on
- * surfaces). A child Area3D named "PickupArea" handles character detection.
+ * A collectable ITEM. Not a physics body — see {@link PickupBody}, which is.
+ *
+ * An item has two states and they are different SHAPES, not one object with physics turned
+ * down. Lying in the world it rides inside a {@code PickupBody} (a RigidBody3D that owns the
+ * collision shape, gravity and impulses); held, it is a plain Node3D under a bone socket with no
+ * physics presence at all. This class owns that transition — {@link #placeInWorld} builds the body,
+ * {@link #detachWorldBody} takes it away — so no caller has to reason about a body it cannot see.
  *
  * Scene setup:
- *   Pickup (RigidBody3D + subclass script)
- *     CollisionShape3D        ← physics body shape  (layer 3, mask layer 1)
- *     PickupArea (Area3D)
- *       CollisionShape3D      ← detection sphere    (layer 0, mask layer 2)
+ *   Pickup (Node3D + subclass script)      ← the item: meshes, markers, logic
+ *     CollisionShape3D        ← the WORLD body's shape; lent to PickupBody while in the world
+ *     PickupArea (Area3D)     ← character detection    (layer 0, mask layer 2)
+ *       CollisionShape3D      ← detection volume
  *   Connect: PickupArea.body_entered → on_body_entered
  *   Connect: PickupArea.body_exited  → on_body_exited
  *
+ * A scene-placed item wraps ITSELF in a body on the first idle frame ({@link #attachWorldBody});
+ * one authored inside a character (the Fist under a weapon socket) does not — see
+ * {@link #bornHeld()}.
+ *
  * Post-pickup behaviour:
  *   removeOnPickup = true   → queue_free()  (one-shot consumable: health, key)
- *   pauseOnPickup  = true   → freeze + hide + disable area; resume via resumeFromPause()
+ *   pauseOnPickup  = true   → drop the body + hide + disable area; resume via resumeFromPause()
  *   neither                 → stays active  (permanent station)
  *
  * Interaction modes:
@@ -51,7 +63,7 @@ import com.openworld.weapon.WeaponItem;
  * in the subclass .gdj for scene signal connections.
  */
 @Script(className = "Pickup")
-public class Pickup extends RigidBody3D {
+public class Pickup extends Node3D {
 
   protected static final NodePath WEAPON_CONTROLLER_PATH = new NodePath("WeaponController");
   private static final String PICKUP_AREA = "PickupArea";
@@ -75,6 +87,14 @@ public class Pickup extends RigidBody3D {
    */
   @Export public String pickupId = "";
 
+  /**
+   * Continuous collision detection for this item's world body. A small, light item thrown hard —
+   * a grenade — can tunnel through a thin floor in one step without it; a rifle dropped at the
+   * player's feet does not need the cost. Authored on the ITEM because it is a fact about the item,
+   * and applied to the {@link PickupBody} each time one is built.
+   */
+  @Export public boolean worldBodyContinuousCd = false;
+
   /** Group every pickup joins in _ready() — replication handlers resolve pickupId through it. */
   public static final String PICKUPS_GROUP = "pickups";
 
@@ -89,6 +109,13 @@ public class Pickup extends RigidBody3D {
    * resolved outcome rather than a pre-equip guess. See {@link #collectBy}.
    */
   private Node pendingCollector;
+  /**
+   * The RigidBody3D this item rides while it is lying in the world; null while held. The item is
+   * this body's child at identity, and the item's authored CollisionShape3D children are lent to
+   * it for as long as it exists (a shape only registers with the CollisionObject3D it is a DIRECT
+   * child of). Never read it raw — {@link #worldBody()} nulls a freed one.
+   */
+  private PickupBody worldBody;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -101,6 +128,140 @@ public class Pickup extends RigidBody3D {
     // pickup would share the literal id "NodePath()". getPath() (the path property) is the
     // actual path string, identical on every peer for world-scene nodes.
     if (pickupId.isEmpty()) pickupId = getPath().getPath();
+    // A scene-placed world item gets its body on the next idle frame. Deferred because _ready runs
+    // while the scene is still being built (reparenting into a body we just created is not a thing
+    // to do mid-construction), and because the id above must be read from the AUTHORED path —
+    // wrapping first would change it, and every peer has to derive the same string.
+    if (!bornHeld()) callDeferred(new StringName("attach_world_body"));
+  }
+
+  // ── World body: the item's physics, which exists only while it is in the world ──────────
+
+  /** This item's world body, or null when it is held (or when a previous one has been freed). */
+  public PickupBody worldBody() {
+    if (worldBody != null && !GD.isInstanceValid(worldBody)) worldBody = null;
+    return worldBody;
+  }
+
+  /**
+   * True when this item was authored INSIDE a character (the Fist, a vehicle's mounted weapon) and
+   * so is held from birth — it must never wrap itself in a body. The test is the one that actually
+   * decides it: a WeaponController somewhere up the parent chain. Owner/scene-root tests were
+   * considered and are wrong for a runtime-instantiated weapon (no owner) and for a weapon placed
+   * in a sub-scene.
+   */
+  protected final boolean bornHeld() {
+    for (Node n = getParent(); n != null; n = n.getParent()) {
+      if (n.hasNode(WEAPON_CONTROLLER_PATH)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Claim this item for an inventory before the equip actually resolves. Two things want this and
+   * both are the same thing: an item that is ON ITS WAY into a slot is not lying in the world, so
+   * it must not sprout a world body in the meantime.
+   *
+   * <p>Measured on DebugWorld: without it, every weapon spawned straight into an inventory
+   * (ZoneManager arming a streamed-in AI, DebugHarness) built a PickupBody on the deferred frame
+   * and had it freed again by the equip one frame later — 3 of the 13 bodies built in a boot.
+   * The pickup path had this already: {@code WeaponItem.onCharacterEntered} sets the same flag
+   * before it defers, to block a re-trigger.
+   *
+   * <p>Deliberately does NOT take the body away — that reparents CollisionShape3D nodes out of a
+   * RigidBody3D, and this is reached from a body_entered physics signal where the physics server
+   * will not accept it. {@link #onPickedUp} does the detach, at idle.
+   */
+  public void claimForInventory() {
+    equipped = true;
+  }
+
+  /**
+   * Wrap this item in a {@link PickupBody} in place, keeping its world transform. Idempotent, and a
+   * no-op while the item is equipped — which is what makes the deferred call from {@link #_ready}
+   * safe whichever side of the first equip it lands on.
+   */
+  @Register
+  public void attachWorldBody() {
+    attachWorldBodyUnder(null);
+  }
+
+  /** As {@link #attachWorldBody}, placing (or moving) the body under {@code host}. */
+  private void attachWorldBodyUnder(Node host) {
+    if (equipped || !isInsideTree()) return;
+    PickupBody body = worldBody();
+    if (body != null) {
+      if (host != null && !host.equals(body.getParent())) body.reparent(host, true);
+      return;
+    }
+    Node parent = host != null ? host : getParent();
+    if (parent == null || parent instanceof PickupBody) return;
+
+    Transform3D at = getGlobalTransform();
+    body = new PickupBody();
+    body.setName(new StringName(getName().toString() + "Body"));
+    parent.addChild(body);
+    // Orthonormalised: a scaled rigid body is a physics hazard, and any scale the item carries
+    // stays on the item (reparent below keeps its global transform, so it absorbs the residual).
+    body.setGlobalTransform(new Transform3D(at.getBasis().orthonormalized(), at.getOrigin()));
+    if (worldBodyContinuousCd) body.setUseContinuousCollisionDetection(true);
+    reparent(body, true);
+    lendShapesTo(body);
+    worldBody = body;
+  }
+
+  /**
+   * Take the body away: shapes come back, the item is reparented to where the body stood (keeping
+   * its world transform) and the body is freed. Idempotent — most callers cannot know whether the
+   * item currently has one.
+   */
+  public void detachWorldBody() {
+    PickupBody body = worldBody();
+    worldBody = null;
+    if (body == null) return;
+    reclaimShapesFrom(body);
+    Node host = body.getParent();
+    if (host != null && isInsideTree()) reparent(host, true);
+    body.queueFree();
+  }
+
+  /**
+   * Put this item in the world at {@code position} and throw it with {@code impulse} — the one
+   * entry point for a drop. {@code parent} null keeps it where it already is (the replicated-drop
+   * convergence path, which only needs to move an item that is already lying about).
+   */
+  public void placeInWorld(Node parent, Vector3 position, Vector3 impulse) {
+    attachWorldBodyUnder(parent);
+    PickupBody body = worldBody();
+    if (body == null) {           // equipped, or not in the tree — nothing to throw
+      setGlobalPosition(position);
+      return;
+    }
+    body.setGlobalPosition(position);
+    // Clear the velocity a freshly built body cannot have but a re-placed one can: an item
+    // converged by a replicated drop keeps whatever it was doing, and adding an impulse on top of
+    // that can tunnel it through a thin floor.
+    body.setLinearVelocity(Vector3.Companion.getZERO());
+    body.setAngularVelocity(Vector3.Companion.getZERO());
+    body.applyCentralImpulse(impulse);
+  }
+
+  /** Hand every direct CollisionShape3D to {@code body} — a shape only registers with its DIRECT parent. */
+  private void lendShapesTo(PickupBody body) {
+    for (Node child : new ArrayList<>(collectShapes(this))) child.reparent(body, true);
+  }
+
+  /** The other half of {@link #lendShapesTo}: take them back before the body goes. */
+  private void reclaimShapesFrom(PickupBody body) {
+    for (Node child : new ArrayList<>(collectShapes(body))) child.reparent(this, true);
+  }
+
+  private List<CollisionShape3D> collectShapes(Node parent) {
+    List<CollisionShape3D> shapes = new ArrayList<>();
+    for (Node child : parent.getChildren()) {
+      if (child instanceof CollisionShape3D shape) shapes.add(shape);
+    }
+    return shapes;
   }
 
   // ── Tick ─────────────────────────────────────────────────────────────────
@@ -168,45 +329,60 @@ public class Pickup extends RigidBody3D {
     overlappingBodies.clear();
     emitInteractPrompt(false);
     setVisible(false);
-    setFreezeEnabled(true);
-    // setMonitoring must be deferred — this method can be called from body signals.
-    Node areaNode = getNodeOrNull(PICKUP_AREA);
-    if (areaNode instanceof Area3D area) area.setDeferred(new StringName("monitoring"), false);
+    detachWorldBody();
+    setAreaMonitoring(false);
   }
 
   @Register
   public void resumeFromPause() {
     setVisible(true);
-    setFreezeEnabled(false);
-    Node areaNode = getNodeOrNull(PICKUP_AREA);
-    if (areaNode instanceof Area3D area) area.setMonitoring(true);
+    attachWorldBody();
+    setAreaMonitoring(true);
     onResumed();
+  }
+
+  /**
+   * Toggle the PickupArea. Deferred: a physics server will not accept a monitoring change while it
+   * is flushing queries, and this is reached from body_entered.
+   */
+  private void setAreaMonitoring(boolean on) {
+    Node areaNode = getNodeOrNull(PICKUP_AREA);
+    if (areaNode instanceof Area3D area) area.setDeferred(new StringName("monitoring"), on);
   }
 
   protected void onResumed() {}
 
   // ── Equip / return lifecycle (used by WeaponItem) ─────────────────────────
 
-  /** Called after this pickup is reparented into a character's inventory marker.
-   *  Hides immediately so the world pickup vanishes on collection, then freezes physics.
-   *  WeaponItem.moveWeaponToHand calls show() afterwards for weapons with a hold socket,
-   *  so the hide here is intentionally overridden for visually-held weapons. */
+  /** Collected: the item loses its world body entirely and becomes an ordinary Node3D the caller
+   *  can hang off a bone socket. Hides immediately so the world pickup vanishes on collection;
+   *  WeaponController.moveWeaponToHand calls show() afterwards for weapons with a hold socket, so
+   *  the hide here is intentionally overridden for visually-held weapons.
+   *
+   *  <p>Must run BEFORE the caller reparents the item onto a socket — reparenting the item while it
+   *  still sits inside its body would carry the body's shapes nowhere and strand the body itself.
+   *
+   *  <p>Registered because it is half of the item's world/held transition, and the only way anything
+   *  outside {@code WeaponController} (a scene, a probe) can say "this item is carried now". */
+  @Register
   public void onPickedUp() {
     equipped = true;
     overlappingBodies.clear();
     emitInteractPrompt(false);
     hide();
-    setFreezeEnabled(true);
+    detachWorldBody();
+    setAreaMonitoring(false);
   }
 
-  /** Called after this pickup is reparented back into the world scene.
-   *  Re-enables physics and detection. Safe to call from _process (not a signal). */
+  /** Back in the world: physical presence and detection return. Note this only clears the equipped
+   *  flag and rebuilds the body IN PLACE — a drop that also has a position and a throw goes through
+   *  {@link #placeInWorld}. Safe to call from _process (not a signal). */
+  @Register
   public void onReturnedToWorld() {
     equipped = false;
     pickupCooldown = pickupCooldownAfterDrop;
-    setFreezeEnabled(false);
-    Node areaNode = getNodeOrNull(PICKUP_AREA);
-    if (areaNode instanceof Area3D area) area.setMonitoring(true);
+    attachWorldBody();
+    setAreaMonitoring(true);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

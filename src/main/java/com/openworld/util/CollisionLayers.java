@@ -10,7 +10,7 @@ import com.openworld.item.Pickup;
  * Layer map:
  *   1  world     (bitmask  1) — StaticBody3D world geometry (Godot default layer)
  *   2  character (bitmask  2) — Live CharacterBody3D capsule
- *   3  pickup    (bitmask  4) — Dropped weapon/item RigidBody3D
+ *   3  pickup    (bitmask  4) — item.PickupBody, the RigidBody3D a world item rides
  *   4  hitbox    (bitmask  8) — PhysicalBone3D ragdoll bones (live, for hitscan)
  *   5  vehicle   (bitmask 16) — Vehicle RigidBody3D
  *
@@ -20,12 +20,14 @@ import com.openworld.item.Pickup;
  *
  * Common combined masks:
  *   CHARACTER body mask:      WORLD | CHARACTER | VEHICLE  = 19
- *   AimRay (character/veh):  WORLD | HITBOX    | VEHICLE  = 25
+ *   AimRay (character):       WORLD | PICKUP | HITBOX | VEHICLE = 29  (Character.tscn — PICKUP is
+ *                             what lets a bullet detonate a dropped grenade)
+ *   AimRay (vehicle):         WORLD | HITBOX | VEHICLE          = 25
  *   PickupArea mask:          CHARACTER                    =  2
  *   AmmoRefill mask:          CHARACTER                    =  2
  *   Vehicle EntranceArea:     CHARACTER                    =  2
  *   Vehicle SpringArm mask:   WORLD | VEHICLE              = 17
- *   Pickup RigidBody3D mask:  WORLD                        =  1
+ *   PickupBody mask:          WORLD                        =  1
  *   Ragdoll bone mask:        WORLD                        =  1
  */
 public final class CollisionLayers {

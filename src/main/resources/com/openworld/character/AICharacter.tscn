@@ -30,21 +30,12 @@ behavior_config = SubResource("Resource_aibcf")
 escort_target_path = NodePath("")
 character_info = SubResource("Resource_be1gi")
 
-[node name="MovementController" parent="." index="4" unique_id=349324944]
-world_space_movement = true
-
-[node name="AnimationController" parent="." index="5" unique_id=1235095298]
-world_space_movement = true
-
 [node name="Health" parent="." index="9" unique_id=1822801054]
 display_name = "Enemy"
 
 [node name="TPSCameraController" parent="." index="10" unique_id=1945688108]
 script = ExtResource("4_x1vpt")
 aim_tracking_degrees_per_sec = 90.0
-
-[node name="Pivot" parent="TPSCameraController/Yaw/Pitch" parent_id_path=PackedInt32Array(643544584) index="0" unique_id=1611848527]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 
 [node name="AimTarget" type="Marker3D" parent="ActiveCamera" parent_id_path=PackedInt32Array(1900000042) index="0" unique_id=1416140619]
 

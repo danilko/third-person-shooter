@@ -36,11 +36,21 @@ public class TPSCameraController extends Node3D {
   @Export
   public double pitchSensitivity = 0.07;
 
+  /**
+   * SEED for how far the view may look UP, degrees; positive is up (see {@link ControlRotation}).
+   *
+   * <p>Only a seed: the live limit is per stance ({@code Stance.viewPitchMax}), published into
+   * {@link ControlRotation} by {@link #onSetStance}, and {@code Character._ready()} force-sets a
+   * stance — so this pair is what the rig holds for the handful of frames before the first
+   * {@code changed_stance} arrives, and for a rig on a body with no stances at all. It matches
+   * upright so those frames are not a different camera.
+   */
   @Export
-  public double pitchMax = 75.0;
+  public double pitchMax = 80.0;
 
+  /** SEED for how far the view may look DOWN, as a negative number. See {@link #pitchMax}. */
   @Export
-  public double pitchMin = -55.0;
+  public double pitchMin = -80.0;
 
   @Export
   public double shoulderOffsetLerpSpeed = 4.0;
@@ -86,7 +96,17 @@ public class TPSCameraController extends Node3D {
     }
 
 
-    if (player instanceof Character c) {
+    // Re-resolve the export before reading a single Java field off it. `player` is serialized as
+    // node_paths and godot-kotlin-jvm 0.17 can hand back a SECOND JVM wrapper for that engine
+    // object -- same instance id, different Java object, every Java field at its default. Engine
+    // calls work on either (which is why springArm.addExcludedObject above is fine on the raw
+    // export), Java state does not, and which exports are affected depends on resolution order and
+    // can only be measured. Everything below IS Java state: `controlRotation` is an object
+    // identity shared with the FPS rig and MovementController, `isFpsMode` decides which rig owns
+    // the camera, and `headMeshes` decides whether the character has a face. See CLAUDE.md,
+    // "SOLVED: the player's ~90 degree body rotation".
+    Node resolved = player == null ? null : getNodeOrNull(player.getPath());
+    if (resolved instanceof Character c) {
       character    = c;
       activeCamera = c.activeCamera;
       controlRotation = c.controlRotation;
@@ -107,10 +127,14 @@ public class TPSCameraController extends Node3D {
     return Vector2.Companion.getZERO();
   }
 
-  /** Camera yaw in radians — read by PlayerController to rotate WASD input to world-space each tick. */
-  public double getCurrentYaw() {
-    return yawNode != null ? yawNode.getRotation().getY() : 0.0;
-  }
+  // NOTE: there is deliberately no getCurrentYaw() here any more, and since AIM_PLAN.md W3 there is
+  // nothing for it to return that a caller cannot read directly: the rig's world basis is stated
+  // every frame in _physicsProcess, so `yawNode.rotation.y` — the value `set_cam_rotation` emits —
+  // IS the world view yaw, and `controlRotation.yaw` is the same number in degrees. It used to be a
+  // LOCAL yaw under a frozen parent frame, which is what made a caller add the body's yaw back and
+  // hope it had not moved. PlayerController still reads ActiveCamera's own world basis (see its
+  // movement block): that is the one node EVERY mode writes — TPS, FPS and the vehicle seat — so it
+  // stays the right owner for "which way is the human looking" even now that the rig agrees with it.
 
   public void changeShoulderDirection() {
     shoulderDirection = shoulderDirection * -1;
@@ -125,6 +149,19 @@ public class TPSCameraController extends Node3D {
     controlRotation.yaw   += lookDelta.getX();
     controlRotation.pitch += lookDelta.getY();
 
+    // The rig's world basis is stated OUTRIGHT, every frame, and that is the whole of W3's step 1.
+    // `setAsTopLevel(true)` detaches this node from the body but PRESERVES its global transform at
+    // the instant it is called, so without this line the rig's parent frame is frozen at whatever
+    // the body's yaw happened to be when `_ready()` ran — and `controlRotation.yaw` is then a LOCAL
+    // yaw under that frame, not a world direction. Every bug in AIM_PLAN.md's "why the current
+    // shape keeps producing these bugs" list came from something reading it as though it were one:
+    // `PlayerController` had to add the body's yaw back (and broke the moment a body was rotated
+    // after `add_child()`), and `MovementController.aimYaw()`'s fallback returned it raw and put the
+    // player 90 degrees off. Identity here plus the flips removed from the scene means
+    // `controlRotation` IS the world view rotation, so nothing downstream needs a compensation term.
+    // It must be set BEFORE the positioning block, which reads `yawNode`'s global basis.
+    setGlobalRotation(Vector3.Companion.getZERO());
+
     // TPS positioning: smooth shoulder-offset follow.
     positionOffset = positionOffset.lerp(positionOffsetTarget, shoulderOffsetLerpSpeed * delta);
     Vector3 playerBase = player.getGlobalPosition().plus(new Vector3(0, positionOffset.getY(), 0));
@@ -134,8 +171,12 @@ public class TPSCameraController extends Node3D {
     setGlobalPosition(getGlobalPosition().lerp(targetPos, followSpeedWeight));
     springArm.setLength(GD.lerp(springArm.getLength(), springArmLengthTarget, followSpeedWeight));
 
-    // Clamp clean mouse-intent pitch
-    controlRotation.pitch = GD.clamp(controlRotation.pitch, pitchMin, pitchMax);
+    // Clamp clean mouse-intent pitch against the LIVE limits, which the STANCE owns
+    // (onSetStance writes them into ControlRotation). pitchMin/pitchMax above are only this rig's
+    // seed, used until the first changed_stance arrives; reading them here instead would ignore
+    // the stance and put the elevation limit in two places.
+    controlRotation.pitch =
+        GD.clamp(controlRotation.pitch, controlRotation.pitchMin, controlRotation.pitchMax);
 
     // Decay recoil offsets toward zero each frame
     controlRotation.recoilPitch = GD.lerp(controlRotation.recoilPitch, 0.0, recoilRecoverySpeed * delta);
@@ -146,7 +187,8 @@ public class TPSCameraController extends Node3D {
     yawNode.setRotationDegrees(yawRot);
 
     Vector3 pitchRot = pitchNode.getRotationDegrees();
-    pitchRot.setX(GD.clamp(controlRotation.pitch + controlRotation.recoilPitch, pitchMin, pitchMax));
+    pitchRot.setX(GD.clamp(controlRotation.pitch + controlRotation.recoilPitch,
+                           controlRotation.pitchMin, controlRotation.pitchMax));
     pitchNode.setRotationDegrees(pitchRot);
 
     setCamRotation.emit(yawNode.getRotation().getY());
@@ -155,15 +197,27 @@ public class TPSCameraController extends Node3D {
     // The Proxy is a child of SpringArm; Godot's SpringArm3D C++ positions it at
     // (0, 0, -current_spring_length) in local space each physics step, correctly
     // handling collision shortening. Reading its global transform is always exact.
-    if (activeCamera != null && (character == null || !character.isFpsMode)) {
+    // ...and not while the carrier owns this driver's view: the camera it would write is not the one
+    // on screen, and `AimTarget` hangs off it, so writing it moves the very node
+    // `Character.applySeatedAimTarget` is placing in world space each frame. See the longer note in
+    // FPSCameraController._physicsProcess — there the same seam is an outright feedback loop.
+    if (activeCamera != null && (character == null || !character.isFpsMode)
+            && (character == null || !character.carrierOwnsView())) {
         activeCamera.setGlobalTransform(proxyNode.getGlobalTransform());
     }
+
+    // Head visibility is DERIVED from the live view, every frame, rather than latched at the
+    // moment the view is toggled. Latching it is what left the head missing in a vehicle: the
+    // player toggled FPS on foot, `setHeadVisible(false)` ran once, and nothing on the way into
+    // the seat ever put it back. This node processes in every mode -- it is not the Character,
+    // whose _physicsProcess the driver seat switches off -- so it is the one place that always
+    // gets a frame. refreshHeadVisibility() only touches the meshes when the answer changes.
+    if (character != null) character.refreshHeadVisibility();
   }
 
   /** Adds a per-shot kick (degrees) that decays back to zero at recoilRecoverySpeed. */
   public void applyRecoil(double pitchKick, double yawKick) {
-    // TPS: double-180°Y cancellation makes positive pitch = look down, so subtract to kick up.
-    controlRotation.recoilPitch -= pitchKick;
+    controlRotation.recoilPitch += pitchKick;   // positive pitch is UP, so a kick just adds
     controlRotation.recoilYaw   += yawKick;
   }
 
@@ -208,6 +262,16 @@ public class TPSCameraController extends Node3D {
   public void onSetStance(Stance stance) {
     stanceCameraHeight = stance.getCameraHeight();
     applyCameraHeight();
+
+    // The stance owns the elevation limit -- see Stance.viewPitchMax for why it lives on the
+    // camera and not on the aim modifiers. Published into ControlRotation so BOTH rigs read one
+    // number: this one clamps below, FPSCameraController clamps from the same pair.
+    controlRotation.pitchMax = stance.getViewPitchMax();
+    controlRotation.pitchMin = stance.getViewPitchMin();
+    // Re-clamp immediately: a stance that narrows the range (standing up -> going prone) must not
+    // leave the view held one frame outside its own new limit.
+    controlRotation.pitch =
+        GD.clamp(controlRotation.pitch, controlRotation.pitchMin, controlRotation.pitchMax);
   }
 
   /** Combine the stance base height with the combat-state offset into the camera's Y target. */

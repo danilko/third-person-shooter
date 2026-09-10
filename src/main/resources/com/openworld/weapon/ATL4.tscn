@@ -20,13 +20,12 @@ size = Vector3(0.2, 0.2, 1)
 [sub_resource type="BoxShape3D" id="BoxShape3D_atl4_pickup"]
 size = Vector3(0.4, 0.4, 1.2)
 
-[node name="ATL4" type="RigidBody3D" unique_id=200200001]
-collision_layer = 4
+[node name="ATL4" type="Node3D" unique_id=200200001]
 script = ExtResource("1_pi")
 projectile_scene = ExtResource("2_proj")
 weapon_id = "ATL4"
 weapon_name = "ATL-4"
-weapon_pose_index = 1
+weapon_pose_index = 2
 hold_socket = "MarkerATL4"
 holster_sockets = PackedStringArray("LongWeaponHolsterMaker1", "LongWeaponHolsterMaker2", "LongWeaponHolsterMaker3", "LongWeaponHolsterMaker4")
 reload_speed = 2.5
@@ -58,6 +57,9 @@ collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=200200004]
 shape = SubResource("BoxShape3D_atl4_pickup")
+
+[node name="GripPoint" type="Marker3D" parent="." unique_id=200200008]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.09, 0.1)
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=200200005]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.664365)

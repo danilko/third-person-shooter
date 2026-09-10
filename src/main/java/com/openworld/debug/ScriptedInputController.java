@@ -3,6 +3,7 @@ package com.openworld.debug;
 import com.openworld.control.Controller;
 import com.openworld.control.UserCommand;
 import com.openworld.movement.character.MovementType;
+import com.openworld.movement.character.StanceName;
 import godot.annotation.Script;
 import godot.core.Vector3;
 
@@ -33,6 +34,19 @@ public class ScriptedInputController extends Controller {
     public float steering = 0f;
     public boolean brake = false;
 
+    // ── Pose / aim intent, for a stand that poses a body instead of driving one ──────────────
+    /** Combat pose: what turns the aim modifiers on (AnimationController.onSetCombatState). */
+    public boolean wantCombat = false;
+    /** null leaves the stance alone; otherwise requested every tick, so it also HOLDS a stance. */
+    public StanceName desiredStance = null;
+    /** Weapon slot to hold. Negative leaves the current one alone. */
+    public int desiredWeapon = -1;
+    /** World point to aim at; null leaves the AimTarget marker where it is. */
+    public Vector3 aimTargetPosition = null;
+    /** Trigger held. Goes through the same UserCommand field a human's trigger sets. */
+    public boolean fire = false;
+    public boolean reload = false;
+
     private boolean enterExitPending = false;
     private long tick = 0;
 
@@ -48,6 +62,12 @@ public class ScriptedInputController extends Controller {
         cmd.steering = steering;
         cmd.brake = brake;
         cmd.enterExit = enterExitPending;
+        cmd.wantCombat = wantCombat;
+        cmd.desiredStance = desiredStance;
+        if (desiredWeapon >= 0) cmd.desiredWeapon = desiredWeapon;
+        cmd.aimTargetPosition = aimTargetPosition;
+        cmd.fire = fire;
+        cmd.reload = reload;
         cmd.tick = ++tick;
         enterExitPending = false;
         return cmd;

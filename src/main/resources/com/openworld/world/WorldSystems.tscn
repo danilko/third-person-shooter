@@ -1,14 +1,14 @@
-[gd_scene format=3 uid="uid://worldsystems0001"]
+[gd_scene format=3 uid="uid://dvq2be1wcewoe"]
 
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/ParticleManager.java" id="1_pctl"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/control/Controller.java" id="2_kfoa7"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/ImpactManager.java" id="3_imct"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/DecalManager.java" id="4_dcal"]
+[ext_resource type="Script" uid="uid://dbxdfumy5eubg" path="res://src/main/java/com/openworld/world/manager/ParticleManager.java" id="1_pctl"]
+[ext_resource type="Script" uid="uid://dossevkjauxr6" path="res://src/main/java/com/openworld/control/Controller.java" id="2_kfoa7"]
+[ext_resource type="Script" uid="uid://072r5nlh8oqs" path="res://src/main/java/com/openworld/world/manager/ImpactManager.java" id="3_imct"]
+[ext_resource type="Script" uid="uid://bqc4oycgaiob" path="res://src/main/java/com/openworld/world/manager/DecalManager.java" id="4_dcal"]
 [ext_resource type="Texture2D" uid="uid://bwnu26014m3dy" path="res://icon.svg" id="5_m0gj3"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/BulletTracerManager.java" id="6_btrc"]
-[ext_resource type="Script" path="res://src/main/java/com/openworld/world/manager/ExplosionManager.java" id="7_evfx"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/MenuManager.tscn" id="8_kfoa7"]
-[ext_resource type="PackedScene" path="res://src/main/resources/com/openworld/ui/HUDManager.tscn" id="9_nmpqt"]
+[ext_resource type="Script" uid="uid://b4w0lx4s4hgbl" path="res://src/main/java/com/openworld/world/manager/BulletTracerManager.java" id="6_btrc"]
+[ext_resource type="Script" uid="uid://bud0imsvemb7b" path="res://src/main/java/com/openworld/world/manager/ExplosionManager.java" id="7_evfx"]
+[ext_resource type="PackedScene" uid="uid://menumgr001" path="res://src/main/resources/com/openworld/ui/MenuManager.tscn" id="8_kfoa7"]
+[ext_resource type="PackedScene" uid="uid://fg0ucxit12ax" path="res://src/main/resources/com/openworld/ui/HUDManager.tscn" id="9_nmpqt"]
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flesh"]
 direction = Vector3(0, 1, 0)
@@ -102,15 +102,15 @@ albedo_color = Color(0.28, 0.28, 0.28, 0.6)
 material = SubResource("StandardMaterial3D_expl_smoke")
 size = Vector3(0.5, 0.5, 0.5)
 
-[node name="WorldSystems" type="Node"]
+[node name="WorldSystems" type="Node" unique_id=1713208280]
 
-[node name="ParticleManager" type="Node" parent="."]
+[node name="ParticleManager" type="Node" parent="." unique_id=105500717]
 script = ExtResource("1_pctl")
 pool_size_per_type = 40
 
-[node name="FLESH" type="Node" parent="ParticleManager"]
+[node name="FLESH" type="Node" parent="ParticleManager" unique_id=66734027]
 
-[node name="1" type="GPUParticles3D" parent="ParticleManager/FLESH"]
+[node name="1" type="GPUParticles3D" parent="ParticleManager/FLESH" unique_id=1407804374]
 emitting = false
 amount = 12
 one_shot = true
@@ -119,11 +119,10 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_flesh")
 draw_pass_1 = SubResource("BoxMesh_flesh")
 
-[node name="DEFAULT" type="Node" parent="ParticleManager"]
+[node name="DEFAULT" type="Node" parent="ParticleManager" unique_id=795531080]
 script = ExtResource("2_kfoa7")
-metadata/_custom_type_script = "uid://ciyfqqv4fmm45"
 
-[node name="1" type="GPUParticles3D" parent="ParticleManager/DEFAULT"]
+[node name="1" type="GPUParticles3D" parent="ParticleManager/DEFAULT" unique_id=1281880802]
 emitting = false
 amount = 5
 one_shot = true
@@ -132,30 +131,30 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_hs4nr")
 draw_pass_1 = SubResource("BoxMesh_kfoa7")
 
-[node name="ImpactManager" type="Node" parent="."]
+[node name="ImpactManager" type="Node" parent="." unique_id=1201546686]
 script = ExtResource("3_imct")
 
-[node name="DecalManager" type="Node" parent="."]
+[node name="DecalManager" type="Node" parent="." unique_id=854225497]
 script = ExtResource("4_dcal")
 pool_size = 40
 decal_lifetime = 5.0
 
-[node name="1" type="Decal" parent="DecalManager"]
+[node name="1" type="Decal" parent="DecalManager" unique_id=1862829401]
 size = Vector3(0.1, 0.1, 0.1)
 texture_albedo = ExtResource("5_m0gj3")
 
-[node name="BulletTracerManager" type="Node3D" parent="."]
+[node name="BulletTracerManager" type="Node3D" parent="." unique_id=897467713]
 script = ExtResource("6_btrc")
 
-[node name="1" type="MeshInstance3D" parent="BulletTracerManager"]
+[node name="1" type="MeshInstance3D" parent="BulletTracerManager" unique_id=328855298]
 mesh = SubResource("BoxMesh_hs4nr")
 
-[node name="ExplosionManager" type="Node" parent="."]
+[node name="ExplosionManager" type="Node" parent="." unique_id=1297552414]
 script = ExtResource("7_evfx")
 
-[node name="FLASH" type="Node" parent="ExplosionManager"]
+[node name="FLASH" type="Node" parent="ExplosionManager" unique_id=1306518404]
 
-[node name="1" type="GPUParticles3D" parent="ExplosionManager/FLASH"]
+[node name="1" type="GPUParticles3D" parent="ExplosionManager/FLASH" unique_id=1383531096]
 emitting = false
 amount = 48
 one_shot = true
@@ -164,9 +163,9 @@ explosiveness = 1.0
 process_material = SubResource("ParticleProcessMaterial_expl_flash")
 draw_pass_1 = SubResource("BoxMesh_expl_flash")
 
-[node name="FIREBALL" type="Node" parent="ExplosionManager"]
+[node name="FIREBALL" type="Node" parent="ExplosionManager" unique_id=1444165009]
 
-[node name="1" type="GPUParticles3D" parent="ExplosionManager/FIREBALL"]
+[node name="1" type="GPUParticles3D" parent="ExplosionManager/FIREBALL" unique_id=805765536]
 emitting = false
 amount = 32
 one_shot = true
@@ -174,9 +173,9 @@ explosiveness = 0.8
 process_material = SubResource("ParticleProcessMaterial_expl_fireball")
 draw_pass_1 = SubResource("BoxMesh_expl_fireball")
 
-[node name="SMOKE" type="Node" parent="ExplosionManager"]
+[node name="SMOKE" type="Node" parent="ExplosionManager" unique_id=991320692]
 
-[node name="1" type="GPUParticles3D" parent="ExplosionManager/SMOKE"]
+[node name="1" type="GPUParticles3D" parent="ExplosionManager/SMOKE" unique_id=295459310]
 emitting = false
 amount = 24
 one_shot = true
@@ -185,6 +184,6 @@ explosiveness = 0.3
 process_material = SubResource("ParticleProcessMaterial_expl_smoke")
 draw_pass_1 = SubResource("BoxMesh_expl_smoke")
 
-[node name="MenuManager" parent="." instance=ExtResource("8_kfoa7")]
+[node name="MenuManager" parent="." unique_id=766152510 instance=ExtResource("8_kfoa7")]
 
-[node name="HUDManager" parent="." instance=ExtResource("9_nmpqt")]
+[node name="HUDManager" parent="." unique_id=426533981 instance=ExtResource("9_nmpqt")]

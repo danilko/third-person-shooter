@@ -533,10 +533,9 @@ public class GameManager extends Node {
             world.pickupId = newPickupId;
             world.setMagazine(magazine);
             world.setReserve(reserve);
-            world.setGlobalPosition(position);
-            world.setLinearVelocity(Vector3.Companion.getZERO());
-            world.setAngularVelocity(Vector3.Companion.getZERO());
-            world.applyCentralImpulse(impulse);
+            // null parent: this item is already lying in the world under its own PickupBody —
+            // converge it in place rather than re-homing it to the scene root.
+            world.placeInWorld(null, position, impulse);
         }
     }
 

@@ -19,9 +19,16 @@ import com.openworld.carrier.vehicle.Vehicle;
  * Scene hierarchy expected:
  *   CameraController (this node, 180°Y, setAsTopLevel)
  *     Yaw / Pitch / Pivot (180°Y) / SpringArm / Proxy   ← shared TPS rig
- *   FPSCameraMount (Marker3D sibling — driver head position)
+ *   FPSCameraMount (Marker3D sibling — over the bonnet)
+ *   Seats/Seat0/CockpitCameraMount (Marker3D — the driver's eye line; optional)
  *   ActiveCamera (Camera3D sibling — written each frame)
  *     AimRay (RayCast3D)
+ *
+ * THREE views, cycled by the `view` action in {@link #cycleView()}: TPS follow, cockpit, bonnet.
+ * Two fields carry that, and the split is the point — {@link CameraMode} (is this first person?)
+ * is MIRRORED with {@code Character.isFpsMode} across the enter/exit seam, so the view the player
+ * chose on foot is the view they get in the seat and the view they get back when they climb out;
+ * {@link VehicleEyeMount} (WHICH first person?) is carrier-local and remembered per vehicle.
  *
  * Four sub-modes:
  *   TPS follow  — yaw/pitch lerp to vehicle heading at independent speeds (yaw faster than
@@ -76,7 +83,38 @@ public class VehicleCameraController extends Node3D {
 
     @Export public double recoilRecoverySpeed =  8.0;
 
+    /** The BONNET eye point — over the nose. See {@link VehicleEyeMount#BONNET}. */
     @Export public NodePath fpsCameraMountPath = new NodePath("FPSCameraMount");
+
+    /**
+     * The COCKPIT eye point — the driver's own eye line.
+     *
+     * <p>Authored as a {@code Marker3D} CHILD OF THE SEAT rather than a number in this class, so
+     * the seat stays the one owner of where the driver is: move {@code Seat0} and the cockpit view
+     * moves with it, with nothing here to keep in sync. It is also the only honest way to set the
+     * height — a seated head's offset above the seat anchor differs per vehicle and per character
+     * rig, so it is a thing to drag in the editor, not a constant to guess in Java.
+     *
+     * <p><b>Author it against the eye of a driver who is SEATED AND IN COMBAT.</b> Entering a seat
+     * sets {@code combat = true}, which switches on the {@code NeckFront} blend and the aim
+     * modifier — and both move {@code neck_01}, which is what {@code MarkerFPSCamera} hangs off. An
+     * offset measured on a standing body with combat off is 0.10 m too far back and 0.06 m too low,
+     * which puts the camera behind the driver's own neck looking at the back of their shoulders,
+     * with the head hidden so nothing on screen explains it. {@code probe_vehicle_views.gd}
+     * measures the real thing and asserts it.
+     *
+     * <p><b>A fixed seat-relative mount, deliberately, rather than following the head bone.</b> The
+     * carrier camera's ray feeds {@code Character.applySeatedAimTarget}, which drives the aim
+     * modifier, which drives {@code neck_01} — so a camera that followed that bone would close the
+     * exact feedback loop that made first-person driving tangle (see
+     * {@code FPSCameraController._physicsProcess}). A driving view wants to be steady anyway.
+     *
+     * <p>Left unresolved (a vehicle scene with no such marker) the cockpit view falls back to the
+     * bonnet mount, so an older carrier scene keeps working and simply offers two views instead of
+     * three.
+     */
+    @Export public NodePath cockpitCameraMountPath =
+            new NodePath("../Seats/Seat0/CockpitCameraMount");
 
     // ── Speed feel (racing-game sense of speed) ───────────────────────────────
     // OFF BY DEFAULT SINCE 2026-08-31, on a walk-test report: the previous package — an 18 deg
@@ -128,6 +166,7 @@ public class VehicleCameraController extends Node3D {
     private Camera3D    activeCamera;
     private RayCast3D   aimRay;
     private Node3D      fpsCameraMount;
+    private Node3D      cockpitCameraMount;
 
     private Node3D      yawNode;
     private Node3D      pitchNode;
@@ -145,6 +184,8 @@ public class VehicleCameraController extends Node3D {
     // ── State ─────────────────────────────────────────────────────────────────
 
     private CameraMode cameraMode       = CameraMode.TPS;
+    /** Which first-person eye point, when {@link #cameraMode} is FPS. Carrier-local, remembered. */
+    private VehicleEyeMount eyeMount    = VehicleEyeMount.COCKPIT;
     private boolean    passengerAimMode = false;
 
     private double yaw          = 0.0;
@@ -179,6 +220,10 @@ public class VehicleCameraController extends Node3D {
         Node m = getNodeOrNull(fpsCameraMountPath);
         if (m instanceof Node3D n) fpsCameraMount = n;
 
+        Node cm = (cockpitCameraMountPath == null || cockpitCameraMountPath.isEmpty())
+                ? null : getNodeOrNull(cockpitCameraMountPath);
+        if (cm instanceof Node3D n) cockpitCameraMount = n;
+
         if (activeCamera != null) baseFov = activeCamera.getFov();
         if (tpsSpringArm != null) baseSpringLength = tpsSpringArm.getLength();
         if (target instanceof CollisionObject3D co) {
@@ -195,16 +240,95 @@ public class VehicleCameraController extends Node3D {
 
     public void setPassengerAimMode(boolean enabled) { passengerAimMode = enabled; }
     public void setCameraMode(CameraMode mode)        { cameraMode = mode; }
+    public CameraMode getCameraMode()                 { return cameraMode; }
 
+    /**
+     * This rig's aim ray — the one {@link #getAimTarget()} reads, so the one an occupant must be
+     * excepted from. Exposed rather than duplicating the exception list here: what a body says must
+     * not be hit belongs to the body ({@code Character.addAimExceptionsTo}).
+     */
+    public RayCast3D getAimRayNode()                  { return aimRay; }
+
+    public VehicleEyeMount getEyeMount()              { return eyeMount; }
+    public void setEyeMount(VehicleEyeMount mount)    { eyeMount = mount; }
+
+    /**
+     * True while this camera is rendering from behind the DRIVER'S OWN EYES — the one view of the
+     * three for which the driver's head must be hidden. Asked by {@code Character
+     * .refreshHeadVisibility} every frame, which is why it answers false when the cockpit mount is
+     * missing (the bonnet fallback is not in anyone's skull) and false in TPS.
+     */
+    public boolean isCockpitView() {
+        return cameraMode == CameraMode.FPS
+                && eyeMount == VehicleEyeMount.COCKPIT
+                && cockpitCameraMount != null;
+    }
+
+    /**
+     * One press of {@code view} = the next of the THREE driving views, in the order a player would
+     * expect to find them: TPS follow -> cockpit -> bonnet -> TPS.
+     *
+     * <p>One writer for both fields, so "which view am I in" cannot be assembled from two
+     * independently-toggled halves. The cockpit step is skipped when the vehicle scene has no
+     * cockpit mount, which keeps the cycle honest (a press always changes the picture) rather than
+     * silently landing on a view that renders from the bonnet anyway.
+     */
+    public void cycleView() {
+        if (cameraMode == CameraMode.TPS) {
+            cameraMode = CameraMode.FPS;
+            eyeMount   = (cockpitCameraMount != null) ? VehicleEyeMount.COCKPIT : VehicleEyeMount.BONNET;
+        } else if (eyeMount == VehicleEyeMount.COCKPIT) {
+            eyeMount   = VehicleEyeMount.BONNET;
+        } else {
+            cameraMode = CameraMode.TPS;
+        }
+    }
+
+    /** Where the first-person camera sits this frame — the cockpit mount, else the bonnet one. */
+    private Node3D eyeMountNode() {
+        return (eyeMount == VehicleEyeMount.COCKPIT && cockpitCameraMount != null)
+                ? cockpitCameraMount : fpsCameraMount;
+    }
+
+    /**
+     * Note the sign, and that it is NOT a leftover. This rig is the vehicle's own — its own
+     * {@code yaw}/{@code pitch}/{@code pitchMin}/{@code pitchMax} fields, its own scene under
+     * {@code Vehicle.tscn}, and it still carries the {@code Pivot} 180-degree Y flip that negates
+     * pitch downstream, so positive pitch means look DOWN here and a kick subtracts. AIM_PLAN.md
+     * W3 unified the CHARACTER rig (where {@code ControlRotation} is now a world rotation with
+     * positive pitch UP) and deliberately left this one alone: it shares no state with
+     * {@code ControlRotation}, so it is self-consistent as it stands. Change it as a whole or not
+     * at all — matching one half of it to the character convention is how a sign bug is born.
+     */
     public void applyRecoil(double pitchKick, double yawKick) {
         recoilPitch -= pitchKick;
         recoilYaw   += yawKick;
     }
 
+    /** Fallback aim distance (m) when there is no ray to read a length from. */
+    private static final double AIM_FALLBACK_RANGE = 200.0;
+
+    /**
+     * The world point this carrier is aiming at.
+     *
+     * <p><b>Every fallback here points FORWARD, and none of them is the carrier's own origin.</b>
+     * That used to be the no-ray answer, and it is the one answer that cannot be used: it puts the
+     * aim point INSIDE the car, 0.8 m from the driver's own chest, where a
+     * {@code Vehicle.clampSeatAim} heading is computed from a metre-long vector (noise), the
+     * drive-by posture reacts to that noise, and the shot's sight leg — which reads this point
+     * through {@code Character.applySeatedAimTarget} — is aimed at the vehicle the shooter is
+     * sitting in. Measured on {@code probe_driveby_aim.gd}: 0.8 m against the 200 m the ray gives,
+     * and a 64-degree error in the aim heading whenever it was hit.
+     */
     public Vector3 getAimTarget() {
-        if (aimRay == null) return target.getGlobalPosition();
-        if (aimRay.isColliding()) return aimRay.getCollisionPoint();
-        return activeCamera.toGlobal(aimRay.getTargetPosition());
+        if (aimRay != null && aimRay.isColliding()) return aimRay.getCollisionPoint();
+        if (activeCamera != null) {
+            double range = (aimRay != null) ? aimRay.getTargetPosition().length() : AIM_FALLBACK_RANGE;
+            Vector3 fwd = activeCamera.getGlobalTransform().getBasis().getColumn(2).times(-1f);
+            return activeCamera.getGlobalPosition().plus(fwd.times((float) range));
+        }
+        Vector3 fwd = target.getGlobalTransform().getBasis().getColumn(2).times(-1f);
+        return target.getGlobalPosition().plus(fwd.times((float) AIM_FALLBACK_RANGE));
     }
 
     // ── Input ─────────────────────────────────────────────────────────────────
@@ -234,7 +358,7 @@ public class VehicleCameraController extends Node3D {
     public void _physicsProcess(double delta) {
         if (activeCamera != null && activeCamera.isCurrent()
                 && INSTANCE.isActionJustPressed("view", false)) {
-            setCameraMode(cameraMode == CameraMode.FPS ? CameraMode.TPS : CameraMode.FPS);
+            cycleView();
         }
 
         recoilPitch = GD.lerp(recoilPitch, 0.0, recoilRecoverySpeed * delta);
@@ -252,7 +376,8 @@ public class VehicleCameraController extends Node3D {
         double targetFollowPitch = GD.clamp(followPitchDeg - smoothedSlope, pitchMin, pitchMax);
 
         if (cameraMode == CameraMode.FPS) {
-            if (fpsCameraMount != null) setGlobalPosition(fpsCameraMount.getGlobalPosition());
+            Node3D eye = eyeMountNode();
+            if (eye != null) setGlobalPosition(eye.getGlobalPosition());
 
             if (isAimingOrFiring()) {
                 // FPS aim: full mouse control, same as character FPS.

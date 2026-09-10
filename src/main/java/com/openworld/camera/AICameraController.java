@@ -42,10 +42,14 @@ public class AICameraController extends TPSCameraController {
    * When an aim target is set, drives Yaw/Pitch toward that world position so the
    * AimRay converges on the target across frames.
    *
-   * Camera forward = (cos(p)*sin(y), -sin(p), cos(p)*cos(y)).
-   * Inverting: targetYaw = atan2(dx, dz), targetPitch = -atan2(dy, hDist).
+   * <p>{@code controlRotation} is a WORLD rotation with positive pitch UP (see
+   * {@link ControlRotation}), so both targets are simply the bearing and the elevation of the
+   * aim point — no compensation term, and the same numbers the Player's own rig would settle at.
+   * Before AIM_PLAN.md W3 the pitch was negated here to match a {@code Pivot} flip the AI rig did
+   * not have, and the yaw was written into a frame frozen at the body's spawn rotation: measured,
+   * the AI camera pointed {@code 180 - bodyYaw} degrees away from the target it was tracking.
    *
-   * Without an aim target, falls back to tracking the character body's facing direction.
+   * <p>Without an aim target, falls back to tracking the character's VISUAL facing.
    */
   @Override
   protected Vector2 gatherLookInput(double delta) {
@@ -57,7 +61,7 @@ public class AICameraController extends TPSCameraController {
       double  hDist = Math.sqrt(dx * dx + dz * dz);
 
       double targetYawDeg   = Math.toDegrees(Math.atan2(-dx, -dz));
-      double targetPitchDeg = (hDist > 0.01) ? -Math.toDegrees(Math.atan2(dy, hDist)) : 0.0;
+      double targetPitchDeg = (hDist > 0.01) ? Math.toDegrees(Math.atan2(dy, hDist)) : 0.0;
 
       double deltaYaw   = GD.wrapf(targetYawDeg - controlRotation.yaw,  -180.0, 180.0);
       double deltaPitch = targetPitchDeg - controlRotation.pitch;
@@ -72,12 +76,19 @@ public class AICameraController extends TPSCameraController {
       return new Vector2((float) deltaYaw, (float) deltaPitch);
     }
 
-    // Default: track character body facing, pitch returns level.
+    // Default: track the character's VISUAL facing, pitch returns level.
     // Both deltas are clamped exactly like the aim-target branch above — otherwise
     // losing/clearing the aim target (combat → patrol, target killed, LoS lost)
     // makes the camera snap instantly to the body's facing/level pitch in one frame.
-    double characterYawDeg = Math.toDegrees(player.getRotation().getY());
-    double targetYaw       = -characterYawDeg;
+    //
+    // `getFacingYaw()` and not `player.getRotation().getY()`: facing lives on MovementController's
+    // meshRoot, and the body's own yaw is not it — a strafing character keeps the mesh on the aim
+    // while the body slides sideways. The old form negated the body yaw, which was a compensation
+    // for the frozen rig frame rather than a facing; with `controlRotation` a world rotation
+    // (AIM_PLAN.md W3) the honest target is simply where the mesh points.
+    double targetYaw = (player instanceof Character c)
+            ? Math.toDegrees(c.getFacingYaw())
+            : Math.toDegrees(player.getRotation().getY());
     double deltaYaw        = GD.wrapf(targetYaw - controlRotation.yaw, -180.0, 180.0);
     double deltaPitch      = -controlRotation.pitch;
 

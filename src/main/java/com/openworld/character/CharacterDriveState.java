@@ -77,6 +77,10 @@ final class CharacterDriveState {
             owner.combat = true;
             owner.setCombatState();
         }
+        // The carrier's camera is the carrier's own -- over the bonnet, not behind this
+        // character's eyes -- so the head comes back the moment the seat is taken, whatever the
+        // on-foot view was. Called here as well as per-frame so the swap lands on THIS frame.
+        owner.refreshHeadVisibility();
         if (isDriver) {
             owner.setProcess(false);
             owner.setPhysicsProcess(false);
@@ -100,6 +104,8 @@ final class CharacterDriveState {
         owner.combat = preDriveCombat;
         owner.setCombatState();
         owner.vehicleWeaponMode = VehicleWeaponMode.NONE;
+        // ... and it goes again on foot if the player was in FPS when they got in.
+        owner.refreshHeadVisibility();
     }
 
     /**
@@ -112,9 +118,9 @@ final class CharacterDriveState {
      * @param aimTargetPos  world-space point the vehicle camera is aimed at
      */
     void applyPassengerWeaponInput(boolean fire, boolean reload, int desiredWeapon, Vector3 aimTargetPos) {
-        if (aimTargetPos != null && owner.aimTarget != null) {
-            owner.aimTarget.setGlobalPosition(aimTargetPos);
-        }
+        // Through Character.applySeatedAimTarget, never the marker directly: the carrier's firing
+        // sector is applied there, once, for the bones and the bullet and the reticle alike.
+        owner.applySeatedAimTarget(aimTargetPos);
         if (fire) owner.fireWeapon.emit();
         else      owner.notFireWeapon.emit();
         if (reload) owner.reloadWeapon.emit();

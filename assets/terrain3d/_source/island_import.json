@@ -1,0 +1,25 @@
+{
+  "height_file": "res://assets/terrain3d/_source/island_height.r16",
+  "data_directory": "res://assets/terrain3d/island",
+  "size": [
+    3072,
+    3072
+  ],
+  "range": [
+    -23.399999618530273,
+    760.5999755859375
+  ],
+  "import_position": [
+    -3072.0,
+    -3072.0
+  ],
+  "vertex_spacing": 2.0,
+  "region_size": 512,
+  "region_locations": [
+    -3,
+    2
+  ],
+  "sea_level_y": 0.0,
+  "sea_shift_applied": 0.6,
+  "source": "island_v3_terrain.Terrain.surface"
+}

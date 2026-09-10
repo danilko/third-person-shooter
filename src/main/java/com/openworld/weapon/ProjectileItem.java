@@ -19,8 +19,9 @@ import com.openworld.world.manager.ExplosionManager;
  * ExplosionManager — this class only spawns the projectile and plays weapon feedback.
  *
  * Scene setup (e.g. ATL4.tscn):
- *   RigidBody3D + ProjectileItem script
- *     CollisionShape3D   (layer 4, mask world layer 1)
+ *   Node3D + ProjectileItem script
+ *     CollisionShape3D   (the WORLD body's shape — lent to the PickupBody built at drop time;
+ *                         the layer/mask live on that body, not here)
  *     PickupArea (Area3D)
  *       CollisionShape3D (detection sphere, layer 0 / mask character layer 2)
  *     Muzzle (Marker3D)

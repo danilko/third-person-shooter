@@ -1,0 +1,26 @@
+{
+  "note": "weaponPoseIndex -> grip archetype. APPEND-ONLY: an index is stored in every weapon .tscn, so inserting in the middle silently re-poses existing weapons.",
+  "archetypes": [
+    {"index": 0, "name": "pistol",       "base": "pistol", "exists": true},
+    {"index": 1, "name": "rifle",        "base": "rifle",  "exists": true},
+    {"index": 2, "name": "launcher",     "base": "rifle",  "exists": false},
+    {"index": 3, "name": "dual_pistol",  "base": "pistol", "exists": false},
+    {"index": 4, "name": "melee",        "base": "pistol", "exists": false},
+    {"index": 5, "name": "fist",         "base": "pistol", "exists": false},
+    {"index": 6, "name": "shield",       "base": "pistol", "exists": false},
+    {"index": 7, "name": "shield_melee", "base": "pistol", "exists": false},
+    {"index": 8, "name": "throwable",    "base": "pistol", "exists": false}
+  ],
+  "clip_families": {
+    "upright_aim_%s-loop":   "aim pose, fed to the FILTERED WeaponBlend (upper body only)",
+    "upright_idle_%s-loop":  "hold pose, non-combat",
+    "weapon_switch_%s":      "draw one-shot"
+  },
+  "weapon_assignments": {
+    "ATL4": 2,
+    "MW1": 4,
+    "MW2": 4,
+    "Fist": 5,
+    "T1": 8
+  }
+}

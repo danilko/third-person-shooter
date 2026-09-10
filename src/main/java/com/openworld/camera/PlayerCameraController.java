@@ -52,7 +52,10 @@ public class PlayerCameraController extends TPSCameraController {
    * aim — exactly the "wrong direction" replication symptom (round 5c report).
    */
   private boolean isLocallyControlled() {
-    return player instanceof Character c && c.getController() instanceof PlayerController;
+    // `character`, not `player`: the runtime-resolved reference (TPSCameraController._ready).
+    // A stale export wrapper's controller field is null, which would silently make every body
+    // non-local and swallow all mouse look.
+    return character != null && character.getController() instanceof PlayerController;
   }
 
   @Register
@@ -61,7 +64,10 @@ public class PlayerCameraController extends TPSCameraController {
     if (!isLocallyControlled()) return;
     if (event instanceof InputEventMouseMotion mm) {
       pendingYaw   -= mm.getRelative().getX() * yawSensitivity;
-      pendingPitch += mm.getRelative().getY() * pitchSensitivity;
+      // Godot's mouse Y grows DOWNWARD and positive pitch is UP, so this subtracts. It added
+      // while Pivot's 180° flip negated the pitch downstream (AIM_PLAN.md W3); the two changed
+      // together and the resulting view is identical.
+      pendingPitch -= mm.getRelative().getY() * pitchSensitivity;
     }
   }
 
@@ -74,7 +80,7 @@ public class PlayerCameraController extends TPSCameraController {
     // mouse or apply look. This runs in _physicsProcess, which setProcessInput(false) does not stop,
     // so without this guard the per-frame CAPTURED re-grab below immediately hides/locks the cursor
     // the overlay just made visible — making the radial menu impossible to navigate with the mouse.
-    if (player instanceof Character c && c.inputBlocked) {
+    if (character != null && character.inputBlocked) {
       pendingYaw   = 0;
       pendingPitch = 0;
       return Vector2.Companion.getZERO();
@@ -83,14 +89,14 @@ public class PlayerCameraController extends TPSCameraController {
     // Deferred from _ready() (see comment there) — idempotent, cheap to repeat.
     Input.setMouseMode(Input.MouseMode.CAPTURED);
 
-    boolean isFps = player instanceof Character c && c.isFpsMode;
+    boolean isFps = character != null && character.isFpsMode;
 
     if (Input.isActionJustPressed("shoulder", false) && !isFps) {
       changeShoulderDirection();
     }
 
     if (Input.isActionJustPressed("view", false)) {
-      if (player instanceof Character c) c.setCameraMode(!c.isFpsMode);
+      if (character != null) character.setCameraMode(!character.isFpsMode);
     }
 
     double dy = pendingYaw;

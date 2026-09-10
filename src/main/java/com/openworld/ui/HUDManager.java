@@ -408,6 +408,11 @@ public class HUDManager extends CanvasLayer {
 	if (weaponProgress != null && newPlayer instanceof Character c) {
 	  weaponProgress.wireCharacter(c);
 	}
+	// The reticle follows this character's SEATED aim point. It self-gates on
+	// Character.isSeatedAimAnchored(), so on foot this reference changes nothing.
+	if (crosshair != null && newPlayer instanceof Character c) {
+	  crosshair.aimCharacter = c;
+	}
 	// I5 navigation widgets follow the local player.
 	if (newPlayer instanceof Player p) {
 	  if (minimap != null)  minimap.wirePlayer(p);

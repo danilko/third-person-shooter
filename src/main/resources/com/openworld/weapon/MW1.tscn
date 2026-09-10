@@ -6,15 +6,14 @@
 [sub_resource type="BoxShape3D" id="BoxShape3D_mk1_body"]
 size = Vector3(0.05, 0.25, 0.04)
 
-[node name="MW1" type="RigidBody3D" unique_id=300200001]
-collision_layer = 4
+[node name="MW1" type="Node3D" unique_id=300200001]
 script = ExtResource("1_0jset")
 cone_angle_deg = 15.0
 swing_duration = 0.15
 weapon_id = "MK1"
 weapon_name = "MK-1"
 slot_type = 2
-weapon_pose_index = 1
+weapon_pose_index = 4
 hold_socket = "MarkerAR4"
 holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2", "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4")
 fire_rate = 3.0

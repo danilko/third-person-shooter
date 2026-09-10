@@ -5,6 +5,7 @@ import com.openworld.carrier.vehicle.VehicleWeaponMode;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.annotation.Visible;
 import godot.api.*;
 import godot.core.*;
 import godot.global.GD;
@@ -165,7 +166,15 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     /** True while seated as the DRIVER (seat 0) of {@link #currentVehicleNode}; false as a passenger. */
     public boolean vehicleDriver = false;
-    /** The Vehicle RigidBody3D this character is currently riding, or null when on foot. */
+    /**
+     * The Vehicle RigidBody3D this character is currently riding, or null when on foot.
+     *
+     * <p>{@code @Visible} so "is this body in a seat" is answerable from a probe or the remote
+     * debugger. It is the deciding half of {@link #refreshHeadVisibility()} -- a headless driver
+     * is exactly this flag disagreeing with {@link #isFpsMode} -- and unobservable state is how
+     * that shipped in the first place.
+     */
+    @Visible
     public Node currentVehicleNode = null;
     final CharacterDriveState driveState = new CharacterDriveState(this);
 
@@ -182,12 +191,33 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     protected ArrayList<Node3D> headMeshes = new ArrayList<>();
 
+    /** Last value pushed to {@link #headMeshes}, so {@link #refreshHeadVisibility()} is a no-op when unchanged. */
+    private boolean headVisibleApplied = true;
+
     public Health healthNode;
     protected Marker3D aimTarget;
     public RayCast3D aimRay;
 
     protected Node3D cameraRoot;
     protected FPSCameraController fpsCameraController;
+
+    /**
+     * Which of the on-foot views the shared {@link #activeCamera} is being written from — false =
+     * over-the-shoulder TPS, true = first person. Toggled by {@code PlayerCameraController} on the
+     * {@code view} action, and by {@link #setCameraMode(boolean)} in code.
+     *
+     * <p><b>{@code @Visible}, so it is a real registered property</b> ({@code is_fps_mode}). It was
+     * a plain Java field, which reads exactly like a registered one from Java and like nothing at
+     * all from GDScript: {@code body.get("is_fps_mode")} returned {@code <null>} and
+     * {@code body.set(...)} silently did nothing, so a probe that switched to FPS and measured
+     * measured the TPS camera and said so with a straight face (AIM_PLAN.md W3's two blind spots).
+     * {@code @Visible} rather than {@code @Export} on purpose — it is live view state, not
+     * something to author into a scene.
+     *
+     * <p>Writing it directly is safe: nothing is latched off the transition. Head visibility is
+     * re-derived every frame by {@link #refreshHeadVisibility()}.
+     */
+    @Visible
     public boolean isFpsMode = false;
     public final ControlRotation controlRotation = new ControlRotation();
     public Camera3D activeCamera;
@@ -370,11 +400,42 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
                 Node atNode = visualsInstance.getNodeOrNull(meshConfig.animationTreePath);
                 if (atNode instanceof AnimationTree at) ac.animationTree = at;
             }
+            // The strafe blend's frame is the mesh's own facing -- the same node MovementController
+            // yaws, and the same reason ShoulderAimModifier needs it below (AIM_PLAN.md W2).
+            if (!meshConfig.meshRootPath.isEmpty()
+                    && visualsInstance.getNodeOrNull(meshConfig.meshRootPath) instanceof Node3D acMr) {
+                ac.meshRoot = acMr;
+            }
             if (!meshConfig.aimSpineModifierPath.isEmpty()) {
                 Node asmNode = visualsInstance.getNodeOrNull(meshConfig.aimSpineModifierPath);
-                if (asmNode instanceof LookAtModifier3D asm) {
+                if (asmNode instanceof ShoulderAimModifier asm) {
                     ac.aimSpineModifier = asm;
-                    if (aimTarget != null) asm.setTargetNode(aimTarget.getPath());
+                    if (aimTarget != null) asm.setTargetNode(asm.getPathTo(aimTarget));
+                    // The chest aim needs the body frame too now: its yaw clamp is measured
+                    // against it, and so is the elevation clamp's fallback bearing for a target
+                    // straight overhead, which has none of its own.
+                    if (!meshConfig.meshRootPath.isEmpty()
+                            && visualsInstance.getNodeOrNull(meshConfig.meshRootPath)
+                                    instanceof Node3D smr) {
+                        asm.setBodyForwardNode(asm.getPathTo(smr));
+                    }
+                }
+            }
+            if (!meshConfig.shoulderAimModifierPath.isEmpty()) {
+                Node samNode = visualsInstance.getNodeOrNull(meshConfig.shoulderAimModifierPath);
+                if (samNode instanceof ShoulderAimModifier sam) {
+                    ac.shoulderAimModifier = sam;
+                    // Both aim mechanisms track the SAME marker, so a stance swap cannot move the
+                    // aim point -- only which bones carry it.
+                    if (aimTarget != null) sam.setTargetNode(sam.getPathTo(aimTarget));
+                    // "Straight ahead" for the yaw clamp is the mesh's facing -- the node
+                    // MovementController yaws. A prone chest points at the floor, so the bone
+                    // itself cannot supply it (see ShoulderAimModifier.bodyForwardNode).
+                    if (!meshConfig.meshRootPath.isEmpty()
+                            && visualsInstance.getNodeOrNull(meshConfig.meshRootPath)
+                                    instanceof Node3D mr) {
+                        sam.setBodyForwardNode(sam.getPathTo(mr));
+                    }
                 }
             }
         }
@@ -385,9 +446,18 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         }
 
         // ── FPSCameraController ────────────────────────────────────────────
-        if (fpsCameraController != null && !meshConfig.fpsCameraMarkerPath.isEmpty()) {
-            Node fpsMountNode = visualsInstance.getNodeOrNull(meshConfig.fpsCameraMarkerPath);
-            if (fpsMountNode instanceof Node3D fpsMark) fpsCameraController.fpsCameraMount = fpsMark;
+        if (fpsCameraController != null) {
+            if (!meshConfig.fpsCameraMarkerPath.isEmpty()) {
+                Node fpsMountNode = visualsInstance.getNodeOrNull(meshConfig.fpsCameraMarkerPath);
+                if (fpsMountNode instanceof Node3D fpsMark) fpsCameraController.fpsCameraMount = fpsMark;
+            }
+            // The frame the eye-point filter works in: MeshRoot, the node MovementController yaws.
+            // Sprinting and turning are not motion in that frame, so the filter has only the head
+            // bone's own bob and aim swing to deal with -- see FPSCameraController's class doc.
+            if (!meshConfig.meshRootPath.isEmpty()
+                    && visualsInstance.getNodeOrNull(meshConfig.meshRootPath) instanceof Node3D fmr) {
+                fpsCameraController.frameNode = fmr;
+            }
         }
 
         // ── MovementController ─────────────────────────────────────────────
@@ -440,6 +510,42 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         for (int i = 0; i < sim.getChildCount(); i++) {
             Node child = sim.getChild(i);
             if (child instanceof PhysicalBone3D bone) aimRay.addException(bone);
+        }
+    }
+
+    /**
+     * Make {@code ray} blind to this body — its collider AND every ragdoll hitbox bone.
+     *
+     * <p>The same set {@code _ready()} excepts from this character's own {@code aimRay}, offered to
+     * anyone else whose ray must not see us. **A CARRIER'S AIM RAY IS EXACTLY THAT**, and it was
+     * missing: `Vehicle.tscn`'s `ActiveCamera/AimRay` has `collision_mask = 25`, which includes the
+     * HITBOX layer, so a seated driver's aim ray started at the cockpit camera — inside their own
+     * head — and reported a hit on their own hitbox 0.3 m later. Measured on
+     * `probe_driveby_aim.gd`: the aim point landed 0.8 m from the driver instead of 200 m out, its
+     * heading read 64-118 degrees off where the camera was pointing, and since
+     * {@code FirearmItem.resolveSightPoint} reads that same point for a seated shooter, the shot
+     * was aimed into the shooter. It also read exactly like the reported symptom — the aim refusing
+     * to go where you were looking — because the point kept snapping back onto the body.
+     *
+     * <p>One owner: this is what a body says must not be hit, so the carrier asks rather than
+     * assembling its own list of our bones.
+     */
+    public void addAimExceptionsTo(RayCast3D ray) {
+        if (ray == null) return;
+        ray.addException(this);
+        if (physicalBoneSimulator == null) return;
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            if (physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) ray.addException(bone);
+        }
+    }
+
+    /** Undo {@link #addAimExceptionsTo} — a carrier's ray must see the next body that stands there. */
+    public void removeAimExceptionsFrom(RayCast3D ray) {
+        if (ray == null) return;
+        ray.removeException(this);
+        if (physicalBoneSimulator == null) return;
+        for (int i = 0; i < physicalBoneSimulator.getChildCount(); i++) {
+            if (physicalBoneSimulator.getChild(i) instanceof PhysicalBone3D bone) ray.removeException(bone);
         }
     }
 
@@ -730,9 +836,13 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         replication.applyAim(aimPosition);
     }
 
-    /** Drives the locomotion blend on a non-authority body from replicated motion. */
-    public void applyReplicatedLocomotion(Vector3 velocity, double yaw) {
-        replication.applyLocomotion(velocity, yaw);
+    /**
+     * Drives the locomotion blend on a non-authority body from replicated motion. Takes no yaw:
+     * the strafe blend's frame is MeshRoot's own facing, which {@code applyReplicatedFacing} has
+     * already written this frame from the same snapshot (see CharacterReplication.applyLocomotion).
+     */
+    public void applyReplicatedLocomotion(Vector3 velocity) {
+        replication.applyLocomotion(velocity);
     }
 
     /** Applies a replicated movement type (IDLE/WALK/SPRINT) on a puppet. */
@@ -972,11 +1082,70 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         return currentVehicleNode != null && !vehicleDriver;
     }
 
+    /**
+     * True while a carrier is the thing deciding what this character sees — the DRIVER's seat, whose
+     * view is one of the carrier's three (TPS follow / cockpit / bonnet).
+     *
+     * <p>A PASSENGER is deliberately excluded: nothing switches their camera when they sit down, so
+     * their own rig is still their view and must keep running. That asymmetry is the same one
+     * {@link #refreshHeadVisibility} turns on.
+     */
+    public boolean carrierOwnsView() {
+        return currentVehicleNode != null && vehicleDriver;
+    }
+
+    /**
+     * How far this body can turn its aim off its own facing in the seated stance, degrees — the
+     * RIG's reach, for a carrier to compare its authored firing sector against. Negative when the
+     * stance is not loaded (nothing to say, so nothing is warned).
+     */
+    public double seatedAimReachDegrees() {
+        Stance s = stanceCache.get(StanceName.DRIVE_CARRIER);
+        return s != null ? s.getAimYawLimit() : -1.0;
+    }
+
+    /** Set while the carrier's firing sector is holding this occupant's aim short of where the camera looks. */
+    private boolean seatAimClamped = false;
+
+    /** True while the seat's firing sector is holding the aim back — the reticle dims to say so. */
+    public boolean isSeatAimClamped() { return seatAimClamped; }
+
+    /**
+     * True while this occupant's reticle should be pinned to the WORLD point they are aiming at
+     * rather than to the centre of the screen.
+     *
+     * <p>Seated only, and that is not an arbitrary restriction: on foot the aim point IS the camera
+     * ray's hit, so the screen centre and the world point are the same pixel and anchoring would
+     * buy nothing but jitter. In a seat they come apart, because the camera may look anywhere and
+     * the weapon may not.
+     */
+    public boolean isSeatedAimAnchored() {
+        return currentVehicleNode != null && vehicleWeaponMode == VehicleWeaponMode.PASSENGER_WEAPON;
+    }
+
+    /**
+     * THE one place a seated occupant's aim target is written — for the driver (via
+     * {@code CharacterDriveState.applyPassengerWeaponInput}, fed by the carrier camera) and for a
+     * passenger (via {@link #applySeatedPassengerInput}, fed by their own). Both used to write the
+     * marker directly, which is how the clamp came to have no owner at all.
+     *
+     * <p>Everything downstream reads this ONE point: the aim modifiers (so the gun points here),
+     * {@code FirearmItem.resolveSightPoint} (so the bullet goes here), the snapshot (so remote peers
+     * see the same), and the reticle (so the player is told where it is). That is the whole fix —
+     * before it, the bones were clamped by {@code Stance.aimYawLimit} and the bullet was not clamped
+     * by anything, so the visible gun and the shot disagreed by up to 135 degrees.
+     */
+    public void applySeatedAimTarget(Vector3 desired) {
+        if (desired == null || aimTarget == null) return;
+        Vector3 allowed = (currentVehicleNode instanceof Vehicle v)
+                ? v.clampSeatAim(this, desired) : desired;
+        seatAimClamped = allowed.minus(desired).lengthSquared() > 1e-4;
+        aimTarget.setGlobalPosition(allowed);
+    }
+
     /** Reduced input path while riding as a passenger — weapon use + aim only. */
     protected void applySeatedPassengerInput(UserCommand input) {
-        if (input.aimTargetPosition != null && aimTarget != null) {
-            aimTarget.setGlobalPosition(input.aimTargetPosition);
-        }
+        applySeatedAimTarget(input.aimTargetPosition);
         if (vehicleWeaponMode != VehicleWeaponMode.PASSENGER_WEAPON) return;   // seat can't shoot
         if (input.fire) fireWeapon.emit();
         else            notFireWeapon.emit();
@@ -1214,6 +1383,43 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
 
     public void setHeadVisible(boolean visible) {
         for (Node3D headMesh : headMeshes) headMesh.setVisible(visible);
+        headVisibleApplied = visible;
+    }
+
+    /**
+     * Re-derives head-mesh visibility from the live view. Cheap to call every frame — it touches
+     * the meshes only when the answer changes.
+     *
+     * <p><b>The head is hidden for exactly one reason: the camera on screen is behind THIS
+     * character's own eyes.</b> Everything else follows from asking that one question of whoever
+     * owns the camera — which changes when the character sits down:
+     *
+     * <ul>
+     *   <li><b>On foot</b> — the FPS rig is mounted on {@code neck_01}, so {@link #isFpsMode} IS
+     *       the answer.</li>
+     *   <li><b>Driving</b> — the camera is the carrier's, and the carrier has three views. Only its
+     *       cockpit view is in the driver's skull; its TPS boom and its bonnet mount (0, 0.34,
+     *       -0.80, over the nose) are not, so the head stays on in both. The carrier is the one
+     *       that knows, so it is asked: {@code Vehicle.isViewInsideOccupantHead}.</li>
+     *   <li><b>Riding</b> — a passenger keeps their own camera when they sit down, so they are the
+     *       on-foot case again. Deriving that instead of special-casing "in a vehicle" is what
+     *       stops a passenger in FPS looking at the inside of their own head.</li>
+     * </ul>
+     *
+     * <p>This used to be latched — {@code setCameraMode} called {@code setHeadVisible(!fps)} once,
+     * at the toggle — and that is why a player who entered a vehicle while in FPS drove a headless
+     * character: nothing on the way into the seat had any reason to put it back. Deriving it
+     * removes the whole class instead of adding a fourth site that remembers to. Note how little
+     * the cockpit view cost here for the same reason: one more question asked of one more owner,
+     * not a fourth place that remembers to set a flag.
+     */
+    @Register
+    public void refreshHeadVisibility() {
+        boolean insideOwnEyes = (vehicleDriver && currentVehicleNode instanceof Vehicle v)
+                ? v.isViewInsideOccupantHead(this)
+                : isFpsMode;
+        boolean visible = !insideOwnEyes;
+        if (visible != headVisibleApplied) setHeadVisible(visible);
     }
 
     /**
@@ -1227,8 +1433,9 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         return (n instanceof Node3D nd) ? nd : null;
     }
 
+    /** Same convention as {@code TPSCameraController.applyRecoil}: positive pitch is UP. */
     public void applyRecoil(double pitchKick, double yawKick) {
-        controlRotation.recoilPitch -= pitchKick;
+        controlRotation.recoilPitch += pitchKick;
         controlRotation.recoilYaw   += yawKick;
     }
 
@@ -1236,7 +1443,7 @@ public class Character extends CharacterBody3D implements Controllable, Nameplat
         isFpsMode = fps;
         // ActiveCamera is the single rendering camera — no makeCurrent() switching needed.
         // Controllers write their proxy transform to it each frame based on isFpsMode.
-        setHeadVisible(!fps);
+        refreshHeadVisibility();
     }
 
     // ── Override in subclasses ────────────────────────────────────────────────

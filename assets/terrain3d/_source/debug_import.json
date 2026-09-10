@@ -1,0 +1,42 @@
+{
+  "height_file": "res://assets/terrain3d/_source/debug_height.r16",
+  "data_directory": "res://assets/terrain3d/debug_world",
+  "size": [
+    512,
+    512
+  ],
+  "range": [
+    -55.0,
+    14.0
+  ],
+  "import_position": [
+    -512.0,
+    -512.0
+  ],
+  "vertex_spacing": 2.0,
+  "region_size": 256,
+  "region_locations": [
+    -1,
+    0
+  ],
+  "sea_level_y": 0.0,
+  "source": "tools/make_debug_world.py (two islands, authored)",
+  "islands": [
+    {
+      "centre": [
+        -250.0,
+        0.0
+      ],
+      "pad_radius": 90.0,
+      "pad_height": 14.0
+    },
+    {
+      "centre": [
+        250.0,
+        0.0
+      ],
+      "pad_radius": 70.0,
+      "pad_height": 9.0
+    }
+  ]
+}

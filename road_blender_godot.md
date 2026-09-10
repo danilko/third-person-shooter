@@ -2447,7 +2447,7 @@ of the BOX curb's cross-section were present, forming a complete, solid end wall
 curb-height (0.15m) block sitting right across the road at the seam.
 
 **Root cause**: `kit_common.make_curb_loop_group()` (`GN_CurbLoop`) had
-`c2m.inputs["Fill Caps"].default_value = True` hardcoded, unconditionally. A segment/transition's
+is `c2m.inputs["Fill Caps"].default_value = True` hardcoded, unconditionally. A segment/transition's
 own L/R curb is built from an OPEN boundary curve (`curb_loop(..., closed=False)`) — Curve to
 Mesh's Fill Caps then caps BOTH ends with the profile's own cross-section, i.e. a solid block
 right where the curb should stay open into the next piece. An intersection's own curb loop is
@@ -2577,3 +2577,22 @@ issue the user kept correctly insisting was still there after each partial fix. 
 progressively more special-case machinery (tag endpoints, delete caps, two-pass shading, then patch
 in a missing face) to keep behaving correctly, that is itself a signal to step back and ask whether
 the underlying approach is right at all — which is exactly what the user's question did.
+
+### Tooling: the Godot binary is the STOCK one now (2026-09-08, user-requested)
+
+`blender/tools/env.sh`'s `GODOT` default moved from `godot.linuxbsd.editor.x86_64.jvm` to
+`/data/danilko/bin/Godot_v4.7.2-stable_linux.x86_64`, and every remaining reference to the old
+binary outside this file's dated history was updated with it (`AIM_PLAN.md`, `CLAUDE.md`'s
+Build & Run, 35 stale `.jvm.0.15.0` entries in `.claude/settings.local.json`).
+
+**Why the old one is now actively wrong, not merely old.** `build.gradle.kts` is on
+`com.utopia-rise.godot-jvm` `1.0.0-dev3`, which ships the runtime **with the project** as the
+`addons/jvm/` GDExtension. A binary with the JVM module compiled in therefore loads it twice, and
+the failure does not name the binary: `Attempt to register extension class 'JvmScript', which
+appears to be already registered` → `Version mismatch! C++ module is : 0.17.1-4.7.2 / Jar is :
+1.0.0-dev3` → **every AutoLoad failing with "does not inherit from 'Node'"**. That reads as a
+completely broken project, which is exactly how it cost a debugging detour this session before
+`AimDebugAuto.tscn` was run under the stock binary and came back clean.
+
+The entries above this one keep the old paths on purpose — they are dated records of what was true
+when they were written, and `env.sh` has been the single owner of the default since 2026-07-27.

@@ -33,8 +33,9 @@ import com.openworld.item.Pickup;
  *   Set magazineSize = 1 in the inspector.
  *
  * Scene setup (e.g. T1.tscn):
- *   RigidBody3D + ThrowableItem script
- *     CollisionShape3D   (pickup physics body — layer 4 / mask world layer 1)
+ *   Node3D + ThrowableItem script
+ *     CollisionShape3D   (the WORLD body's shape — lent to the PickupBody built at drop time;
+ *                         the layer/mask live on that body, not here)
  *     PickupArea (Area3D)
  *       CollisionShape3D (detection sphere — layer 0 / mask character layer 2)
  *   Connections: PickupArea.body_entered → on_body_entered

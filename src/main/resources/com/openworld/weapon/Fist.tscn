@@ -2,8 +2,9 @@
 
 [ext_resource type="Script" path="res://src/main/java/com/openworld/weapon/FistItem.java" id="1_fist"]
 
-[node name="Fist" type="RigidBody3D" unique_id=100001001]
+[node name="Fist" type="Node3D" unique_id=100001001]
 script = ExtResource("1_fist")
+weapon_pose_index = 5
 melee_range = 1.5
 
 [node name="HitTimer" type="Timer" parent="." unique_id=100001004]

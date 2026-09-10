@@ -8,8 +8,7 @@ size = Vector3(0.12, 0.55, 0.06)
 [sub_resource type="BoxMesh" id="BoxMesh_mw2_visual"]
 size = Vector3(0.12, 0.55, 0.06)
 
-[node name="MW2" type="RigidBody3D" unique_id=300300001]
-collision_layer = 4
+[node name="MW2" type="Node3D" unique_id=300300001]
 script = ExtResource("1_axeitem")
 melee_range = 2.5
 cone_angle_deg = 30.0
@@ -17,7 +16,7 @@ swing_duration = 0.4
 weapon_id = "MW2"
 weapon_name = "MW-2"
 slot_type = 2
-weapon_pose_index = 1
+weapon_pose_index = 4
 hold_socket = "MarkerAR4"
 holster_sockets = PackedStringArray("ShortWeaponHolsterMaker1", "ShortWeaponHolsterMaker2", "ShortWeaponHolsterMaker3", "ShortWeaponHolsterMaker4")
 fire_rate = 1.5

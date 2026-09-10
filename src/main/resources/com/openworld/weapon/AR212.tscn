@@ -13,8 +13,7 @@ size = Vector3(0.215, 0.105, 0.625)
 [sub_resource type="BoxShape3D" id="BoxShape3D_3xjif"]
 size = Vector3(0.215, 0.105, 0.625)
 
-[node name="AR212" type="RigidBody3D" unique_id=1788483088]
-collision_layer = 4
+[node name="AR212" type="Node3D" unique_id=1788483088]
 script = ExtResource("1_baof6")
 weapon_id = "AR212"
 weapon_name = "AR-212"

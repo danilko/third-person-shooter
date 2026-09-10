@@ -13,8 +13,7 @@ size = Vector3(0.215, 0.105, 0.625)
 [sub_resource type="BoxShape3D" id="BoxShape3D_v5ooh"]
 size = Vector3(0.215, 0.105, 0.625)
 
-[node name="AR4" type="RigidBody3D" unique_id=1788483088]
-collision_layer = 4
+[node name="AR4" type="Node3D" unique_id=1788483088]
 script = ExtResource("1_fu3cl")
 weapon_id = "AR4"
 weapon_name = "AR-4"
@@ -49,6 +48,9 @@ collision_mask = 2
 [node name="CollisionShape3D" type="CollisionShape3D" parent="PickupArea" unique_id=1413815656]
 transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0, 0, 0)
 shape = SubResource("BoxShape3D_v5ooh")
+
+[node name="SupportPoint" type="Marker3D" parent="." unique_id=491564193]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.03, -0.2)
 
 [node name="Muzzle" type="Marker3D" parent="." unique_id=491564192]
 transform = Transform3D(1, 2.9802322e-08, 0, -2.9802322e-08, 0.9999999, 2.9802322e-08, 1.7881393e-07, -2.9802322e-08, 1, 0, 0, -0.34146672)

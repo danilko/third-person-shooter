@@ -5,12 +5,16 @@ import com.openworld.item.Pickup;
 import godot.annotation.Export;
 import godot.annotation.Register;
 import godot.annotation.Script;
+import godot.api.AnimationPlayer;
 import godot.api.AudioStreamPlayer3D;
 import godot.api.AudioStreamWAV;
 import godot.api.CharacterBody3D;
 import godot.api.Node;
+import godot.api.Node3D;
 import godot.api.Texture2D;
+import godot.core.NodePath;
 import godot.core.PackedStringArray;
+import godot.core.Transform3D;
 import godot.core.Vector3;
 
 import static godot.global.GD.min;
@@ -53,6 +57,86 @@ public class WeaponItem extends Pickup implements WeaponAction {
 
   // Name of the Marker3D socket to attach to when this weapon is the active (held) weapon.
   // Must match a node name registered in WeaponController.socketPaths.
+  // ── How this weapon SITS in a socket, and how its own parts MOVE ──────────
+  //
+  // Both of these are facts about the WEAPON, and both used to have nowhere to live.
+
+  /**
+   * Child {@code Marker3D} naming the point this weapon is HELD by — where the hand's socket
+   * should land on it. Empty (or missing) keeps the historical behaviour: the weapon's local
+   * transform is zeroed, so its ORIGIN lands on the socket.
+   *
+   * <p><b>This inverts who owns the fit.</b> Zeroing meant the character's socket carried the whole
+   * placement, so every weapon needed its own marker on the character rig
+   * ({@code MarkerAR4}, {@code MarkerATL4}, ...) — adding a weapon meant editing the CHARACTER, the
+   * fit could not travel with the weapon to another rig, and a weapon's own anatomy (where its grip
+   * is) was written down nowhere. With a grip point the character needs one socket per GRIP
+   * ARCHETYPE and each weapon aligns itself to it, which is the same split
+   * {@code weaponPoseIndex} already makes for the pose.
+   *
+   * <p>A launcher is the case that shows why it matters: it rides on the SHOULDER, so its tube sits
+   * high and back relative to the hand compared to a rifle. That is a translation of this marker,
+   * not a new animation — though the ARM pose really is authored art (`weaponPoseIndex` 2).
+   */
+  @Export public String gripPoint = "GripPoint";
+
+  /** As {@link #gripPoint}, for the pose this weapon takes when HOLSTERED — a rifle hangs on a back
+   *  socket by a different point than the one the hand grips. Empty falls back to the grip point. */
+  @Export public String holsterPoint = "";
+
+  /**
+   * Optional {@code AnimationPlayer} inside this weapon's own scene, for MOVING PARTS — a shotgun
+   * pump, a bolt, a revolver cylinder, a folding stock.
+   *
+   * <p>It is the weapon's own player on purpose. Putting those parts in the character's skeleton
+   * would tie every weapon to one rig and one clip set, and the part has to keep moving while the
+   * character is doing something else entirely. What the character and the weapon share is the
+   * EVENT, not the animation: {@code WeaponController} plays both from the same fire/reload moment,
+   * on the authority AND on a puppet, so a remote peer sees the pump cycle too.
+   */
+  @Export public NodePath weaponAnimatorPath = new NodePath("WeaponAnimator");
+
+  /** Clip on {@link #weaponAnimatorPath} to play per shot. Empty = this weapon has no moving parts. */
+  @Export public String fireAnimation = "";
+
+  /** Clip on {@link #weaponAnimatorPath} to play on reload. Empty = none. */
+  @Export public String reloadAnimation = "";
+
+  private AnimationPlayer weaponAnimator;
+  private boolean weaponAnimatorResolved = false;
+
+  /**
+   * The local transform this weapon takes when parented to {@code socketName}'s marker, so that its
+   * grip (or holster) point coincides with the socket. Identity when it declares none.
+   */
+  @Register
+  public Transform3D alignmentFor(boolean holstered) {
+    String name = holstered && !holsterPoint.isEmpty() ? holsterPoint : gripPoint;
+    if (name == null || name.isEmpty()) return new Transform3D();
+    Node n = getNodeOrNull(new NodePath(name));
+    if (!(n instanceof Node3D marker)) return new Transform3D();
+    return marker.getTransform().affineInverse();
+  }
+
+  /**
+   * Play one of this weapon's own motion clips, if it has an animator and the clip exists.
+   *
+   * <p>Silent about a missing clip by design — a weapon with no moving parts names none, and every
+   * call site fires for every weapon.
+   */
+  public void playMotion(String clip) {
+    if (clip == null || clip.isEmpty()) return;
+    if (!weaponAnimatorResolved) {
+      weaponAnimatorResolved = true;
+      Node n = (weaponAnimatorPath == null || weaponAnimatorPath.isEmpty())
+              ? null : getNodeOrNull(weaponAnimatorPath);
+      if (n instanceof AnimationPlayer ap) weaponAnimator = ap;
+    }
+    if (weaponAnimator == null || !weaponAnimator.hasAnimation(clip)) return;
+    weaponAnimator.stop();
+    weaponAnimator.play(clip, -1.0, 1.0f, false);
+  }
+
   @Export public String holdSocket = "";
 
   // Names of Marker3D sockets to try (in order) when parking this weapon in inventory.

@@ -13,9 +13,8 @@ size = Vector3(0.064, 0.161, 0.211)
 [sub_resource type="BoxShape3D" id="BoxShape3D_area"]
 size = Vector3(0.064, 0.161, 0.211)
 
-[node name="PI52" type="RigidBody3D" unique_id=358619058]
+[node name="PI52" type="Node3D" unique_id=358619058]
 transform = Transform3D(1, 0, -2.2351742e-08, 0, 0.99999994, -1.4901161e-08, -5.5879354e-09, 0, 1, 0, 0, 0)
-collision_layer = 4
 script = ExtResource("1_wa52e")
 weapon_id = "PI52"
 weapon_name = "PI-52"

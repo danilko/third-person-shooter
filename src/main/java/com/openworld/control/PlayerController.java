@@ -9,7 +9,6 @@ import godot.api.Input;
 import godot.api.Node;
 import godot.api.Timer;
 import godot.core.Vector3;
-import com.openworld.camera.TPSCameraController;
 import com.openworld.character.Character;
 import com.openworld.character.Player;
 import com.openworld.movement.character.MovementController;
@@ -133,16 +132,28 @@ public class PlayerController extends Controller {
         cmd.movementDirection.setX(moveX);
         cmd.movementDirection.setZ(moveZ);
 
-        // Rotate to world-space at the source so the command always carries world-space
-        // intent. cam.getCurrentYaw() returns the previous tick's yaw — identical timing
-        // to the old MovementController rotation which also used the previous tick's
-        // camRotation.
-        Node camNode = body.getNodeOrNull("TPSCameraController");
-        if (camNode instanceof TPSCameraController cam) {
-            if (cmd.movementDirection.lengthSquared() > 0.001) {
-                cmd.movementDirection = cmd.movementDirection.rotated(
-                        Vector3.Companion.getUP(),
-                        (float) (cam.getCurrentYaw() + body.getRotation().getY()));
+        // Rotate to world-space at the source so the command always carries world-space intent.
+        //
+        // The frame is taken off the camera the human is ACTUALLY looking through — its world
+        // basis, flattened — and not rebuilt from the rig's parts. The rig is
+        // `setAsTopLevel(true)`, so its own world yaw is whatever the body's was at the instant
+        // its `_ready()` ran; the previous form added `body.getRotation().getY()` back to
+        // compensate, which is right only while the body's yaw has not changed since. Rotate a
+        // body after `add_child()` — every code spawn path, and the AimDebug stand — and W walked
+        // 90 degrees off what the screen showed (measured, tools/godot/probe_camera_frame.gd
+        // case B). One owner, and it covers FPS and the vehicle seat for free: every camera mode
+        // writes `ActiveCamera`'s global transform, so this reads the same view in all of them.
+        //
+        // Timing is unchanged: `_physics_process` runs parent-first, so the camera controllers
+        // (children) have not written this tick yet and we read the previous tick's view —
+        // exactly what `getCurrentYaw()` returned.
+        if (cmd.movementDirection.lengthSquared() > 0.001 && body.activeCamera != null) {
+            Vector3 camZ = body.activeCamera.getGlobalTransform().getBasis().getZ();
+            Vector3 fwd = new Vector3(-camZ.getX(), 0.0, -camZ.getZ());   // a camera looks down -Z
+            if (fwd.lengthSquared() > 1e-6) {
+                fwd = fwd.normalized();
+                Vector3 right = new Vector3(-fwd.getZ(), 0.0, fwd.getX());   // fwd x UP
+                cmd.movementDirection = right.times(moveX).plus(fwd.times(-moveZ));
             }
         }
 

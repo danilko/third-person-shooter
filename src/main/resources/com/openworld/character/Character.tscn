@@ -110,16 +110,25 @@ player = NodePath("..")
 
 [node name="Crouch" type="Node" parent="Stances" unique_id=1942246071 node_paths=PackedStringArray("collider", "col_raycast")]
 script = ExtResource("7_2iqcg")
+aim_yaw_limit = 75.0
+view_pitch_max = 55.0
+view_pitch_min = -70.0
+aim_pitch_max = 40.0
+aim_pitch_min = -60.0
 idle_state = ExtResource("8_ttk2h")
 walk_state = ExtResource("9_gguhd")
 sprint_state = ExtResource("10_gguhd")
 camera_height = 0.99
-spine_aim_max_angle = 0.0
 collider = NodePath("../../CrouchCollision")
 col_raycast = NodePath("../../CrouchCollision/RayCast3D")
 
 [node name="Upright" type="Node" parent="Stances" unique_id=963536893 node_paths=PackedStringArray("collider", "col_raycast")]
 script = ExtResource("7_2iqcg")
+aim_yaw_limit = 80.0
+view_pitch_max = 60.0
+view_pitch_min = -75.0
+aim_pitch_max = 45.0
+aim_pitch_min = -65.0
 idle_state = ExtResource("11_kuqdj")
 walk_state = ExtResource("12_agpyf")
 sprint_state = ExtResource("13_jwg7l")
@@ -129,28 +138,47 @@ col_raycast = NodePath("../../UprightCollision/RayCast3D")
 
 [node name="Crawl" type="Node" parent="Stances" unique_id=1531972803 node_paths=PackedStringArray("collider")]
 script = ExtResource("7_2iqcg")
+aim_yaw_limit = 45.0
+view_pitch_max = 40.0
+view_pitch_min = -35.0
+aim_pitch_max = 30.0
+aim_pitch_min = -30.0
 idle_state = ExtResource("7_d7d1u")
 walk_state = ExtResource("15_bgnjm")
 sprint_state = ExtResource("16_u0j3k")
 camera_height = 0.82
-spine_aim_max_angle = 0.0
+spine_aim_enabled = false
+shoulder_aim_enabled = true
 collider = NodePath("../../CrawlCollision")
 
 [node name="DriveCarrier" type="Node" parent="Stances" unique_id=838124124]
 script = ExtResource("7_2iqcg")
+aim_yaw_limit = 100.0
+spine_aim_yaw_limit = 45.0
+view_pitch_max = 45.0
+view_pitch_min = -45.0
+aim_pitch_max = 35.0
+aim_pitch_min = -35.0
 idle_state = ExtResource("22_arx8k")
 walk_state = ExtResource("22_arx8k")
 sprint_state = ExtResource("22_arx8k")
-spine_aim_max_angle = 0.0
+spine_aim_enabled = true
+shoulder_aim_enabled = true
 
 [node name="Swim" type="Node" parent="Stances" unique_id=838124999 node_paths=PackedStringArray("collider")]
 script = ExtResource("7_2iqcg")
+aim_yaw_limit = 45.0
+view_pitch_max = 50.0
+view_pitch_min = -50.0
+aim_pitch_max = 40.0
+aim_pitch_min = -40.0
 idle_state = ExtResource("7_d7d1u")
 walk_state = ExtResource("16_u0j3k")
 sprint_state = ExtResource("15_bgnjm")
 camera_height = 0.82
 animation_stance_key = "Crawl"
-spine_aim_max_angle = 0.0
+spine_aim_enabled = false
+shoulder_aim_enabled = true
 collider = NodePath("../../CrawlCollision")
 
 [node name="WeaponController" type="Node" parent="." unique_id=384125234 node_paths=PackedStringArray("animation_controller", "weapon_audio")]
@@ -178,7 +206,7 @@ one_shot = true
 script = ExtResource("26_gapvf")
 
 [node name="TPSCameraController" type="Node3D" parent="." unique_id=1945688108 node_paths=PackedStringArray("player")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 1.7, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0)
 script = ExtResource("25_gapvf")
 player = NodePath("..")
 
@@ -188,7 +216,7 @@ player = NodePath("..")
 transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 
 [node name="Pivot" type="Node3D" parent="TPSCameraController/Yaw/Pitch" unique_id=1611848527]
-transform = Transform3D(-1, 0, 1.509958e-07, 0, 0.9999995, 0, -1.509957e-07, 0, -0.9999995, 0, 0.4, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
 
 [node name="SpringArm" type="SpringArm3D" parent="TPSCameraController/Yaw/Pitch/Pivot" unique_id=588223935]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 1.4210855e-14, 0, 1, 0, 0, 0)
@@ -214,7 +242,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.011982799, -5.461198)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8157457, 0)
 
 [node name="FPSCameraController" type="Node3D" parent="." unique_id=704008049]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 script = ExtResource("27_gapvf")
 metadata/_custom_type_script = "uid://tssnb6upftda"
 
@@ -224,7 +252,7 @@ metadata/_custom_type_script = "uid://tssnb6upftda"
 transform = Transform3D(1, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0)
 
 [node name="Pivot" type="Node3D" parent="FPSCameraController/Yaw/Pitch" unique_id=1900000301]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [connection signal="changed_combat_state" from="." to="MovementController" method="on_set_combat_state"]
 [connection signal="changed_combat_state" from="." to="AnimationController" method="on_set_combat_state"]
@@ -248,4 +276,3 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
 [connection signal="timeout" from="WeaponController/ReloadTimer" to="WeaponController" method="on_weapon_reload_complete"]
 [connection signal="died" from="Health" to="." method="on_died"]
 [connection signal="set_cam_rotation" from="TPSCameraController" to="MovementController" method="on_set_cam_rotation"]
-[connection signal="set_cam_rotation" from="TPSCameraController" to="AnimationController" method="on_set_cam_rotation"]

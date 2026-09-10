@@ -90,8 +90,10 @@ public class WeaponController extends Node {
   // when it changes, so a reloading character is visibly reloading on every screen (a tactical tell).
   private int reloadSeq = 0;
 
-  // Weapons queued for equip/drop; processed in _process (idle) to avoid
-  // reparenting a RigidBody3D (CollisionObject) during a physics callback.
+  // Weapons queued for equip/drop; drained in _process (idle). A held weapon is no longer a
+  // physics body, so this is no longer the CollisionObject-reparent restriction it was built for —
+  // what it still buys is that an equip resolves OUT of the body_entered signal that requested it,
+  // which is what the same-frame merge/displacement guards below are written against.
   private final List<WeaponItem> pendingEquips = new ArrayList<>();
   // Items already equipped during the current _process pass — see the race-guard
   // comment in equipWeapon(). Cleared at the start of each pass that has work to do.
@@ -128,6 +130,17 @@ public class WeaponController extends Node {
 
   // Populated in _ready() from socketPaths: node name → Marker3D node.
   private final Map<String, Node> socketMap = new HashMap<>();
+
+  /**
+   * Where a weapon with no hold/holster socket is parked while carried — the weapon attachment
+   * node, so it rides the character hidden instead of being left lying in the world scene.
+   *
+   * <p>That used to be the workaround for a real hazard: the weapon WAS a RigidBody3D, and moving a
+   * frozen body confused Jolt into clipping it through the ground when it came back. A held weapon
+   * has no body now (see {@code item.PickupBody}), so there is nothing left to confuse and the item
+   * can simply go where it belongs.
+   */
+  private Node stowNode;
 
   private RayCast3D aimRay;
   private RayCast3D originalAimRay;
@@ -350,6 +363,7 @@ public class WeaponController extends Node {
     if (attachPath == null || attachPath.isEmpty()) return;
     Node attachment = root.getNodeOrNull(attachPath);
     if (attachment == null) return;
+    stowNode = attachment;
     for (Node child : attachment.getChildren()) {
       if (child.getChildCount() > 0 && child.getChild(0) instanceof WeaponItem w) {
         int slot = findFreeSlot(w.resolveSlotType());
@@ -371,6 +385,10 @@ public class WeaponController extends Node {
    * body_entered signal (physics context) where reparent() is forbidden.
    */
   public void requestEquip(WeaponItem item) {
+    // Claim it now, whichever way the equip resolves: an item heading for a slot must not build
+    // itself a world body in the meantime (see Pickup.claimForInventory). The bounce paths in
+    // equipWeapon hand it back with onReturnedToWorld, which rebuilds one.
+    item.claimForInventory();
     if (synchronousEquip) {
       // Isolated single-item pass: equippedThisPass is cleared either side so the
       // cross-item displacement guard in equipWeapon never fires here — sequential
@@ -547,6 +565,9 @@ public class WeaponController extends Node {
     if (w == null) return;
     if (!w.isInfiniteAmmo && w.getMagazine() == 0) { onWeaponReload(); return; }
     if (!w.canUse()) return;
+    // The weapon's OWN moving parts (pump, bolt, cylinder) -- see WeaponItem.weaponAnimatorPath.
+    // Placed after every gate, so a shot that was suppressed moves nothing.
+    w.playMotion(w.fireAnimation);
 
     fireTimer.setWaitTime(1.0 / w.getFireRate());
     fireTimer.start();
@@ -582,6 +603,7 @@ public class WeaponController extends Node {
   public void playRemoteReloadCue() {
     WeaponItem w = getCurrentWeaponItem();
     if (w == null || !isArmed()) return;
+    w.playMotion(w.reloadAnimation);
     if (w.getReloadAudio() != null) {
       weaponAudio.setStream(w.getReloadAudio());
       weaponAudio.play();
@@ -607,6 +629,7 @@ public class WeaponController extends Node {
     }
     WeaponItem w = getCurrentWeaponItem();
     if (w != null && isArmed()) {
+      w.playMotion(w.fireAnimation);   // the weapon's own moving parts, on the remote peer too
       // Polymorphic cosmetic replay: firearms draw muzzle/tracer, throwable/projectile
       // weapons spawn a non-damaging projectile so the grenade/rocket arc + explosion is
       // seen on every peer (damage stays authority-side). Default no-op for the fist.
@@ -637,6 +660,7 @@ public class WeaponController extends Node {
     WeaponItem w = getCurrentWeaponItem();
     if (w == null || w.isInfiniteAmmo || w.getReserve() == 0 || isWeaponReloading()) return;
     reloadTimer.setWaitTime(1.0 / w.getReloadSpeed());
+    w.playMotion(w.reloadAnimation);
     if (w.getReloadAudio() != null) {
       weaponAudio.setStream(w.getReloadAudio());
       weaponAudio.play();
@@ -938,44 +962,62 @@ public class WeaponController extends Node {
     return (socketName == null || socketName.isEmpty()) ? null : socketMap.get(socketName);
   }
 
-  /** Reparents {@code item} to its holdSocket Marker3D and shows it.
-   *  Items with no holdSocket (e.g. throwables) stay in the world scene where Jolt already
-   *  registered their physics body; onPickedUp() already hid them, so just keep hidden. */
+  /** Reparents {@code item} to its holdSocket Marker3D and shows it. An item with no holdSocket
+   *  (a throwable) is stowed on the character, hidden — see {@link #stowWeapon}. */
   private void moveWeaponToHand(WeaponItem item) {
     Node target = resolveSocket(item.holdSocket);
     if (target != null) {
-      reparentWeapon(item, target);
+      reparentWeapon(item, target, false);
       item.show();
     } else {
-      item.hide();
+      stowWeapon(item);
     }
   }
 
   /** Reparents {@code item} to the first free socket in its holsterSockets list and shows it.
    *  A socket is considered free when it has no children or already holds this weapon.
-   *  Items with no holster sockets stay in the world scene (hidden); do NOT reparent them
-   *  to the owner — moving a frozen RigidBody3D confuses Jolt's body position and causes
-   *  the item to clip through the ground when it is returned to the world later. */
+   *  An item with no free holster socket is stowed on the character, hidden. */
   private void moveWeaponToHolster(WeaponItem item) {
     for (String socketName : item.holsterSockets) {
       Node target = resolveSocket(socketName);
       if (target == null) continue;
       if (target.getChildCount() > 0 && !target.getChild(0).equals(item)) continue;
-      reparentWeapon(item, target);
+      reparentWeapon(item, target, true);
       item.show();
       return;
     }
-    item.hide();
+    stowWeapon(item);
   }
 
-  /** Reparents {@code item} to {@code target}, zeroing local transform. Skips reparent
-   *  if {@code item} is already a child of {@code target} to avoid re-triggering _ready. */
-  private void reparentWeapon(WeaponItem item, Node target) {
+  /**
+   * Park a carried weapon that has no socket to show it at: hidden, on the character's weapon
+   * attachment. It must GO somewhere — leaving it in the world scene is what the old frozen-body
+   * workaround did, and a throwable carried that way sat invisible at wherever it was collected,
+   * with a stale transform that nothing dared read.
+   */
+  private void stowWeapon(WeaponItem item) {
+    item.hide();
+    if (stowNode != null && GD.isInstanceValid(stowNode) && !stowNode.equals(item.getParent())) {
+      item.reparent(stowNode, false);
+      item.setTransform(new godot.core.Transform3D());
+    }
+  }
+
+  /**
+   * Reparents {@code item} to {@code target} and aligns it. Skips the reparent if {@code item} is
+   * already a child of {@code target}, to avoid re-triggering {@code _ready}.
+   *
+   * <p>The alignment is the WEAPON's to state ({@code WeaponItem.alignmentFor}): a weapon that
+   * declares a {@code GripPoint} puts THAT point on the socket, and one that declares none keeps
+   * the historical zeroed transform, which puts its ORIGIN there. Zeroing unconditionally is what
+   * forced a per-weapon marker onto the character rig for every weapon in the game — see
+   * {@code WeaponItem.gripPoint} for why that is the wrong way round.
+   */
+  private void reparentWeapon(WeaponItem item, Node target, boolean holstered) {
     Node current = item.getParent();
     if (current != null && current.equals(target)) return;
     item.reparent(target, false);
-    item.setPosition(Vector3.Companion.getZERO());
-    item.setRotation(Vector3.Companion.getZERO());
+    item.setTransform(item.alignmentFor(holstered));
   }
 
   // Manual drop: throw forward at chest height (1.3 m gives clearance when crouching/crawling).
@@ -1178,7 +1220,7 @@ public class WeaponController extends Node {
    * world pickup by the manifest's pickupId (kills the ghost-pickup case when healing a
    * lost grant echo), else instantiate the validated weapon scene — the same
    * add-to-tree-then-equip shape DebugHarness.equipDebugRifle uses. Runs at idle time
-   * (NetworkManager._process), so the RigidBody3D reparent is safe.
+   * (NetworkManager._process), where the item's world body can be taken away and rebuilt.
    */
   private void equipReconciled(int slot, com.openworld.net.NetMessageCodec.InventorySlotEntry entry) {
     WeaponItem item = findWorldPickupById(entry.pickupId());
@@ -1229,30 +1271,21 @@ public class WeaponController extends Node {
   }
 
   /**
-   * Shared mechanics for both drop variants: clears character refs, re-enables physics,
-   * places the weapon at spawnPos, and applies impulse.
+   * Shared mechanics for both drop variants: clears character refs, un-equips the item, and hands
+   * it to {@code Pickup.placeInWorld} — which builds the item's world body (a {@code PickupBody}
+   * RigidBody3D that takes the item's authored collision shapes), puts it at {@code spawnPos} and
+   * throws it.
    *
-   * Throwables (and any weapon without a socket) stay in the world scene while equipped
-   * (frozen, hidden), so reparent is a no-op for them — skipping it avoids the
-   * same-parent reparent edge-case. Socket-based weapons live under a Marker3D and need
-   * to be moved back.
-   * Jolt Physics does not reliably propagate setGlobalPosition on a frozen body, so
-   * onReturnedToWorld() unfreezes before we set position.
+   * <p>Where the weapon currently hangs — a hand socket, a holster socket, the stow node, or
+   * nowhere — does not matter here: it has no body to reparent, and building one is what puts it
+   * back in the world. That is the whole reason this used to need a case analysis and a comment
+   * about Jolt not propagating setGlobalPosition on a frozen body.
    */
   private void returnWeaponToWorld(WeaponItem item, Vector3 spawnPos, Vector3 impulse) {
     item.setup(null, null, null);
     item.show();
-    Node currentScene = getTree().getCurrentScene();
-    if (!currentScene.equals(item.getParent())) {
-      item.reparent(currentScene, true);
-    }
     item.onReturnedToWorld();
-    item.setGlobalPosition(spawnPos);
-    // Reset any residual velocity from the frozen/equipped state before applying
-    // the intended throw impulse, otherwise the weapon can tunnel through thin floors.
-    item.setLinearVelocity(Vector3.Companion.getZERO());
-    item.setAngularVelocity(Vector3.Companion.getZERO());
-    item.applyCentralImpulse(impulse);
+    item.placeInWorld(getTree().getCurrentScene(), spawnPos, impulse);
   }
 
   // After a drop, fall back to fist (slot 0) which is always available.

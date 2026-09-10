@@ -135,6 +135,13 @@ public class ImpactManager extends Node {
      */
     private static HitContext resolveHitContext(Node hitNode) {
         if (hitNode == null) return new HitContext(null, null, SurfaceType.DEFAULT, null, null, null);
+        // A world item's collider belongs to its PickupBody, and the ITEM is that body's CHILD --
+        // so a walk that only goes up would pass straight over it. Shooting a dropped grenade has to
+        // find the ThrowableItem's Detonatable, and the item is also where a HittableBody surface
+        // type would live. Start at the item: everything above the body is above the item too.
+        if (hitNode instanceof com.openworld.item.PickupBody body && body.carriedItem() != null) {
+            hitNode = body.carriedItem();
+        }
         Character character = null;
         Node healthOwner = null;
         SurfaceType surface = SurfaceType.DEFAULT;

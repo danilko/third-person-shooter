@@ -305,6 +305,91 @@ public class VehicleConfig extends Resource {
     /** Passengers (seats 1..n) may fire their own weapon from the window (GTA drive-by). */
     @Export public boolean passengerSeatsCanShoot = true;
 
+    /**
+     * Drive-by aim SWEEP for a LEFT-side seat: how far the occupant's weapon may turn from the
+     * carrier's forward, in degrees, positive to the RIGHT. Mirrored automatically for a
+     * right-side seat ({@code Vehicle.seatAimSweep} reads the side off the seat marker's own X),
+     * so one authored pair covers every seat in the car.
+     *
+     * <p><b>This is the only yaw limit on a seated occupant's aim</b> — the whole point of it. A
+     * body belted into a seat cannot turn, so unlike an on-foot character (whose mesh yaws to the
+     * aim point and therefore never reaches its bone limit) a seated one hits a limit constantly;
+     * with two of them — this and {@code Stance.aimYawLimit} — the gun stopped at the tighter one
+     * while the bullet kept going to the camera's point, up to 135 degrees apart. So `DriveCarrier`
+     * ships {@code aimYawLimit = 180} (uncapped) and this decides it, once, for the bones AND the
+     * bullet AND the reticle.
+     *
+     * <p><b>Full circle by default, and that is a deliberate departure from GTA.</b> Rockstar
+     * restricts a left-hand-drive driver to their own window plus forward — which is why passenger
+     * drive-bys exist at all — and this pair is how you author that ({@code -180 / +20} for a left
+     * seat, mirrored automatically). It is not the default because the restriction only reads as a
+     * RULE when the player can see it: here it read as a dead zone plus a body swing every time the
+     * aim crossed it, i.e. as lag. The posture ({@link #postureHoldDeg}) turns the occupant toward
+     * whichever side the target is on, so the far side is reachable by a body rather than only by a
+     * clamp, and the bones are still only ever asked for the residual.
+     *
+     * <p>Narrow it per carrier when the geometry genuinely says so — an armoured van with one gun
+     * port, a seat boxed in by a bulkhead. {@code Vehicle.warnIfAimSectorUnreachable} checks the
+     * pair against what the posture and the rig can actually cover.
+     */
+    @Export public double drivebyAimMin = -180.0;
+
+    /** The other end of {@link #drivebyAimMin}: how far the weapon may cross the bonnet. */
+    @Export public double drivebyAimMax = 180.0;
+
+    // ── Drive-by POSTURE (how the body gets there, vs. the sweep's "may it") ──
+
+    /**
+     * How much of the aim the BONES carry before the body starts turning, degrees.
+     *
+     * <p><b>This is the whole drive-by posture rule, and it is CONTINUOUS.</b> Beyond this the
+     * occupant turns in the seat by exactly the excess — {@code body = sign(heading) *
+     * min(rearAimBodyYaw, |heading| - postureHoldDeg)} — so the residual left to the spine and
+     * collarbones sits at this value all the way round and the body tracks the aim smoothly.
+     *
+     * <p>It replaced an enter/exit threshold pair that snapped the body to a FIXED angle
+     * ({@code rearAimBodyYaw}) and latched which way it had turned. That version had two faults a
+     * player feels immediately and neither is fixable by tuning: between the exit threshold and the
+     * full turn the body sat pinned at 150 degrees while the aim was near 80, and once latched it
+     * held that side, so sweeping across the rear left the body facing the wrong way with the bones
+     * covering the difference. A continuous rule needs no hysteresis to be stable either — it has no
+     * step to chatter across.
+     *
+     * <p>Keep it at or below the rig's reach ({@code Stance.aimYawLimit}); the gun visibly lags the
+     * reticle above it, and {@code Vehicle.warnIfAimSectorUnreachable} says so on entry.
+     */
+    @Export public double postureHoldDeg = 80.0;
+
+    /**
+     * The MOST the body may turn in the seat, degrees — a cap on the rule above, not a target. A
+     * belted body cannot come round to 180.
+     */
+    @Export public double rearAimBodyYaw = 150.0;
+
+    /**
+     * How far the occupant slides toward the side they are turning, metres, at a full turn. A body
+     * that pivots on the spot reads as a mannequin spinning; bracing across is what sells "turned
+     * round to fire", and it gets the weapon clear of the seat back.
+     */
+    @Export public double rearAimSeatShift = 0.22;
+
+    /**
+     * How fast the body turns between postures, degrees per second. Fast enough to answer the
+     * player, slow enough to read as a person turning.
+     */
+    @Export public double postureTurnSpeed = 360.0;
+
+    /**
+     * Beyond this heading magnitude the body KEEPS the side it is already turned to, degrees.
+     *
+     * <p>The only latch left, and it exists for one unavoidable discontinuity: directly behind, +179
+     * and -179 are a degree apart in the world and opposite in the number, so "turn toward the
+     * target" flips the body ~200 degrees for a degree of aim movement. Near the rear the two poses
+     * are almost the same anyway, so holding the current side is both stable and correct; it releases
+     * as soon as the aim comes forward of this.
+     */
+    @Export public double postureSideLatchDeg = 150.0;
+
     // ── Collision damage ──────────────────────────────────────────────────
 
     /** Minimum vehicle speed (m/s) needed to deal collision damage. 0 = disabled. */

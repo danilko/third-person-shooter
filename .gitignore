@@ -3,8 +3,8 @@
 .gradle
 .kotlin
 .idea
-build
-jvm
+/build
+/jvm
 gdj/
 .gdj
 *.bin
@@ -17,3 +17,14 @@ __pycache__/
 /assets/world_source/world_session.blend
 /assets/world_source/_*.blend
 /PLAN.md
+
+# Terrain3D
+#   assets/terrain3d/<name>/  IS tracked — once the island is imported it is the authored
+#   terrain, sculpted in the editor, and there is no other copy of it.
+#   The r16 below is DERIVED: tools/island_to_terrain3d.py regenerates it from
+#   island_v3_terrain.py in under a minute, and it is 19 MB of a file nothing reads twice.
+assets/terrain3d/_source/*.r16
+
+# Terrain3D pre-edit snapshots (tools/godot/fix_island_extent.gd) — local safety copies.
+assets/terrain3d/.island_backup_*
+assets/terrain3d/.debug_world_backup_*

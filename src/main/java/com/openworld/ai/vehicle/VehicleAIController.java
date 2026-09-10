@@ -103,6 +103,8 @@ public class VehicleAIController extends Controller {
         finished = false;
         progressInit = false;
         routeProgress = 0.0;
+        stallSeconds = 0.0;
+        stallProgressMark = 0.0;
     }
 
     public Lane getRoute() { return route; }
@@ -147,6 +149,28 @@ public class VehicleAIController extends Controller {
     /** True once this car reached a dead-end lane with no continuation — the zone reclaims it. */
     public boolean isFinished() { return finished; }
 
+    /**
+     * Seconds this car has been essentially stationary. A car can fail to drive for reasons its own
+     * FSM considers perfectly normal — its forward ray permanently tripped by another car it will
+     * never get past, or a body resting somewhere its lane cannot pull it off — and every existing
+     * reclaim reason misses that: it is alive, not finished, on the road, in range and routed. This
+     * is the eye on it, in the same family as the fell-out check. The zone owns the policy (how long
+     * is too long, and how near a player is too near to pop a car); the controller only measures.
+     */
+    public double stalledFor() { return stallSeconds; }
+
+    /**
+     * Metres of lane progress that count as getting somewhere. Deliberately measured on
+     * {@code routeProgress} and NOT on speed: a car can be moving and still going nowhere — measured,
+     * one oscillated back and forth across 6 m of plateau at 0.3-1.0 m/s indefinitely, dodging a
+     * speed threshold entirely while advancing along its lane not at all. Progress is the thing the
+     * car is actually for.
+     */
+    private static final float STALL_PROGRESS = 1.0f;
+
+    private double stallSeconds = 0.0;
+    private double stallProgressMark = 0.0;
+
     // ── FSM tick ───────────────────────────────────────────────────────────────
 
     @Override
@@ -159,6 +183,14 @@ public class VehicleAIController extends Controller {
 
         VehicleAIState next = currentState.update(vehicleBody, this, cmd, delta);
         if (next != currentState) transitionTo(next);
+
+        // After the state tick, so routeProgress is this frame's.
+        if (routeProgress - stallProgressMark > STALL_PROGRESS) {
+            stallProgressMark = routeProgress;
+            stallSeconds = 0.0;
+        } else {
+            stallSeconds += delta;
+        }
         return cmd;
     }
 

@@ -115,6 +115,19 @@ public class ZoneManager extends Node {
 	 */
 	@Export public boolean recycleBodies = false;
 
+	/**
+	 * Seconds an ambient car may sit essentially motionless before it is reclaimed (0 = never).
+	 * Long enough that an ordinary queue at a junction is never mistaken for a stuck car.
+	 */
+	@Export public float vehicleStallTimeout = 12.0f;
+
+	/**
+	 * A stalled car is only reclaimed beyond this distance (m) from the nearest player, so the pop
+	 * is never something anyone sees. Well outside the ~50 m a player can read a car's behaviour at,
+	 * and well inside {@code unloadRadius} (350 m), where out-of-range already takes over.
+	 */
+	@Export public float stallReclaimMinDist = 60.0f;
+
 	private static final String AI_SCENE_PATH =
 			"res://src/main/resources/com/openworld/character/AICharacter.tscn";
 
@@ -600,12 +613,45 @@ public class ZoneManager extends Node {
 				boolean fell = !dead && v.getGlobalPosition().getY() < FELL_OUT_Y;
 				boolean far = !dead && !fin && !fell
 						&& nearestPlayerDistXZ(v.getGlobalPosition()) > marker.zone.unloadRadius;
-				if (dead || fin || fell || far) {
+				// A car with no Lane cannot drive: it sits where it spawned, forever. That used to be
+				// impossible — baked VehicleRoutes register in _ready, so the registry was complete
+				// before the first eval tick — but road-generator builds its RoadLanes through
+				// call_deferred and RoadNetworkBridge publishes a few frames after that, so a zone
+				// streaming in during that window spawns its whole fleet unrouted (measured: the zone
+				// LOADED one log line before the bridge published). A road rebuild destroys and
+				// re-creates every lane, which can strand a car the same way. Reclaiming is the fix
+				// rather than re-routing in place, because placing a car on a lane already has ONE
+				// owner — vehicleStartPoint, on the top-up path below, which also spreads the fleet by
+				// VEHICLE_QUEUE_SPACING. Adopting a route here would be a SECOND placement path, and
+				// two of those disagree: measured, it left two cars on one lane nose to tail with the
+				// front one stuck in BrakeState. Ambient traffic is disposable by design, and this
+				// only fires in the seconds after a zone loads.
+				boolean unrouted = !dead && !fin && !fell && !far && namesARoute(configs)
+						&& v.getController() instanceof VehicleAIController c2 && c2.getRoute() == null;
+				// A car that is alive, on the road, in range, routed and NOT finished can still fail to
+				// drive — measured on the first road-generator road: one sat in BrakeState at 0.00 m/s
+				// with its forward ray permanently tripped by a car ahead it would never get past, and
+				// another came to rest 1.4 m proud of the terrain. Every other reclaim reason misses
+				// that by construction, so a stuck car is immortal and holds a slot the top-up would
+				// otherwise fill with a working one. Distance-based reclaim does not cover it: the
+				// stall happens near the spawn, i.e. near the player, which is exactly where the
+				// out-of-range test is furthest from firing.
+				//
+				// Gated on distance so a car is never popped out of existence in front of someone —
+				// beyond stallReclaimMinDist the reclaim is invisible, and a car stalled that far away
+				// is by definition not part of anything the player is doing.
+				boolean stalled = !dead && !fin && !fell && !far && !unrouted
+						&& vehicleStallTimeout > 0f
+						&& v.getController() instanceof VehicleAIController c3
+						&& c3.stalledFor() > vehicleStallTimeout
+						&& nearestPlayerDistXZ(v.getGlobalPosition()) > stallReclaimMinDist;
+				if (dead || fin || fell || far || unrouted || stalled) {
 					// "finished" reclaims should be ~0 away from map edges once lanes chain through
 					// junctions (roads-v2 Phase 1) — a steady stream of them means broken wiring.
 					if (debugLog) GD.print("ZoneManager: traffic reclaim in '" + marker.zone.zoneId
 							+ "' (" + (dead ? "dead" : fin ? "route-finished"
-									 : fell ? "fell-out" : "out-of-range") + ")");
+									 : fell ? "fell-out" : far ? "out-of-range"
+									 : unrouted ? "unrouted" : "stalled") + ")");
 					freeTrafficCar(lz, v, net);
 					it.remove();
 				}
@@ -1352,6 +1398,15 @@ public class ZoneManager extends Node {
 	 * metres up the first lane segment so they queue in-lane instead of overlapping. Falls back to the
 	 * zone center when the route has no markers.
 	 */
+	/** True when any of this zone's vehicle configs asks for a named route — so a car without one
+	 *  is a defect rather than an intentionally free-roaming car. */
+	private static boolean namesARoute(List<VehicleSpawnConfig> configs) {
+		for (VehicleSpawnConfig vc : configs) {
+			if (vc.routeName != null && !vc.routeName.isEmpty()) return true;
+		}
+		return false;
+	}
+
 	private Vector3 vehicleStartPoint(Lane route, Vector3 center, int index) {
 		if (route == null) return center;
 		double total = route.total();

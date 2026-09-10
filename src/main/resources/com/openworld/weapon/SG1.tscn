@@ -12,8 +12,7 @@ size = Vector3(0.065, 0.105, 0.625)
 [sub_resource type="BoxShape3D" id="BoxShape3D_sg1_pickup"]
 size = Vector3(0.065, 0.105, 0.625)
 
-[node name="SG1" type="RigidBody3D" unique_id=300100001]
-collision_layer = 4
+[node name="SG1" type="Node3D" unique_id=300100001]
 script = ExtResource("1_sg1")
 pellet_count = 8
 weapon_id = "SG1"
